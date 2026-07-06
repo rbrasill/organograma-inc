@@ -8,6 +8,7 @@ import {
 import {
   UserIcon, PinIcon, CheckIcon, CloseIcon, GridIcon,
   ChevronIcon, SearchIcon, FullscreenIcon, AlertIcon,
+  PlusIcon, MinusIcon, TargetIcon,
 } from "@/components/icons";
 import PersonModal from "@/components/PersonModal";
 
@@ -113,9 +114,17 @@ export default function OrgChart() {
   const [highlightId, setHighlightId] = useState(null);
   const [showSug, setShowSug] = useState(false);
   const boxRef = useRef(null);
-  const scrollRef = useRef(null);
+  const viewportRef = useRef(null);
   const treeRef = useRef(null);
-  const [fit, setFit] = useState({ scale: 1, h: undefined });
+
+  // pan & zoom: posição (x,y) e escala do organograma dentro do viewport
+  const [view, setView] = useState({ x: 0, y: 24, scale: 1 });
+  const [dragging, setDragging] = useState(false);
+  const viewRef = useRef(view);
+  const dragRef = useRef(null);
+  const justDraggedRef = useRef(false);
+
+  useEffect(() => { viewRef.current = view; }, [view]);
 
   const { roots, byId } = useMemo(() => construirArvore(pessoas), [pessoas]);
   const root = roots[0];
@@ -126,23 +135,107 @@ export default function OrgChart() {
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
+  // centraliza o organograma no viewport (usado no carregamento e no botão "Centralizar")
+  function centerView() {
+    const vp = viewportRef.current, t = treeRef.current;
+    if (!vp || !t) return;
+    const natW = t.scrollWidth || 1;
+    const natH = t.scrollHeight || 1;
+    const availW = vp.clientWidth, availH = vp.clientHeight;
+    const scale = Math.min(1, availW / natW, availH / natH);
+    setView({
+      x: (availW - natW * scale) / 2,
+      y: Math.max(24, (availH - natH * scale) / 2),
+      scale,
+    });
+  }
+
   useEffect(() => {
-    function recompute() {
-      const c = scrollRef.current, t = treeRef.current;
-      if (!c || !t) return;
-      const natW = t.scrollWidth;
-      const natH = t.scrollHeight;
-      const avail = c.clientWidth;
-      const scale = Math.min(1, avail / (natW || 1));
-      setFit({ scale, h: natH * scale });
+    centerView();
+    const t = setTimeout(centerView, 140); // após fontes/layout estabilizarem
+    const ro = new ResizeObserver(() => centerView());
+    if (viewportRef.current) ro.observe(viewportRef.current);
+    return () => { ro.disconnect(); clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pessoas]);
+
+  // zoom com a roda do mouse, ancorado no cursor
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    function onWheel(e) {
+      e.preventDefault();
+      const v = viewRef.current;
+      const rect = vp.getBoundingClientRect();
+      const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+      const scale = Math.min(2, Math.max(0.25, v.scale * factor));
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      setView({
+        x: mx - ((mx - v.x) / v.scale) * scale,
+        y: my - ((my - v.y) / v.scale) * scale,
+        scale,
+      });
     }
-    recompute();
-    const ro = new ResizeObserver(() => recompute());
-    if (scrollRef.current) ro.observe(scrollRef.current);
-    window.addEventListener("resize", recompute);
-    const t = setTimeout(recompute, 140);
-    return () => { ro.disconnect(); window.removeEventListener("resize", recompute); clearTimeout(t); };
-  }, [pessoas, collapsedSet]);
+    vp.addEventListener("wheel", onWheel, { passive: false });
+    return () => vp.removeEventListener("wheel", onWheel);
+  }, []);
+
+  function zoomBy(factor) {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const v = viewRef.current;
+    const scale = Math.min(2, Math.max(0.25, v.scale * factor));
+    const cx = vp.clientWidth / 2, cy = vp.clientHeight / 2;
+    setView({
+      x: cx - ((cx - v.x) / v.scale) * scale,
+      y: cy - ((cy - v.y) / v.scale) * scale,
+      scale,
+    });
+  }
+
+  function onPointerDown(e) {
+    if (e.button !== 0) return;
+    dragRef.current = { sx: e.clientX, sy: e.clientY, ox: viewRef.current.x, oy: viewRef.current.y, moved: false };
+  }
+  function onPointerMove(e) {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+    if (!d.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+      d.moved = true;
+      // só captura o ponteiro quando o arraste começa de fato,
+      // para não roubar o clique dos cards e botões de expandir/recolher
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setDragging(true);
+    }
+    if (d.moved) setView((v) => ({ ...v, x: d.ox + dx, y: d.oy + dy }));
+  }
+  function onPointerUp() {
+    if (dragRef.current?.moved) justDraggedRef.current = true;
+    dragRef.current = null;
+    setDragging(false);
+  }
+  // após arrastar, engole o clique para não abrir o modal sem querer
+  function onClickCapture(e) {
+    if (justDraggedRef.current) {
+      e.stopPropagation();
+      e.preventDefault();
+      justDraggedRef.current = false;
+    }
+  }
+
+  // move a visão até deixar o card da pessoa no centro do viewport
+  function focarPessoa(id) {
+    const el = document.getElementById(`card-${id}`);
+    const vp = viewportRef.current, t = treeRef.current;
+    if (!el || !vp || !t) return;
+    const v = viewRef.current;
+    const tRect = t.getBoundingClientRect();
+    const cRect = el.getBoundingClientRect();
+    const cx = (cRect.left - tRect.left + cRect.width / 2) / v.scale;
+    const cy = (cRect.top - tRect.top + cRect.height / 2) / v.scale;
+    setView({ ...v, x: vp.clientWidth / 2 - cx * v.scale, y: vp.clientHeight / 2 - cy * v.scale });
+  }
 
   const sugestoes = useMemo(() => {
     const q = normalizar(query.trim());
@@ -170,10 +263,7 @@ export default function OrgChart() {
     setQuery(p.nome);
     setShowSug(false);
     setHighlightId(p.id);
-    setTimeout(() => {
-      const el = document.getElementById(`card-${p.id}`);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-    }, 80);
+    setTimeout(() => focarPessoa(p.id), 120);
     setTimeout(() => setHighlightId(null), 2600);
   }
 
@@ -236,8 +326,22 @@ export default function OrgChart() {
             </div>
           </div>
 
-          <div className="tree-scroll" ref={scrollRef} style={{ height: fit.h }}>
-            <div className="tree" ref={treeRef} style={{ transform: `scale(${fit.scale})`, transformOrigin: "top center" }}>
+          <div
+            className={`tree-viewport ${dragging ? "dragging" : ""}`}
+            ref={viewportRef}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            onClickCapture={onClickCapture}
+          >
+            <div className="tree-tools" onPointerDown={(e) => e.stopPropagation()}>
+              <button className="icon-btn" onClick={() => zoomBy(1.2)} title="Aproximar"><PlusIcon /></button>
+              <button className="icon-btn" onClick={() => zoomBy(1 / 1.2)} title="Afastar"><MinusIcon /></button>
+              <button className="icon-btn" onClick={centerView} title="Centralizar organograma"><TargetIcon /></button>
+            </div>
+            <div className="pan-hint">Arraste para navegar · role para dar zoom</div>
+            <div className="tree" ref={treeRef} style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}>
               <ul>
                 <TreeNode node={root} rest={rest} />
               </ul>
