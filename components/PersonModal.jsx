@@ -48,9 +48,12 @@ export default function PersonModal({ pessoa, pessoas, byId, onClose, onSalvar }
     return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc); };
   }, [pickerAberto]);
 
-  // foca a busca assim que a lista abre
+  // foca a busca e garante que o painel fique visível dentro do modal rolável
   useEffect(() => {
-    if (pickerAberto && buscaRef.current) buscaRef.current.focus();
+    if (pickerAberto && buscaRef.current) {
+      buscaRef.current.focus();
+      buscaRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
   }, [pickerAberto]);
 
   function abrirPicker() {
@@ -100,7 +103,7 @@ export default function PersonModal({ pessoa, pessoas, byId, onClose, onSalvar }
         )}
 
         {/* situação: somente leitura, gerenciada pelo RH/DP */}
-        <div className="ro-grid" style={{ marginBottom: 16 }}>
+        <div className="ro-grid" style={{ marginBottom: 12 }}>
           <div className="ro">
             <span>Situação</span>
             <b className={`sit ${normalizar(pessoa.situacao || "")}`}>{pessoa.situacao || "—"}</b>
@@ -183,6 +186,9 @@ export default function PersonModal({ pessoa, pessoas, byId, onClose, onSalvar }
                     onChange={(e) => setLiderBusca(e.target.value)}
                   />
                 </div>
+                {/* a busca não filtra por área: o novo líder pode ser de qualquer
+                    setor (troca de área ou de líder na mesma área) */}
+                <div className="lp-hint">Busca em todas as áreas — o novo líder pode ser de outro setor.</div>
                 <div className="lider-list">
                   <button className={`ll-item ${liderId === "" ? "sel" : ""}`} onClick={() => escolherLider("")}>
                     <b>— Sem líder (topo da área)</b>

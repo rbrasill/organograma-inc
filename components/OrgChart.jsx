@@ -54,22 +54,15 @@ function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
   );
 }
 
-function LeafCards({ nodes, rest }) {
-  return (
-    <div className="leaf-grid">
-      {nodes.map((c) => (
-        <Card
-          key={c.id}
-          node={c}
-          byId={rest.byId}
-          collapsed={false}
-          onToggle={rest.onToggle}
-          onOpen={rest.onOpen}
-          highlight={rest.highlightId === c.id}
-        />
-      ))}
-    </div>
-  );
+// divide as folhas em colunas verticais (equipes grandes),
+// mantendo todas conectadas por linhas: gancho no topo de cada
+// coluna + fio vertical entre os cards da coluna
+function dividirEmColunas(leaves) {
+  const numCols = Math.min(4, Math.ceil(leaves.length / 4));
+  const porCol = Math.ceil(leaves.length / numCols);
+  const cols = [];
+  for (let i = 0; i < leaves.length; i += porCol) cols.push(leaves.slice(i, i + porCol));
+  return cols;
 }
 
 function TreeNode({ node, rest }) {
@@ -78,7 +71,7 @@ function TreeNode({ node, rest }) {
   const hasKids = kids.length > 0;
   const branches = kids.filter((c) => (c.children || []).length > 0);
   const leaves = kids.filter((c) => (c.children || []).length === 0);
-  const soloGrid = branches.length === 0 && leaves.length > 3;
+  const emColunas = leaves.length > 4;
 
   return (
     <li>
@@ -92,14 +85,39 @@ function TreeNode({ node, rest }) {
       />
       {hasKids && !collapsed && (
         <ul>
-          {!soloGrid && branches.map((c) => (
+          {branches.map((c) => (
             <TreeNode key={c.id} node={c} rest={rest} />
           ))}
-          {leaves.length > 0 && (
-            <li className="leaf-holder">
-              <LeafCards nodes={leaves} rest={rest} />
+          {!emColunas && leaves.map((c) => (
+            <li key={c.id}>
+              <Card
+                node={c}
+                byId={rest.byId}
+                collapsed={false}
+                onToggle={rest.onToggle}
+                onOpen={rest.onOpen}
+                highlight={rest.highlightId === c.id}
+              />
             </li>
-          )}
+          ))}
+          {emColunas && dividirEmColunas(leaves).map((col, i) => (
+            <li key={`col-${i}`}>
+              <div className="leaf-col">
+                {col.map((c) => (
+                  <div className="leaf-item" key={c.id}>
+                    <Card
+                      node={c}
+                      byId={rest.byId}
+                      collapsed={false}
+                      onToggle={rest.onToggle}
+                      onOpen={rest.onOpen}
+                      highlight={rest.highlightId === c.id}
+                    />
+                  </div>
+                ))}
+              </div>
+            </li>
+          ))}
         </ul>
       )}
     </li>
