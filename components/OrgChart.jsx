@@ -8,9 +8,10 @@ import {
 import {
   UserIcon, PinIcon, CheckIcon, CloseIcon, GridIcon,
   ChevronIcon, SearchIcon, FullscreenIcon, AlertIcon,
-  PlusIcon, MinusIcon, TargetIcon,
+  PlusIcon, MinusIcon, TargetIcon, UploadIcon,
 } from "@/components/icons";
 import PersonModal from "@/components/PersonModal";
+import ImportModal from "@/components/ImportModal";
 
 function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
   const nivel = nivelDe(node.cargo);
@@ -131,6 +132,7 @@ export default function OrgChart() {
   const [collapsedSet, setCollapsedSet] = useState(new Set());
   const [highlightId, setHighlightId] = useState(null);
   const [showSug, setShowSug] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const boxRef = useRef(null);
   const viewportRef = useRef(null);
   const treeRef = useRef(null);
@@ -299,6 +301,10 @@ export default function OrgChart() {
           </div>
         </div>
         <div className="controls">
+          {/* funcionalidade temporária até as integrações com o DP */}
+          <button className="btn btn-import" onClick={() => setShowImport(true)} title="Subir a base por Excel para o banco de dados">
+            <span className="ic"><UploadIcon size={13} /></span>Importar Excel
+          </button>
           <div className="select">
             <GridIcon /> Área: <b>{AREA}</b> <ChevronIcon />
           </div>
@@ -377,6 +383,8 @@ export default function OrgChart() {
           </div>
         </div>
       </div>
+
+      {showImport && <ImportModal onClose={() => setShowImport(false)} />}
 
       {aberta && (
         <PersonModal
