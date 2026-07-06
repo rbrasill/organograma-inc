@@ -92,6 +92,7 @@ export default function PersonModal({ pessoa, pessoas, byId, onClose, onSalvar }
           </div>
         </div>
 
+        <div className="modal-body">
         {alertas.length > 0 && (
           <div className="modal-alert">
             <AlertIcon size={16} />
@@ -208,6 +209,7 @@ export default function PersonModal({ pessoa, pessoas, byId, onClose, onSalvar }
         </div>
 
         {aviso && <div className="modal-note">{aviso}</div>}
+        </div>
 
         <div className="modal-foot">
           <button className="btn btn-ghost" onClick={solicitarAjuste}>Solicitar ajuste</button>
