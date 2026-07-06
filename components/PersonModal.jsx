@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { nivelDe, NIVEIS, inconsistenciasDe, CARGOS, AREAS, LOCAIS, SITUACOES, opcoesLider, normalizar } from "@/data/ti";
-import { UserIcon, CloseIcon, AlertIcon, SearchIcon } from "@/components/icons";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { nivelDe, NIVEIS, inconsistenciasDe, CARGOS, AREAS, LOCAIS, opcoesLider, normalizar } from "@/data/ti";
+import { UserIcon, CloseIcon, AlertIcon, SearchIcon, ChevronIcon } from "@/components/icons";
 
 // Edição direta (líder, aplica na hora): nome, e-mail, local.
-// Estruturais (exigem "Solicitar ajuste"): cargo, área, líder, situação.
+// Estruturais (exigem "Solicitar ajuste"): cargo, área, líder.
+// Situação: somente leitura — gerenciada pelo RH/DP, não editável aqui.
 export default function PersonModal({ pessoa, pessoas, byId, onClose, onSalvar }) {
   const [nome, setNome] = useState(pessoa.nome);
   const [local, setLocal] = useState(pessoa.local || "");
@@ -14,14 +15,21 @@ export default function PersonModal({ pessoa, pessoas, byId, onClose, onSalvar }
   // campos estruturais (editáveis só via solicitação — aqui pré-preenchem a solicitação)
   const [cargo, setCargo] = useState(pessoa.cargo || "");
   const [area, setArea] = useState("Tecnologia da Informação");
-  const [situacao, setSituacao] = useState(pessoa.situacao || "");
   const [liderId, setLiderId] = useState(pessoa.lider || "");
   const [liderBusca, setLiderBusca] = useState("");
+  const [pickerAberto, setPickerAberto] = useState(false);
   const [aviso, setAviso] = useState("");
+  const pickerRef = useRef(null);
+  const buscaRef = useRef(null);
 
   const nivel = nivelDe(cargo);
   const cor = NIVEIS[nivel - 1].cor;
   const alertas = inconsistenciasDe(pessoa, byId);
+
+  const liderOriginalId = pessoa.lider || "";
+  const mudouLider = liderId !== liderOriginalId;
+  const liderSel = liderId ? byId[liderId] : null;
+  const liderOriginal = liderOriginalId ? byId[liderOriginalId] : null;
 
   const lideres = useMemo(() => {
     const q = normalizar(liderBusca);
@@ -30,7 +38,35 @@ export default function PersonModal({ pessoa, pessoas, byId, onClose, onSalvar }
     return base.filter((l) => normalizar(l.nome).includes(q) || normalizar(l.cargo).includes(q)).slice(0, 8);
   }, [liderBusca, pessoas, pessoa.id]);
 
-  const liderNome = liderId && byId[liderId] ? byId[liderId].nome : "— (topo)";
+  // fecha a lista suspensa ao clicar fora ou apertar Esc
+  useEffect(() => {
+    if (!pickerAberto) return;
+    function fora(e) { if (pickerRef.current && !pickerRef.current.contains(e.target)) setPickerAberto(false); }
+    function esc(e) { if (e.key === "Escape") setPickerAberto(false); }
+    document.addEventListener("mousedown", fora);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc); };
+  }, [pickerAberto]);
+
+  // foca a busca assim que a lista abre
+  useEffect(() => {
+    if (pickerAberto && buscaRef.current) buscaRef.current.focus();
+  }, [pickerAberto]);
+
+  function abrirPicker() {
+    setLiderBusca("");
+    setPickerAberto(true);
+  }
+  function escolherLider(id) {
+    setLiderId(id);
+    setPickerAberto(false);
+    setLiderBusca("");
+  }
+  function desfazerTroca() {
+    setLiderId(liderOriginalId);
+    setPickerAberto(false);
+    setLiderBusca("");
+  }
 
   function salvar() {
     onSalvar({ ...pessoa, nome, local, email });
@@ -62,6 +98,18 @@ export default function PersonModal({ pessoa, pessoas, byId, onClose, onSalvar }
             </div>
           </div>
         )}
+
+        {/* situação: somente leitura, gerenciada pelo RH/DP */}
+        <div className="ro-grid" style={{ marginBottom: 16 }}>
+          <div className="ro">
+            <span>Situação</span>
+            <b className={`sit ${normalizar(pessoa.situacao || "")}`}>{pessoa.situacao || "—"}</b>
+          </div>
+          <div className="ro">
+            <span>Matrícula</span>
+            <b>{pessoa.id}</b>
+          </div>
+        </div>
 
         <div className="modal-section">
           <span className="sec-title">Edição direta <em>(aplica na hora)</em></span>
@@ -97,29 +145,59 @@ export default function PersonModal({ pessoa, pessoas, byId, onClose, onSalvar }
               {AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
             </select>
           </label>
-          <label className="fld">
-            <span>Situação</span>
-            <select value={situacao} onChange={(e) => setSituacao(e.target.value)}>
-              <option value="">— selecione —</option>
-              {SITUACOES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </label>
-          <div className="fld">
-            <span>Líder direto <em style={{color:"var(--ink-faint)",fontStyle:"normal",fontWeight:500}}>(atual: {liderNome})</em></span>
-            <div className="lider-pick">
-              <span className="lp-ic"><SearchIcon size={14} /></span>
-              <input placeholder="Buscar líder..." value={liderBusca} onChange={(e) => setLiderBusca(e.target.value)} />
-            </div>
-            <div className="lider-list">
-              <button className={`ll-item ${liderId === "" ? "sel" : ""}`} onClick={() => setLiderId("")}>
-                — Sem líder (topo da área)
-              </button>
-              {lideres.map((l) => (
-                <button key={l.id} className={`ll-item ${liderId === l.id ? "sel" : ""}`} onClick={() => setLiderId(l.id)}>
-                  <b>{l.nome}</b><em>{l.cargo || "Cargo a definir"}</em>
+
+          {/* líder direto: card em destaque + troca via lista suspensa com busca */}
+          <div className="fld fld-lider" ref={pickerRef}>
+            <span>Líder direto</span>
+
+            <div className={`lider-atual ${mudouLider ? "trocado" : ""}`}>
+              <span className="la-ava"><UserIcon size={20} /></span>
+              <span className="la-txt">
+                <b>{liderSel ? liderSel.nome : "Sem líder (topo da área)"}</b>
+                <em>{liderSel ? (liderSel.cargo || "Cargo a definir") : "Não responde a ninguém nesta área"}</em>
+              </span>
+              {mudouLider ? (
+                <button className="la-btn undo" onClick={desfazerTroca} title="Voltar ao líder atual">Desfazer</button>
+              ) : (
+                <button className="la-btn" onClick={abrirPicker}>
+                  Trocar <ChevronIcon size={12} />
                 </button>
-              ))}
+              )}
             </div>
+
+            {mudouLider && (
+              <div className="lider-troca-nota">
+                Novo líder selecionado — líder atual: <b>{liderOriginal ? liderOriginal.nome : "Sem líder (topo)"}</b>.
+                A troca só é aplicada após aprovação do RH.
+              </div>
+            )}
+
+            {pickerAberto && (
+              <div className="lider-pop">
+                <div className="lider-pick">
+                  <span className="lp-ic"><SearchIcon size={14} /></span>
+                  <input
+                    ref={buscaRef}
+                    placeholder="Buscar pelo nome do líder..."
+                    value={liderBusca}
+                    onChange={(e) => setLiderBusca(e.target.value)}
+                  />
+                </div>
+                <div className="lider-list">
+                  <button className={`ll-item ${liderId === "" ? "sel" : ""}`} onClick={() => escolherLider("")}>
+                    <b>— Sem líder (topo da área)</b>
+                  </button>
+                  {lideres.map((l) => (
+                    <button key={l.id} className={`ll-item ${liderId === l.id ? "sel" : ""}`} onClick={() => escolherLider(l.id)}>
+                      <b>{l.nome}</b><em>{l.cargo || "Cargo a definir"}</em>
+                    </button>
+                  ))}
+                  {lideres.length === 0 && (
+                    <div className="ll-vazio">Nenhuma pessoa encontrada para "{liderBusca}"</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
