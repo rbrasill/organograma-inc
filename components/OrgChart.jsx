@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { NIVEIS, nivelDe, inconsistenciasDe, construirArvore, normalizar } from "@/data/ti";
 import {
   UserIcon, PinIcon, CheckIcon, CloseIcon, GridIcon,
   ChevronIcon, SearchIcon, FullscreenIcon, AlertIcon,
-  PlusIcon, MinusIcon, TargetIcon, UploadIcon, DownloadIcon,
+  PlusIcon, MinusIcon, TargetIcon, UploadIcon, DownloadIcon, InboxIcon,
 } from "@/components/icons";
 import PersonModal from "@/components/PersonModal";
 import ImportModal from "@/components/ImportModal";
@@ -141,6 +142,7 @@ export default function OrgChart() {
   const [showImport, setShowImport] = useState(false);
   const [showAreas, setShowAreas] = useState(false);
   const [baixando, setBaixando] = useState(false);
+  const [pendentes, setPendentes] = useState(0);
   const boxRef = useRef(null);
   const viewportRef = useRef(null);
   const treeRef = useRef(null);
@@ -166,6 +168,14 @@ export default function OrgChart() {
   }, []);
 
   useEffect(() => { carregar(null); }, [carregar]);
+
+  // contador de solicitações pendentes para o badge do cabeçalho
+  useEffect(() => {
+    fetch("/api/solicitacoes?status=pendente")
+      .then((r) => r.json())
+      .then((j) => { if (j.ok) setPendentes(j.pendentes); })
+      .catch(() => {});
+  }, []);
 
   const nomeArea = setores.find((s) => s.id === areaId)?.nome || "—";
 
@@ -364,7 +374,11 @@ export default function OrgChart() {
           </div>
         </div>
         <div className="controls">
-          {/* funcionalidade temporária até as integrações com o DP */}
+          {/* botões no cabeçalho (níveis de acesso virão depois) */}
+          <Link href="/solicitacoes" className="btn btn-import btn-solic" title="Solicitações de ajuste recebidas pelo RH">
+            <span className="ic"><InboxIcon size={13} /></span>Solicitações
+            {pendentes > 0 && <span className="solic-badge">{pendentes}</span>}
+          </Link>
           <button className="btn btn-import" onClick={() => setShowImport(true)} title="Subir a base por Excel para o banco de dados">
             <span className="ic"><UploadIcon size={13} /></span>Importar Excel
           </button>

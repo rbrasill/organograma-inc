@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { nivelDe, NIVEIS, inconsistenciasDe, CARGOS, AREAS, LOCAIS, opcoesLider, normalizar } from "@/data/ti";
-import { UserIcon, CloseIcon, AlertIcon, SearchIcon, ChevronIcon } from "@/components/icons";
+import { UserIcon, CloseIcon, AlertIcon, SearchIcon, ChevronIcon, CheckIcon } from "@/components/icons";
 
 // Edição direta (líder, aplica na hora): nome, e-mail, local.
 // Estruturais (exigem "Solicitar ajuste"): cargo, área, líder.
@@ -24,6 +24,11 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
   const [liderBusca, setLiderBusca] = useState("");
   const [pickerAberto, setPickerAberto] = useState(false);
   const [aviso, setAviso] = useState("");
+  const [erroSol, setErroSol] = useState("");
+  const [confirmandoSol, setConfirmandoSol] = useState(false); // painel de confirmação da solicitação
+  const [obs, setObs] = useState("");
+  const [enviandoSol, setEnviandoSol] = useState(false);
+  const [solEnviada, setSolEnviada] = useState(false);
   const pickerRef = useRef(null);
   const buscaRef = useRef(null);
 
@@ -80,8 +85,57 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
     onSalvar({ ...pessoa, nome, local, email });
     onClose();
   }
-  function solicitarAjuste() {
-    setAviso("Solicitação de ajuste enviada ao RH/DHO para aprovação. (protótipo)");
+
+  // diferenças estruturais (cargo, área, líder) vs. o estado atual
+  const mudancas = useMemo(() => {
+    const ms = [];
+    if ((cargo || "") !== (pessoa.cargo || ""))
+      ms.push({ campo: "cargo", de: pessoa.cargo || "—", para: cargo || "—" });
+    if ((area || "") !== (areaAtual || ""))
+      ms.push({ campo: "area", de: areaAtual || "—", para: area || "—" });
+    if (liderId !== liderOriginalId) {
+      const novo = liderId && byId[liderId] ? byId[liderId] : null;
+      ms.push({
+        campo: "lider",
+        de: liderOriginal ? liderOriginal.nome : "Sem líder (topo)",
+        para: novo ? novo.nome : "Sem líder (topo)",
+        paraMatricula: liderId || "",
+      });
+    }
+    return ms;
+  }, [cargo, area, liderId, pessoa.cargo, areaAtual, liderOriginalId, liderOriginal, byId]);
+
+  function abrirConfirmacao() {
+    setErroSol("");
+    if (mudancas.length === 0) {
+      setErroSol("Nenhuma mudança estrutural para solicitar. Altere cargo, área ou líder primeiro.");
+      return;
+    }
+    setConfirmandoSol(true);
+  }
+
+  async function enviarSolicitacao() {
+    setEnviandoSol(true);
+    setErroSol("");
+    const tipo = mudancas.some((m) => m.campo === "area") ? "mudanca_area"
+      : mudancas.some((m) => m.campo === "cargo") ? "mudanca_cargo" : "correcao_vinculo";
+    try {
+      const r = await fetch("/api/solicitacoes", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          acao: "criar", matricula: pessoa.id, alvoNome: pessoa.nome,
+          solicitanteNome: "Líder (protótipo)", observacao: obs, mudancas, tipo,
+        }),
+      });
+      const txt = await r.text();
+      let j; try { j = JSON.parse(txt); } catch { j = { ok: false, erro: `Servidor respondeu ${r.status}.` }; }
+      if (!j.ok) { setErroSol(j.erro || "Falha ao enviar."); setEnviandoSol(false); return; }
+      setSolEnviada(true);
+      setConfirmandoSol(false);
+    } catch (e) {
+      setErroSol(`Falha ao enviar: ${e.message}`);
+    }
+    setEnviandoSol(false);
   }
 
   return (
@@ -213,14 +267,55 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
           </div>
         </div>
 
+        {erroSol && <div className="modal-alert"><AlertIcon size={16} /><div><b>{erroSol}</b></div></div>}
         {aviso && <div className="modal-note">{aviso}</div>}
+
+        {solEnviada && (
+          <div className="modal-note sol-ok">
+            <b>Solicitação enviada ao RH.</b> Ela aparece em "Solicitações" para aprovação — as mudanças estruturais só valem depois de aprovadas.
+          </div>
+        )}
+
+        {confirmandoSol && (
+          <div className="sol-confirma">
+            <b className="sol-titulo">Enviar solicitação de ajuste ao RH</b>
+            <ul className="sol-diffs">
+              {mudancas.map((m) => (
+                <li key={m.campo}>
+                  <span className="sol-campo">{m.campo === "area" ? "Área" : m.campo === "lider" ? "Líder" : "Cargo"}</span>
+                  <span className="sol-de">{m.de}</span>
+                  <span className="sol-seta">→</span>
+                  <span className="sol-para">{m.para}</span>
+                </li>
+              ))}
+            </ul>
+            <textarea
+              className="sol-obs" rows={2} value={obs} placeholder="Observação para o RH (opcional)"
+              onChange={(e) => setObs(e.target.value)}
+            />
+          </div>
+        )}
         </div>
 
         <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={solicitarAjuste}>Solicitar ajuste</button>
-          <div style={{ flex: 1 }} />
-          <button className="btn btn-neutral" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-primary" onClick={salvar}>Salvar</button>
+          {confirmandoSol ? (
+            <>
+              <button className="btn btn-neutral" onClick={() => setConfirmandoSol(false)}>Voltar</button>
+              <div style={{ flex: 1 }} />
+              <button className="btn btn-primary" disabled={enviandoSol} onClick={enviarSolicitacao}>
+                <span className="ic"><CheckIcon /></span>{enviandoSol ? "Enviando..." : "Enviar solicitação"}
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn btn-ghost" onClick={abrirConfirmacao} disabled={solEnviada}>
+                Solicitar ajuste{mudancas.length ? ` (${mudancas.length})` : ""}
+              </button>
+              <div style={{ flex: 1 }} />
+              <button className="btn btn-neutral" onClick={onClose}>{solEnviada ? "Fechar" : "Cancelar"}</button>
+              <button className="btn btn-primary" onClick={salvar}>Salvar</button>
+            </>
+          )}
         </div>
       </div>
     </div>
