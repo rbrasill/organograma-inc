@@ -137,6 +137,12 @@ export default function ColaboradoresView() {
     setCarregandoDet(false);
   }, []);
 
+  // áreas em ordem alfabética pelo nome (acentos tratados via pt-BR)
+  const areasOrdenadas = useMemo(
+    () => [...areas].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" })),
+    [areas]
+  );
+
   const nomeDe = useCallback((lista, id) => (listas?.[lista] || []).find((x) => x.id === id)?.nome || "", [listas]);
 
   // diferenças (para a confirmação) — compara nomes resolvidos com o snapshot
@@ -208,7 +214,7 @@ export default function ColaboradoresView() {
               <span>Área / Setor</span>
               <select value={areaFiltro} onChange={(e) => setAreaFiltro(e.target.value)} disabled={carregandoBoot}>
                 <option value="">Todas as áreas</option>
-                {areas.map((a) => <option key={a.id} value={a.id}>{a.nome} ({a.pessoas})</option>)}
+                {areasOrdenadas.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}
               </select>
             </label>
             <div className="sol-busca">

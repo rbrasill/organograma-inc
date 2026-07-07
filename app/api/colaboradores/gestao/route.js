@@ -81,7 +81,7 @@ export async function GET(req) {
          FROM setor s
          LEFT JOIN colaborador c ON c.setor_id = s.id AND c.ativo = 1
         GROUP BY s.id, s.nome
-        ORDER BY pessoas DESC, s.nome`
+        ORDER BY s.nome`
     );
     const [cargos]     = await pool.query("SELECT id, nome FROM cargo ORDER BY nome");
     const [setores]    = await pool.query("SELECT id, nome FROM setor ORDER BY nome");
