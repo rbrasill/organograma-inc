@@ -250,6 +250,8 @@ main{padding:28px}
 .imp-drop b{font-size:14px;color:var(--ink)}
 .imp-drop em{font-size:12px;font-style:normal}
 .imp-drop.lendo{border-color:var(--inc);background:#fffaf7}
+.imp-modelo{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;margin:-6px 0 12px}
+.imp-modelo:hover{color:var(--inc);text-decoration:underline}
 
 .imp-resumo{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .imp-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--ink-soft);background:#f1f5fb;border-radius:999px;padding:5px 11px}

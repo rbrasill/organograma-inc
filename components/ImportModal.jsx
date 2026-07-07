@@ -7,7 +7,7 @@
 import { useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { extrairLinhas, validarLinhas } from "@/lib/importacao";
-import { CloseIcon, AlertIcon, CheckIcon, UploadIcon } from "@/components/icons";
+import { CloseIcon, AlertIcon, CheckIcon, UploadIcon, DownloadIcon } from "@/components/icons";
 
 const ROTULO_STATUS = { ok: "OK", alerta: "Alerta", erro: "Erro" };
 
@@ -105,6 +105,7 @@ export default function ImportModal({ onClose }) {
           )}
 
           {(etapa === "selecao" || etapa === "lendo") && (
+            <>
             <div
               className={`imp-drop ${etapa === "lendo" ? "lendo" : ""}`}
               onClick={() => inputRef.current?.click()}
@@ -114,13 +115,24 @@ export default function ImportModal({ onClose }) {
               <UploadIcon size={30} />
               {etapa === "lendo"
                 ? <b>Lendo {arquivoNome}...</b>
-                : <><b>Arraste o arquivo .xlsx aqui</b><em>ou clique para escolher — modelo: Organograma Institucional</em></>}
+                : <><b>Arraste o arquivo .xlsx aqui</b><em>ou clique para escolher — formato: Organograma Institucional</em></>}
               <input
                 ref={inputRef} type="file" hidden
                 accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 onChange={(e) => processarArquivo(e.target.files?.[0])}
               />
             </div>
+            {etapa === "selecao" && (
+              <a
+                className="imp-modelo"
+                href="/modelo-importacao-organograma.xlsx"
+                download
+                onClick={(e) => e.stopPropagation()}
+              >
+                <DownloadIcon size={14} /> Baixar modelo de exemplo (.xlsx)
+              </a>
+            )}
+            </>
           )}
 
           {(etapa === "previa" || etapa === "enviando") && previa && (
