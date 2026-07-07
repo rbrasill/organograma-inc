@@ -50,7 +50,8 @@ export default function ImportModal({ onClose }) {
       // dados do banco para a prévia (novos x atualizados x arquivados)
       let matriculasBanco = new Set();
       let situacoesValidas = null;
-      let setoresBanco = null;
+      let situacoesCodigos = null;
+      let setoresNome = null, setoresCod = null;
       let avisoBanco = "";
       try {
         const r = await fetch("/api/importacao");
@@ -58,7 +59,9 @@ export default function ImportModal({ onClose }) {
         if (j.ok) {
           matriculasBanco = new Set(j.matriculas);
           situacoesValidas = new Set(j.situacoes.map((s) => s.normalizado));
-          setoresBanco = new Set(j.setores || []);
+          situacoesCodigos = new Set(j.situacoes.map((s) => (s.codigo || "").toLowerCase()).filter(Boolean));
+          setoresNome = new Set((j.setores || []).map((s) => s.normalizado));
+          setoresCod = new Set((j.setores || []).map((s) => s.codigo).filter(Boolean));
         } else {
           avisoBanco = j.erro || "Banco indisponível — prévia sem comparação com a base atual.";
         }
@@ -66,19 +69,21 @@ export default function ImportModal({ onClose }) {
         avisoBanco = "Banco indisponível — prévia sem comparação com a base atual.";
       }
 
-      const { anotadas, resumo } = validarLinhas(linhas, { matriculasBanco, situacoesValidas });
+      const { anotadas, resumo } = validarLinhas(linhas, { matriculasBanco, situacoesValidas, situacoesCodigos });
       const noArquivo = new Set(anotadas.filter((l) => l.status !== "erro").map((l) => l.matricula));
       const arquivar = [...matriculasBanco].filter((m) => !noArquivo.has(m));
 
-      // áreas do arquivo que ainda não existem no banco (serão criadas na
-      // importação) — destaque para o RH conferir typos antes de gravar
+      // áreas do arquivo que ainda não existem no banco (por código ou nome) —
+      // destaque para o RH conferir typos antes de gravar
       let areasNovas = [];
-      if (setoresBanco) {
+      if (setoresNome) {
         const vistas = new Map();
         anotadas.forEach((l) => {
-          if (l.setor && !setoresBanco.has(normalizar(l.setor))) {
-            const k = normalizar(l.setor);
-            if (!vistas.has(k)) vistas.set(k, l.setor);
+          const temCod = l.codigoSetor && setoresCod.has(l.codigoSetor);
+          const temNome = l.setor && setoresNome.has(normalizar(l.setor));
+          if ((l.setor || l.codigoSetor) && !temCod && !temNome) {
+            const k = l.codigoSetor || normalizar(l.setor);
+            if (!vistas.has(k)) vistas.set(k, l.setor || l.codigoSetor);
           }
         });
         areasNovas = [...vistas.values()];
@@ -102,10 +107,14 @@ export default function ImportModal({ onClose }) {
       const validas = previa.anotadas.filter((l) => l.status !== "erro");
       const comErro = previa.anotadas.filter((l) => l.status === "erro");
       const empacota = (l) => ({
-        linha: l.linha, matricula: l.matricula, nome: l.nome, cargo: l.cargo,
-        codigoCargo: l.codigoCargo, setor: l.setor, local: l.local,
-        regional: l.regional, situacao: l.situacao, status: l.status,
-        motivos: [...(l.erros || []), ...(l.alertas || [])],
+        linha: l.linha, matricula: l.matricula, nome: l.nome, tipo: l.tipo,
+        cargo: l.cargo, codigoCargo: l.codigoCargo, codigoNH: l.codigoNH,
+        setor: l.setor, codigoSetor: l.codigoSetor,
+        local: l.local, codigoLocal: l.codigoLocal,
+        regional: l.regional,
+        situacao: l.situacao, codigoSituacao: l.codigoSituacao,
+        matriculaLider: l.matriculaLider, liderValido: l.liderValido,
+        status: l.status, motivos: [...(l.erros || []), ...(l.alertas || [])],
       });
 
       const ini = await postJSON({

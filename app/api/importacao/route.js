@@ -25,40 +25,17 @@ export async function GET() {
     const [colabs] = await pool.query(
       "SELECT codigo_dp FROM colaborador WHERE codigo_dp IS NOT NULL AND ativo = 1"
     );
-    const [sits] = await pool.query("SELECT nome, nome_normalizado FROM situacao");
-    const [setores] = await pool.query("SELECT nome_normalizado FROM setor");
+    const [sits] = await pool.query("SELECT nome, nome_normalizado, codigo_dp FROM situacao");
+    const [setores] = await pool.query("SELECT nome_normalizado, codigo_dp FROM setor");
     return Response.json({
       ok: true,
       matriculas: colabs.map((c) => c.codigo_dp),
-      situacoes: sits.map((s) => ({ nome: s.nome, normalizado: s.nome_normalizado })),
-      setores: setores.map((s) => s.nome_normalizado),
+      situacoes: sits.map((s) => ({ nome: s.nome, normalizado: s.nome_normalizado, codigo: s.codigo_dp })),
+      setores: setores.map((s) => ({ normalizado: s.nome_normalizado, codigo: s.codigo_dp })),
     });
   } catch (e) {
     return erroResposta(e);
   }
-}
-
-// garante que todos os valores de um lookup existam (casando por
-// nome_normalizado); cria os que faltam num único INSERT em massa.
-// dispMap: Map(nome_normalizado -> nome de exibição)
-async function ensureLookups(conn, tabela, dispMap) {
-  const map = new Map();
-  const norms = [...dispMap.keys()];
-  if (norms.length === 0) return map;
-  const [rows] = await conn.query(
-    `SELECT id, nome_normalizado FROM ${tabela} WHERE nome_normalizado IN (?)`, [norms]
-  );
-  rows.forEach((r) => map.set(r.nome_normalizado, r.id));
-  const faltando = norms.filter((n) => !map.has(n));
-  if (faltando.length) {
-    const values = faltando.map((n) => {
-      const id = randomUUID();
-      map.set(n, id);
-      return [id, dispMap.get(n), n];
-    });
-    await conn.query(`INSERT INTO ${tabela} (id, nome, nome_normalizado) VALUES ?`, [values]);
-  }
-  return map;
 }
 
 // insere um array de arrays em blocos (evita pacotes gigantes)
@@ -94,21 +71,58 @@ export async function POST(req) {
       conn = await pool.getConnection();
       await conn.beginTransaction();
 
-      const [sits] = await conn.query("SELECT id, nome_normalizado FROM situacao");
-      const situacaoId = new Map(sits.map((s) => [s.nome_normalizado, s.id]));
+      // catálogos completos em memória (poucas centenas de linhas). Casamento
+      // por CÓDIGO oficial (mais robusto) com fallback por nome_normalizado.
+      const [setRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado FROM setor");
+      const [locRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado FROM local_trabalho");
+      const [sitRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado FROM situacao");
+      const [carRows] = await conn.query("SELECT id, nome_normalizado FROM cargo");
+      const [regRows] = await conn.query("SELECT id, nome_normalizado FROM regional");
+      const [nhRows]  = await conn.query("SELECT id, codigo_nh FROM nivel_hierarquico");
 
-      // nomes distintos por lookup neste lote
-      const disp = { cargo: new Map(), setor: new Map(), local_trabalho: new Map(), regional: new Map() };
+      const setCod = new Map(), setNome = new Map();
+      setRows.forEach((r) => { if (r.codigo_dp) setCod.set(r.codigo_dp, r.id); setNome.set(r.nome_normalizado, r.id); });
+      const locCod = new Map(), locNome = new Map();
+      locRows.forEach((r) => { if (r.codigo_dp) locCod.set(r.codigo_dp, r.id); locNome.set(r.nome_normalizado, r.id); });
+      const sitCod = new Map(), sitNome = new Map();
+      sitRows.forEach((r) => { if (r.codigo_dp) sitCod.set(String(r.codigo_dp).toLowerCase(), r.id); sitNome.set(r.nome_normalizado, r.id); });
+      const carNome = new Map(carRows.map((r) => [r.nome_normalizado, r.id]));
+      const regNome = new Map(regRows.map((r) => [r.nome_normalizado, r.id]));
+      const nhId = new Map(nhRows.map((r) => [r.codigo_nh, r.id]));
+
+      // pré-cria lookups ausentes no lote (raro na v2, tudo já semeado).
+      // situacao é lista fechada: nunca cria.
+      const novoSet = [], novoLoc = [], novoCar = [], novoReg = [];
       for (const l of linhas) {
-        if (l.cargo) disp.cargo.set(normalizar(l.cargo), l.cargo.trim());
-        if (l.setor) disp.setor.set(normalizar(l.setor), l.setor.trim());
-        if (l.local) disp.local_trabalho.set(normalizar(l.local), l.local.trim());
-        if (l.regional) disp.regional.set(normalizar(l.regional), l.regional.trim());
+        const sNorm = l.setor ? normalizar(l.setor) : null;
+        if ((l.codigoSetor || sNorm) && !(l.codigoSetor && setCod.has(l.codigoSetor)) && !(sNorm && setNome.has(sNorm))) {
+          const id = randomUUID(); const nome = (l.setor || l.codigoSetor).trim(); const norm = sNorm || normalizar(nome);
+          novoSet.push([id, l.codigoSetor || null, nome, norm]);
+          if (l.codigoSetor) setCod.set(l.codigoSetor, id); setNome.set(norm, id);
+        }
+        const loNorm = l.local ? normalizar(l.local) : null;
+        if ((l.codigoLocal || loNorm) && !(l.codigoLocal && locCod.has(l.codigoLocal)) && !(loNorm && locNome.has(loNorm))) {
+          const id = randomUUID(); const nome = (l.local || l.codigoLocal).trim(); const norm = loNorm || normalizar(nome);
+          novoLoc.push([id, l.codigoLocal || null, nome, norm]);
+          if (l.codigoLocal) locCod.set(l.codigoLocal, id); locNome.set(norm, id);
+        }
+        const cNorm = l.cargo ? normalizar(l.cargo) : null;
+        if (cNorm && !carNome.has(cNorm)) {
+          const id = randomUUID(); const nivelId = l.codigoNH ? (nhId.get(l.codigoNH) || null) : null;
+          novoCar.push([id, l.codigoCargo || null, l.cargo.trim(), cNorm, nivelId]);
+          carNome.set(cNorm, id);
+        }
+        const rNorm = l.regional ? normalizar(l.regional) : null;
+        if (rNorm && !regNome.has(rNorm)) {
+          const id = randomUUID();
+          novoReg.push([id, l.regional.trim(), rNorm]);
+          regNome.set(rNorm, id);
+        }
       }
-      const cargoMap = await ensureLookups(conn, "cargo", disp.cargo);
-      const setorMap = await ensureLookups(conn, "setor", disp.setor);
-      const localMap = await ensureLookups(conn, "local_trabalho", disp.local_trabalho);
-      const regMap = await ensureLookups(conn, "regional", disp.regional);
+      if (novoSet.length) await bulkInsert(conn, "INSERT INTO setor (id, codigo_dp, nome, nome_normalizado) VALUES ?", novoSet);
+      if (novoLoc.length) await bulkInsert(conn, "INSERT INTO local_trabalho (id, codigo_dp, nome, nome_normalizado) VALUES ?", novoLoc);
+      if (novoCar.length) await bulkInsert(conn, "INSERT INTO cargo (id, codigo_cargo_dp, nome, nome_normalizado, nivel_id) VALUES ?", novoCar);
+      if (novoReg.length) await bulkInsert(conn, "INSERT INTO regional (id, nome, nome_normalizado) VALUES ?", novoReg);
 
       const matriculas = linhas.map((l) => l.matricula);
       const [ex] = await conn.query(
@@ -121,12 +135,16 @@ export async function POST(req) {
       let inseridos = 0, atualizados = 0;
 
       for (const l of linhas) {
-        const cargoId = l.cargo ? cargoMap.get(normalizar(l.cargo)) || null : null;
-        const setorId = l.setor ? setorMap.get(normalizar(l.setor)) || null : null;
-        const localId = l.local ? localMap.get(normalizar(l.local)) || null : null;
-        const regId = l.regional ? regMap.get(normalizar(l.regional)) || null : null;
-        const sitId = l.situacao ? situacaoId.get(normalizar(l.situacao)) || null : null;
-        const tipo = String(l.matricula).toUpperCase().startsWith("PJ") ? "PJ" : "CLT";
+        // resolve por código (v2), com fallback por nome normalizado
+        const setorId = (l.codigoSetor && setCod.get(l.codigoSetor)) || (l.setor && setNome.get(normalizar(l.setor))) || null;
+        const localId = (l.codigoLocal && locCod.get(l.codigoLocal)) || (l.local && locNome.get(normalizar(l.local))) || null;
+        const sitId   = (l.codigoSituacao && sitCod.get(String(l.codigoSituacao).toLowerCase())) || (l.situacao && sitNome.get(normalizar(l.situacao))) || null;
+        const cargoId = l.cargo ? carNome.get(normalizar(l.cargo)) || null : null;
+        const regId   = l.regional ? regNome.get(normalizar(l.regional)) || null : null;
+        // tipo de contratação: coluna explícita da v2; fallback = prefixo "PJ"
+        const tipo = l.tipo
+          ? (normalizar(l.tipo).includes("pj") ? "PJ" : "CLT")
+          : (String(l.matricula).toUpperCase().startsWith("PJ") ? "PJ" : "CLT");
 
         const cur = exMap.get(l.matricula);
         if (cur) {
