@@ -264,6 +264,11 @@ main{padding:28px}
 
 .imp-filtro{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:8px;cursor:pointer;user-select:none}
 
+.imp-progresso{margin:4px 0 14px}
+.imp-progresso-bar{height:10px;border-radius:999px;background:#eef1f7;overflow:hidden}
+.imp-progresso-bar span{display:block;height:100%;background:linear-gradient(90deg,#16a34a,#12894b);border-radius:999px;transition:width .3s var(--ease)}
+.imp-progresso-txt{display:block;margin-top:6px;font-size:12px;font-weight:600;color:var(--ink-soft)}
+
 .imp-tabela-wrap{border:1px solid var(--line-soft);border-radius:12px;overflow:auto;max-height:320px}
 .imp-tabela{width:100%;border-collapse:collapse;font-size:12px}
 .imp-tabela th{position:sticky;top:0;background:#f7f9fd;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap}

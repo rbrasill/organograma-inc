@@ -18,7 +18,20 @@ export default function ImportModal({ onClose }) {
   const [resultado, setResultado] = useState(null);
   const [erroGeral, setErroGeral] = useState("");
   const [soProblemas, setSoProblemas] = useState(false);
+  const [progresso, setProgresso] = useState(0);   // % do envio em lotes
   const inputRef = useRef(null);
+
+  async function postJSON(payload) {
+    const r = await fetch("/api/importacao", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    // resposta de timeout/erro do gateway pode não ser JSON
+    const txt = await r.text();
+    try { return JSON.parse(txt); }
+    catch { return { ok: false, erro: `Servidor respondeu ${r.status}. ${txt.slice(0, 120)}` }; }
+  }
 
   async function processarArquivo(file) {
     if (!file) return;
@@ -61,20 +74,51 @@ export default function ImportModal({ onClose }) {
     }
   }
 
+  // envio em LOTES: iniciar → N lotes (com progresso) → finalizar.
+  // Evita o timeout (504) das bases grandes e mostra o progresso.
   async function confirmar() {
     setEtapa("enviando");
     setErroGeral("");
+    setProgresso(0);
     try {
-      const linhas = previa.anotadas.map(({ linha, matricula, nome, cargo, codigoCargo, setor, local, regional, situacao, matriculaLider }) =>
-        ({ linha, matricula, nome, cargo, codigoCargo, setor, local, regional, situacao, matriculaLider }));
-      const r = await fetch("/api/importacao", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ arquivoNome, linhas }),
+      const validas = previa.anotadas.filter((l) => l.status !== "erro");
+      const comErro = previa.anotadas.filter((l) => l.status === "erro");
+      const empacota = (l) => ({
+        linha: l.linha, matricula: l.matricula, nome: l.nome, cargo: l.cargo,
+        codigoCargo: l.codigoCargo, setor: l.setor, local: l.local,
+        regional: l.regional, situacao: l.situacao, status: l.status,
+        motivos: [...(l.erros || []), ...(l.alertas || [])],
       });
-      const j = await r.json();
-      if (!j.ok) { setErroGeral(j.erro || "Falha na importação."); setEtapa("previa"); return; }
-      setResultado(j.resultado);
+
+      const ini = await postJSON({
+        acao: "iniciar", arquivoNome,
+        totalLinhas: previa.anotadas.length, totalErros: comErro.length,
+      });
+      if (!ini.ok) { setErroGeral(ini.erro || "Falha ao iniciar."); setEtapa("previa"); return; }
+      const importacaoId = ini.importacaoId;
+
+      const TAM = 250;
+      let inseridos = 0, atualizados = 0;
+      for (let i = 0; i < validas.length; i += TAM) {
+        const bloco = validas.slice(i, i + TAM).map(empacota);
+        const r = await postJSON({ acao: "lote", importacaoId, linhas: bloco });
+        if (!r.ok) { setErroGeral(r.erro || "Falha ao gravar um lote."); setEtapa("previa"); return; }
+        inseridos += r.inseridos; atualizados += r.atualizados;
+        setProgresso(Math.round(((i + bloco.length) / Math.max(1, validas.length)) * 100));
+      }
+
+      const fin = await postJSON({
+        acao: "finalizar", importacaoId,
+        matriculasArquivo: validas.map((l) => l.matricula),
+        liderPares: validas.filter((l) => l.liderValido).map((l) => [l.matricula, l.liderValido]),
+        erros: comErro.map(empacota),
+      });
+      if (!fin.ok) { setErroGeral(fin.erro || "Falha ao finalizar."); setEtapa("previa"); return; }
+
+      setResultado({
+        inseridos, atualizados, arquivados: fin.arquivados,
+        pulados: comErro.length, total: previa.anotadas.length,
+      });
       setEtapa("resultado");
     } catch (e) {
       setErroGeral(`Falha ao enviar: ${e.message}`);
@@ -133,6 +177,13 @@ export default function ImportModal({ onClose }) {
               </a>
             )}
             </>
+          )}
+
+          {etapa === "enviando" && (
+            <div className="imp-progresso">
+              <div className="imp-progresso-bar"><span style={{ width: `${progresso}%` }} /></div>
+              <span className="imp-progresso-txt">Gravando no banco... {progresso}%</span>
+            </div>
           )}
 
           {(etapa === "previa" || etapa === "enviando") && previa && (
@@ -225,7 +276,7 @@ export default function ImportModal({ onClose }) {
               onClick={confirmar}
             >
               <span className="ic"><CheckIcon /></span>
-              {etapa === "enviando" ? "Gravando no banco..." : "Confirmar e gravar"}
+              {etapa === "enviando" ? `Gravando... ${progresso}%` : "Confirmar e gravar"}
             </button>
           )}
         </div>
