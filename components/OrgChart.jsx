@@ -9,6 +9,7 @@ import {
 } from "@/components/icons";
 import PersonModal from "@/components/PersonModal";
 import ImportModal from "@/components/ImportModal";
+import AreaModal from "@/components/AreaModal";
 
 // nível visual (cor/legenda): usa a ordem do banco quando o cargo tem nível
 // vinculado; senão deriva do nome do cargo (fallback até a curadoria)
@@ -138,6 +139,7 @@ export default function OrgChart() {
   const [highlightId, setHighlightId] = useState(null);
   const [showSug, setShowSug] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showAreas, setShowAreas] = useState(false);
   const [baixando, setBaixando] = useState(false);
   const boxRef = useRef(null);
   const viewportRef = useRef(null);
@@ -366,6 +368,9 @@ export default function OrgChart() {
           <button className="btn btn-import" onClick={() => setShowImport(true)} title="Subir a base por Excel para o banco de dados">
             <span className="ic"><UploadIcon size={13} /></span>Importar Excel
           </button>
+          <button className="btn btn-import" onClick={() => setShowAreas(true)} title="Renomear e mesclar áreas">
+            <span className="ic"><GridIcon size={13} /></span>Gerenciar áreas
+          </button>
           <div className="select">
             <GridIcon /> Área:
             <select
@@ -482,6 +487,10 @@ export default function OrgChart() {
 
       {showImport && (
         <ImportModal onClose={() => { setShowImport(false); carregar(areaId); }} />
+      )}
+
+      {showAreas && (
+        <AreaModal onClose={() => setShowAreas(false)} onMudou={() => carregar(areaId)} />
       )}
 
       {aberta && (

@@ -284,6 +284,32 @@ main{padding:28px}
 .imp-arquivar{margin-top:10px;font-size:11.5px;color:#6d28d9;background:#f6f3fd;border:1px dashed #ddd0f5;border-radius:10px;padding:8px 11px;max-height:74px;overflow:auto}
 .imp-arquivar b{display:block;margin-bottom:2px}
 
+.imp-areas-novas{margin-top:10px;font-size:12px;color:#8a5a00;background:#fff8ee;border:1px solid #ffe3b3;border-radius:11px;padding:10px 12px}
+.imp-areas-novas b{display:flex;align-items:center;gap:5px;margin-bottom:4px}
+.imp-areas-novas span{font-weight:600;color:#7a4f00}
+.imp-areas-novas em{display:block;margin-top:5px;font-style:normal;font-size:11px;color:#a06a1a}
+
+/* ===== painel de gestão de áreas ===== */
+.area-modal{max-width:620px}
+.ar-vazio{color:var(--ink-faint);font-size:13px;text-align:center;padding:20px}
+.ar-lista{display:flex;flex-direction:column;gap:8px}
+.ar-item{border:1px solid var(--line);border-radius:12px;padding:11px 13px;background:#fff;transition:border-color .2s}
+.ar-item:hover{border-color:#d8dfeb}
+.ar-info{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.ar-nome{font-size:14px;font-weight:700;color:var(--ink)}
+.ar-count{font-size:11.5px;font-weight:600;color:var(--ink-faint);white-space:nowrap}
+.ar-acoes{display:flex;gap:8px;margin-top:9px}
+.ar-btn{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12px;font-weight:600;color:var(--ink-soft);background:#f5f7fc;border:1px solid var(--line-soft);border-radius:9px;padding:6px 11px;cursor:pointer;transition:color .2s,background .2s}
+.ar-btn:hover{color:var(--inc);background:#fff1eb}
+.btn-sm{padding:7px 12px;font-size:12px}
+.ar-edit{display:flex;gap:8px;align-items:center}
+.ar-edit input{flex:1;border:1px solid var(--inc);border-radius:10px;padding:8px 11px;font:inherit;font-size:13.5px;color:var(--ink);outline:none;box-shadow:0 0 0 3px rgba(255,83,15,.12)}
+.ar-merge{display:flex;flex-direction:column;gap:9px}
+.ar-merge-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--ink-soft)}
+.ar-merge-top select{flex:1;min-width:180px;border:1px solid var(--line);border-radius:10px;padding:8px 11px;font:inherit;font-size:13px;background:#fff;cursor:pointer;outline:none}
+.ar-merge-aviso{display:flex;align-items:flex-start;gap:6px;font-size:12px;color:#8a5a00;background:#fff8ee;border:1px solid #ffe3b3;border-radius:9px;padding:8px 10px}
+.ar-merge-acoes{display:flex;justify-content:flex-end;gap:8px}
+
 .imp-final{text-align:center;padding:22px 10px}
 .imp-final-ico{width:54px;height:54px;margin:0 auto 10px;border-radius:999px;background:#e8f7ee;color:#16a34a;display:grid;place-items:center}
 .imp-final h4{margin:0 0 12px;font-size:17px;color:var(--brand)}

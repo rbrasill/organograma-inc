@@ -7,6 +7,7 @@
 import { useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { extrairLinhas, validarLinhas } from "@/lib/importacao";
+import { normalizar } from "@/data/ti";
 import { CloseIcon, AlertIcon, CheckIcon, UploadIcon, DownloadIcon } from "@/components/icons";
 
 const ROTULO_STATUS = { ok: "OK", alerta: "Alerta", erro: "Erro" };
@@ -49,6 +50,7 @@ export default function ImportModal({ onClose }) {
       // dados do banco para a prévia (novos x atualizados x arquivados)
       let matriculasBanco = new Set();
       let situacoesValidas = null;
+      let setoresBanco = null;
       let avisoBanco = "";
       try {
         const r = await fetch("/api/importacao");
@@ -56,6 +58,7 @@ export default function ImportModal({ onClose }) {
         if (j.ok) {
           matriculasBanco = new Set(j.matriculas);
           situacoesValidas = new Set(j.situacoes.map((s) => s.normalizado));
+          setoresBanco = new Set(j.setores || []);
         } else {
           avisoBanco = j.erro || "Banco indisponível — prévia sem comparação com a base atual.";
         }
@@ -66,7 +69,22 @@ export default function ImportModal({ onClose }) {
       const { anotadas, resumo } = validarLinhas(linhas, { matriculasBanco, situacoesValidas });
       const noArquivo = new Set(anotadas.filter((l) => l.status !== "erro").map((l) => l.matricula));
       const arquivar = [...matriculasBanco].filter((m) => !noArquivo.has(m));
-      setPrevia({ anotadas, resumo, arquivar, avisoBanco });
+
+      // áreas do arquivo que ainda não existem no banco (serão criadas na
+      // importação) — destaque para o RH conferir typos antes de gravar
+      let areasNovas = [];
+      if (setoresBanco) {
+        const vistas = new Map();
+        anotadas.forEach((l) => {
+          if (l.setor && !setoresBanco.has(normalizar(l.setor))) {
+            const k = normalizar(l.setor);
+            if (!vistas.has(k)) vistas.set(k, l.setor);
+          }
+        });
+        areasNovas = [...vistas.values()];
+      }
+
+      setPrevia({ anotadas, resumo, arquivar, avisoBanco, areasNovas });
       setEtapa("previa");
     } catch (e) {
       setErroGeral(`Não consegui ler o arquivo: ${e.message}`);
@@ -234,6 +252,14 @@ export default function ImportModal({ onClose }) {
                   </tbody>
                 </table>
               </div>
+
+              {previa.areasNovas?.length > 0 && (
+                <div className="imp-areas-novas">
+                  <b><AlertIcon size={13} /> Áreas novas que serão criadas ({previa.areasNovas.length}):</b>
+                  <span>{previa.areasNovas.join(" · ")}</span>
+                  <em>Confira se não é um nome digitado diferente de uma área existente. Se for, cancele, importe, e depois use "Gerenciar áreas" para mesclar — ou corrija o Excel antes.</em>
+                </div>
+              )}
 
               {previa.arquivar.length > 0 && (
                 <div className="imp-arquivar">

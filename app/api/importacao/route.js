@@ -26,10 +26,12 @@ export async function GET() {
       "SELECT codigo_dp FROM colaborador WHERE codigo_dp IS NOT NULL AND ativo = 1"
     );
     const [sits] = await pool.query("SELECT nome, nome_normalizado FROM situacao");
+    const [setores] = await pool.query("SELECT nome_normalizado FROM setor");
     return Response.json({
       ok: true,
       matriculas: colabs.map((c) => c.codigo_dp),
       situacoes: sits.map((s) => ({ nome: s.nome, normalizado: s.nome_normalizado })),
+      setores: setores.map((s) => s.nome_normalizado),
     });
   } catch (e) {
     return erroResposta(e);
