@@ -219,6 +219,23 @@ main{padding:28px}
 .ll-item em{font-size:11px;color:var(--ink-faint);font-style:normal}
 .ll-vazio{padding:12px 10px;font-size:12px;color:var(--ink-faint);text-align:center}
 
+/* seletor de área (dados do banco) */
+.area-select{border:0;outline:0;font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:transparent;cursor:pointer;max-width:230px}
+.area-select:disabled{color:var(--ink-faint);cursor:default}
+
+/* estados do viewport (carregando / vazio / erro do banco) */
+.tree-vazio{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--ink-faint);font-size:13px;font-weight:600;text-align:center;padding:20px;z-index:5}
+.tree-vazio b{color:var(--ink-soft);font-size:14.5px}
+.tree-vazio em{font-style:normal;font-size:12px;max-width:460px}
+.tree-vazio.erro{color:#b45309}
+.tree-vazio.erro b{color:#b42318}
+
+.btn-baixar{color:var(--brand);border-color:var(--line)}
+.btn-baixar .ic{background:#eaf0ff;color:var(--brand)}
+.btn-baixar:hover{color:var(--inc)}
+.btn-baixar:hover .ic{background:#fff1eb;color:var(--inc)}
+.btn-baixar:disabled{opacity:.6;cursor:not-allowed}
+
 /* ===== importação por Excel (funcionalidade temporária) ===== */
 .btn-import{background:#fff;color:var(--brand);border:1px solid var(--line);box-shadow:var(--shadow-soft);padding:9px 14px}
 .btn-import .ic{background:#eaf0ff;color:var(--brand)}

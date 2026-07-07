@@ -7,14 +7,19 @@ import { UserIcon, CloseIcon, AlertIcon, SearchIcon, ChevronIcon } from "@/compo
 // Edição direta (líder, aplica na hora): nome, e-mail, local.
 // Estruturais (exigem "Solicitar ajuste"): cargo, área, líder.
 // Situação: somente leitura — gerenciada pelo RH/DP, não editável aqui.
-export default function PersonModal({ pessoa, pessoas, byId, onClose, onSalvar }) {
+// listas: dropdowns vindos do banco (via API); mock só como fallback.
+export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, onClose, onSalvar }) {
+  const CARGOS_OPCOES = listas?.cargos?.length ? listas.cargos : CARGOS;
+  const AREAS_OPCOES = listas?.areas?.length ? listas.areas : AREAS;
+  const LOCAIS_OPCOES = listas?.locais?.length ? listas.locais : LOCAIS;
+
   const [nome, setNome] = useState(pessoa.nome);
   const [local, setLocal] = useState(pessoa.local || "");
   const [email, setEmail] = useState(pessoa.email || "");
 
   // campos estruturais (editáveis só via solicitação — aqui pré-preenchem a solicitação)
   const [cargo, setCargo] = useState(pessoa.cargo || "");
-  const [area, setArea] = useState("Tecnologia da Informação");
+  const [area, setArea] = useState(areaAtual || AREAS_OPCOES[0] || "");
   const [liderId, setLiderId] = useState(pessoa.lider || "");
   const [liderBusca, setLiderBusca] = useState("");
   const [pickerAberto, setPickerAberto] = useState(false);
@@ -125,7 +130,7 @@ export default function PersonModal({ pessoa, pessoas, byId, onClose, onSalvar }
             <span>Local de trabalho</span>
             <select value={local} onChange={(e) => setLocal(e.target.value)}>
               <option value="">— selecione —</option>
-              {LOCAIS.map((l) => <option key={l} value={l}>{l}</option>)}
+              {LOCAIS_OPCOES.map((l) => <option key={l} value={l}>{l}</option>)}
             </select>
           </label>
           <label className="fld">
@@ -140,13 +145,13 @@ export default function PersonModal({ pessoa, pessoas, byId, onClose, onSalvar }
             <span>Cargo</span>
             <select value={cargo} onChange={(e) => setCargo(e.target.value)}>
               <option value="">— selecione —</option>
-              {CARGOS.map((c) => <option key={c} value={c}>{c}</option>)}
+              {CARGOS_OPCOES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </label>
           <label className="fld">
             <span>Área / Setor</span>
             <select value={area} onChange={(e) => setArea(e.target.value)}>
-              {AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
+              {AREAS_OPCOES.map((a) => <option key={a} value={a}>{a}</option>)}
             </select>
           </label>
 

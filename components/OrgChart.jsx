@@ -1,20 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  PESSOAS, AREA, NIVEIS, nivelDe, inconsistenciasDe,
-  construirArvore, normalizar,
-} from "@/data/ti";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { NIVEIS, nivelDe, inconsistenciasDe, construirArvore, normalizar } from "@/data/ti";
 import {
   UserIcon, PinIcon, CheckIcon, CloseIcon, GridIcon,
   ChevronIcon, SearchIcon, FullscreenIcon, AlertIcon,
-  PlusIcon, MinusIcon, TargetIcon, UploadIcon,
+  PlusIcon, MinusIcon, TargetIcon, UploadIcon, DownloadIcon,
 } from "@/components/icons";
 import PersonModal from "@/components/PersonModal";
 import ImportModal from "@/components/ImportModal";
 
+// nível visual (cor/legenda): usa a ordem do banco quando o cargo tem nível
+// vinculado; senão deriva do nome do cargo (fallback até a curadoria)
+const ORDEM_PARA_NIVEL = { 1: 1, 2: 1, 3: 1, 4: 2, 5: 2, 6: 3, 7: 4, 8: 4, 9: 5, 10: 6 };
+function nivelVisual(node) {
+  if (node.nivelOrdem && ORDEM_PARA_NIVEL[node.nivelOrdem]) return ORDEM_PARA_NIVEL[node.nivelOrdem];
+  return nivelDe(node.cargo);
+}
+
 function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
-  const nivel = nivelDe(node.cargo);
+  const nivel = nivelVisual(node);
   const cor = NIVEIS[nivel - 1].cor;
   const kids = node.children ? node.children.length : 0;
   const alertas = inconsistenciasDe(node, byId);
@@ -38,7 +43,7 @@ function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
         </div>
       </div>
       <div className="card-foot">
-        <div className="loc"><PinIcon /><span>{node.local}</span></div>
+        <div className="loc"><PinIcon /><span>{node.local || "—"}</span></div>
         <span className="dot" />
       </div>
       {kids > 0 && (
@@ -56,8 +61,7 @@ function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
 }
 
 // divide as folhas em colunas verticais (equipes grandes),
-// mantendo todas conectadas por linhas: gancho no topo de cada
-// coluna + fio vertical entre os cards da coluna
+// mantendo todas conectadas por linhas
 function dividirEmColunas(leaves) {
   const numCols = Math.min(4, Math.ceil(leaves.length / 4));
   const porCol = Math.ceil(leaves.length / numCols);
@@ -92,11 +96,8 @@ function TreeNode({ node, rest }) {
           {!emColunas && leaves.map((c) => (
             <li key={c.id}>
               <Card
-                node={c}
-                byId={rest.byId}
-                collapsed={false}
-                onToggle={rest.onToggle}
-                onOpen={rest.onOpen}
+                node={c} byId={rest.byId} collapsed={false}
+                onToggle={rest.onToggle} onOpen={rest.onOpen}
                 highlight={rest.highlightId === c.id}
               />
             </li>
@@ -107,11 +108,8 @@ function TreeNode({ node, rest }) {
                 {col.map((c) => (
                   <div className="leaf-item" key={c.id}>
                     <Card
-                      node={c}
-                      byId={rest.byId}
-                      collapsed={false}
-                      onToggle={rest.onToggle}
-                      onOpen={rest.onOpen}
+                      node={c} byId={rest.byId} collapsed={false}
+                      onToggle={rest.onToggle} onOpen={rest.onOpen}
                       highlight={rest.highlightId === c.id}
                     />
                   </div>
@@ -126,18 +124,50 @@ function TreeNode({ node, rest }) {
 }
 
 export default function OrgChart() {
-  const [pessoas, setPessoas] = useState(PESSOAS);
+  // dados vindos do banco (API) — o mock data/ti.js não é mais a fonte
+  const [pessoas, setPessoas] = useState([]);
+  const [setores, setSetores] = useState([]);
+  const [areaId, setAreaId] = useState(null);
+  const [listas, setListas] = useState(null);
+  const [carregando, setCarregando] = useState(true);
+  const [erroApi, setErroApi] = useState("");
+
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState(null);
   const [collapsedSet, setCollapsedSet] = useState(new Set());
   const [highlightId, setHighlightId] = useState(null);
   const [showSug, setShowSug] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [baixando, setBaixando] = useState(false);
   const boxRef = useRef(null);
   const viewportRef = useRef(null);
   const treeRef = useRef(null);
 
-  // pan & zoom: posição (x,y) e escala do organograma dentro do viewport
+  const carregar = useCallback(async (area) => {
+    setCarregando(true);
+    setErroApi("");
+    try {
+      const r = await fetch(`/api/organograma${area ? `?area=${encodeURIComponent(area)}` : ""}`);
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.erro || "Falha ao carregar o organograma.");
+      setSetores(j.setores);
+      setAreaId(j.areaId);
+      setPessoas(j.pessoas);
+      setListas(j.listas);
+      setCollapsedSet(new Set());
+      setQuery("");
+    } catch (e) {
+      setErroApi(e.message);
+      setPessoas([]);
+    }
+    setCarregando(false);
+  }, []);
+
+  useEffect(() => { carregar(null); }, [carregar]);
+
+  const nomeArea = setores.find((s) => s.id === areaId)?.nome || "—";
+
+  // pan & zoom
   const [view, setView] = useState({ x: 0, y: 24, scale: 1 });
   const [dragging, setDragging] = useState(false);
   const viewRef = useRef(view);
@@ -147,7 +177,6 @@ export default function OrgChart() {
   useEffect(() => { viewRef.current = view; }, [view]);
 
   const { roots, byId } = useMemo(() => construirArvore(pessoas), [pessoas]);
-  const root = roots[0];
 
   useEffect(() => {
     function h(e) { if (boxRef.current && !boxRef.current.contains(e.target)) setShowSug(false); }
@@ -155,7 +184,6 @@ export default function OrgChart() {
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  // centraliza o organograma no viewport (usado no carregamento e no botão "Centralizar")
   function centerView() {
     const vp = viewportRef.current, t = treeRef.current;
     if (!vp || !t) return;
@@ -172,14 +200,13 @@ export default function OrgChart() {
 
   useEffect(() => {
     centerView();
-    const t = setTimeout(centerView, 140); // após fontes/layout estabilizarem
+    const t = setTimeout(centerView, 140);
     const ro = new ResizeObserver(() => centerView());
     if (viewportRef.current) ro.observe(viewportRef.current);
     return () => { ro.disconnect(); clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pessoas]);
 
-  // zoom com a roda do mouse, ancorado no cursor
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp) return;
@@ -223,8 +250,6 @@ export default function OrgChart() {
     const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
     if (!d.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
       d.moved = true;
-      // só captura o ponteiro quando o arraste começa de fato,
-      // para não roubar o clique dos cards e botões de expandir/recolher
       e.currentTarget.setPointerCapture(e.pointerId);
       setDragging(true);
     }
@@ -235,7 +260,6 @@ export default function OrgChart() {
     dragRef.current = null;
     setDragging(false);
   }
-  // após arrastar, engole o clique para não abrir o modal sem querer
   function onClickCapture(e) {
     if (justDraggedRef.current) {
       e.stopPropagation();
@@ -244,7 +268,6 @@ export default function OrgChart() {
     }
   }
 
-  // move a visão até deixar o card da pessoa no centro do viewport
   function focarPessoa(id) {
     const el = document.getElementById(`card-${id}`);
     const vp = viewportRef.current, t = treeRef.current;
@@ -255,6 +278,43 @@ export default function OrgChart() {
     const cx = (cRect.left - tRect.left + cRect.width / 2) / v.scale;
     const cy = (cRect.top - tRect.top + cRect.height / 2) / v.scale;
     setView({ ...v, x: vp.clientWidth / 2 - cx * v.scale, y: vp.clientHeight / 2 - cy * v.scale });
+  }
+
+  // baixa o organograma COMPLETO da área em PNG de alta resolução:
+  // expande tudo, captura a árvore no tamanho natural (sem o pan/zoom da
+  // tela) e restaura o estado — mesmo árvores grandes saem inteiras
+  async function baixarImagem() {
+    const t = treeRef.current;
+    if (!t || roots.length === 0 || baixando) return;
+    setBaixando(true);
+    const anterior = collapsedSet;
+    setCollapsedSet(new Set()); // tudo expandido na imagem
+    await new Promise((r) => setTimeout(r, 300)); // re-render + layout
+    try {
+      const natW = t.scrollWidth, natH = t.scrollHeight;
+      // alta resolução, respeitando o limite de canvas dos navegadores (~16k px)
+      const pixelRatio = Math.max(1, Math.min(3, Math.floor(16000 / Math.max(natW, natH)) || 1));
+      const { toPng } = await import("html-to-image");
+      const opcoes = {
+        width: natW, height: natH, pixelRatio,
+        backgroundColor: "#ffffff",
+        style: { transform: "none", position: "static" },
+      };
+      let dataUrl;
+      try {
+        dataUrl = await toPng(t, opcoes);
+      } catch {
+        // fallback: sem embutir a fonte externa (ambientes com rede restrita)
+        dataUrl = await toPng(t, { ...opcoes, fontEmbedCSS: "" });
+      }
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `organograma-${normalizar(nomeArea).replace(/\s+/g, "-")}.png`;
+      a.click();
+    } finally {
+      setCollapsedSet(anterior);
+      setBaixando(false);
+    }
   }
 
   const sugestoes = useMemo(() => {
@@ -289,6 +349,7 @@ export default function OrgChart() {
 
   const rest = { byId, collapsedSet, onToggle, onOpen: (n) => setOpenId(n.id), highlightId };
   const aberta = openId ? byId[openId] : null;
+  const liderArea = roots[0]?.nome || "—";
 
   return (
     <div className="shell">
@@ -306,7 +367,16 @@ export default function OrgChart() {
             <span className="ic"><UploadIcon size={13} /></span>Importar Excel
           </button>
           <div className="select">
-            <GridIcon /> Área: <b>{AREA}</b> <ChevronIcon />
+            <GridIcon /> Área:
+            <select
+              className="area-select"
+              value={areaId || ""}
+              onChange={(e) => carregar(e.target.value)}
+              disabled={carregando || setores.length === 0}
+            >
+              {setores.length === 0 && <option value="">—</option>}
+              {setores.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+            </select>
           </div>
           <div className="search" ref={boxRef}>
             <SearchIcon />
@@ -323,7 +393,7 @@ export default function OrgChart() {
                     <span className="si-ava"><UserIcon size={16} /></span>
                     <span className="si-txt">
                       <b>{p.nome}</b>
-                      <em>{p.cargo || "Cargo a definir"} · {AREA}</em>
+                      <em>{p.cargo || "Cargo a definir"} · {nomeArea}</em>
                     </span>
                   </button>
                 ))}
@@ -338,13 +408,21 @@ export default function OrgChart() {
           <div className="board-head">
             <div className="title-wrap">
               <span className="eyebrow">Organograma da área</span>
-              <h2>{AREA}</h2>
+              <h2>{nomeArea}</h2>
               <p className="subline">
-                {pessoas.length} pessoas &nbsp;·&nbsp; Líder da área: <b>{root.nome}</b> &nbsp;·&nbsp; Última validação: <b>pendente</b>
+                {pessoas.length} pessoas &nbsp;·&nbsp; Líder da área: <b>{liderArea}</b> &nbsp;·&nbsp; Última validação: <b>pendente</b>
               </p>
             </div>
             <div className="actions">
-              <button className="btn btn-ghost"><span className="ic"><CloseIcon /></span>Solicitar ajuste</button>
+              <button
+                className="btn btn-ghost btn-baixar"
+                onClick={baixarImagem}
+                disabled={baixando || roots.length === 0}
+                title="Baixar o organograma completo da área em imagem de alta resolução"
+              >
+                <span className="ic"><DownloadIcon /></span>
+                {baixando ? "Gerando imagem..." : "Baixar imagem"}
+              </button>
               <button className="btn btn-primary"><span className="ic"><CheckIcon /></span>Validar organograma</button>
               <button className="icon-btn" title="Tela cheia"><FullscreenIcon /></button>
             </div>
@@ -365,10 +443,28 @@ export default function OrgChart() {
               <button className="icon-btn" onClick={centerView} title="Centralizar organograma"><TargetIcon /></button>
             </div>
             <div className="pan-hint">Arraste para navegar · role para dar zoom</div>
+
+            {carregando && <div className="tree-vazio">Carregando organograma...</div>}
+            {!carregando && erroApi && (
+              <div className="tree-vazio erro">
+                <AlertIcon size={22} />
+                <b>Não consegui ler o banco de dados</b>
+                <em>{erroApi}</em>
+              </div>
+            )}
+            {!carregando && !erroApi && roots.length === 0 && (
+              <div className="tree-vazio">
+                <b>Nenhum colaborador ativo nesta área</b>
+                <em>Use o botão "Importar Excel" no topo para carregar a base.</em>
+              </div>
+            )}
+
             <div className="tree" ref={treeRef} style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}>
-              <ul>
-                <TreeNode node={root} rest={rest} />
-              </ul>
+              {roots.length > 0 && (
+                <ul>
+                  {roots.map((r) => <TreeNode key={r.id} node={r} rest={rest} />)}
+                </ul>
+              )}
             </div>
           </div>
 
@@ -384,13 +480,17 @@ export default function OrgChart() {
         </div>
       </div>
 
-      {showImport && <ImportModal onClose={() => setShowImport(false)} />}
+      {showImport && (
+        <ImportModal onClose={() => { setShowImport(false); carregar(areaId); }} />
+      )}
 
       {aberta && (
         <PersonModal
           pessoa={aberta}
           pessoas={pessoas}
           byId={byId}
+          listas={listas}
+          areaAtual={nomeArea}
           onClose={() => setOpenId(null)}
           onSalvar={(atual) => setPessoas((prev) => prev.map((p) => (p.id === atual.id ? { ...p, ...atual } : p)))}
         />
