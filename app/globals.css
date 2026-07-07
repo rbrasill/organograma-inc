@@ -376,6 +376,18 @@ main{padding:28px}
 .sol-devolver textarea:focus{border-color:var(--inc);box-shadow:0 0 0 3px rgba(255,83,15,.12)}
 .sol-devolver-btns{display:flex;justify-content:flex-end;gap:9px;margin-top:9px}
 
+/* ===== tela de edição de colaboradores ===== */
+.col-filtros{display:flex;flex-direction:column;gap:9px;margin-bottom:10px}
+.col-fld{display:flex;flex-direction:column;gap:5px}
+.col-fld > span{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint)}
+.col-fld select{border:1px solid var(--line);border-radius:11px;padding:9px 11px;font:inherit;font-size:13px;background:#fff;color:var(--ink);cursor:pointer;outline:none}
+.col-fld select:focus{border-color:var(--inc);box-shadow:0 0 0 3px rgba(255,83,15,.12)}
+.col-edit-tag{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--inc);background:#fff1eb;border:1px solid #ffd7c4;border-radius:999px;padding:5px 11px;white-space:nowrap}
+.col-form{display:flex;flex-direction:column;gap:12px}
+.col-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:560px){ .col-grid2{grid-template-columns:1fr} }
+.col-foot{display:flex;align-items:center;gap:9px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line-soft)}
+
 /* ===== painel de gestão de áreas ===== */
 .area-modal{max-width:620px}
 .ar-vazio{color:var(--ink-faint);font-size:13px;text-align:center;padding:20px}

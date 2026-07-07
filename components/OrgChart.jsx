@@ -6,7 +6,7 @@ import { NIVEIS, nivelDe, inconsistenciasDe, construirArvore, normalizar } from 
 import {
   UserIcon, PinIcon, CheckIcon, CloseIcon, GridIcon,
   ChevronIcon, SearchIcon, FullscreenIcon, AlertIcon,
-  PlusIcon, MinusIcon, TargetIcon, UploadIcon, DownloadIcon, InboxIcon,
+  PlusIcon, MinusIcon, TargetIcon, UploadIcon, DownloadIcon, InboxIcon, PencilIcon,
 } from "@/components/icons";
 import PersonModal from "@/components/PersonModal";
 import ImportModal from "@/components/ImportModal";
@@ -387,9 +387,15 @@ export default function OrgChart() {
             <span className="ic"><InboxIcon size={13} /></span>Solicitações
             {pendentes > 0 && <span className="solic-badge">{pendentes}</span>}
           </Link>
+          <Link href="/colaboradores" className="btn btn-import" title="Localizar e editar dados de um colaborador">
+            <span className="ic"><PencilIcon size={13} /></span>Editar colaboradores
+          </Link>
           <button className="btn btn-import" onClick={() => setShowImport(true)} title="Subir a base por Excel para o banco de dados">
             <span className="ic"><UploadIcon size={13} /></span>Importar Excel
           </button>
+          <a className="btn btn-import" href="/api/colaboradores/exportar" title="Baixar toda a base de colaboradores em Excel (formato de importação)">
+            <span className="ic"><DownloadIcon size={13} /></span>Exportar base
+          </a>
           <button className="btn btn-import" onClick={() => setShowAreas(true)} title="Renomear e mesclar áreas">
             <span className="ic"><GridIcon size={13} /></span>Gerenciar áreas
           </button>
