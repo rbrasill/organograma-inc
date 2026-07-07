@@ -125,6 +125,10 @@ main{padding:28px}
 .loc svg{flex:none}
 .loc span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dot{width:9px;height:9px;border-radius:999px;flex:none;background:var(--lvl);box-shadow:0 0 0 3px color-mix(in srgb,var(--lvl) 18%,transparent)}
+/* tag discreta de contratação PJ: vive no rodapé (altura já fixa), então
+   os cards sem PJ mantêm exatamente o mesmo tamanho */
+.pj-tag{flex:none;margin-left:auto;font-size:9.5px;font-weight:800;letter-spacing:.03em;color:#8a6500;background:#fff6d6;border:1px solid #f0d38a;border-radius:999px;padding:1px 7px;line-height:1.5}
+.card-foot .pj-tag + .dot{margin-left:8px}
 
 .alert{position:absolute;top:-8px;left:-8px;width:24px;height:24px;border-radius:999px;background:#fff4e6;color:#e08600;display:grid;place-items:center;border:1px solid #ffe0b0;box-shadow:var(--shadow-soft);z-index:2}
 .alert.stat{position:static;width:20px;height:20px}

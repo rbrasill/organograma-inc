@@ -54,6 +54,7 @@ function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
       </div>
       <div className="card-foot">
         <div className="loc"><PinIcon /><span>{node.local || "—"}</span></div>
+        {node.pj && <span className="pj-tag" title="Prestador de serviço — contratação PJ">PJ</span>}
         <span className="dot" />
       </div>
       {kids > 0 && (
