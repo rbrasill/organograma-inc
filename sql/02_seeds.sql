@@ -317,7 +317,7 @@ INSERT INTO cargo (id, codigo_cargo_dp, nome, nome_normalizado, nivel_id) VALUES
 (UUID(), '73', 'Encarregado de Acabamento', 'encarregado de acabamento', NULL),
 (UUID(), '164', 'Secretária Executiva', 'secretaria executiva', NULL);
 
-CREATE TABLE _map_cargo_nh (cargo_norm VARCHAR(160), nh VARCHAR(20), KEY(cargo_norm), KEY(nh));
+CREATE TABLE _map_cargo_nh (cargo_norm VARCHAR(160), nh VARCHAR(20), KEY(cargo_norm), KEY(nh)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 INSERT INTO _map_cargo_nh (cargo_norm, nh) VALUES
 ('servente de obra', 'NH544'),
 ('pedreiro de acabamento', 'NH522'),
