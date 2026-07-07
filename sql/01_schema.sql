@@ -33,13 +33,22 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- BLOCO 1 — Tabelas de referência (lookup)
 -- ---------------------------------------------------------------------------
 
--- 1.1 nivel_hierarquico — ordena os cargos (1 = mais alto)
+-- 1.1 nivel_hierarquico — catálogo de FAMÍLIAS de nível (base v2).
+--   codigo_nh (NH500–NH544): chave externa oficial, única.
+--   ordem (1–18, 1 = topo): NÃO é única — várias famílias compartilham a
+--   mesma altura hierárquica, distinguidas por `variacao` (A–L).
+--   A validação de coerência da árvore usa `ordem` (líder deve ter ordem
+--   menor que o subordinado), ignorando a variação/família.
 CREATE TABLE IF NOT EXISTS nivel_hierarquico (
   id         CHAR(36)     NOT NULL,
+  codigo_nh  VARCHAR(20)  NULL,
   ordem      INT          NOT NULL,
-  descricao  VARCHAR(120) NOT NULL,
+  variacao   VARCHAR(4)   NULL,
+  cod_var    VARCHAR(10)  NULL,
+  familia    VARCHAR(120) NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_nivel_ordem (ordem)
+  UNIQUE KEY uq_nivel_nh (codigo_nh),
+  KEY ix_nivel_ordem (ordem)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 1.2 cargo
@@ -62,12 +71,14 @@ CREATE TABLE IF NOT EXISTS cargo (
 --   lider_colaborador_id: FK adicionada por ALTER após criar colaborador.
 CREATE TABLE IF NOT EXISTS setor (
   id                    CHAR(36)     NOT NULL,
+  codigo_dp             VARCHAR(20)  NULL,   -- código oficial do DP (SET…)
   nome                  VARCHAR(160) NOT NULL,
   nome_normalizado      VARCHAR(160) NOT NULL,
   setor_pai_id          CHAR(36)     NULL,
   lider_colaborador_id  CHAR(36)     NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_setor_norm (nome_normalizado),
+  UNIQUE KEY uq_setor_dp (codigo_dp),
   KEY ix_setor_pai (setor_pai_id),
   KEY ix_setor_lider (lider_colaborador_id),
   CONSTRAINT fk_setor_pai FOREIGN KEY (setor_pai_id) REFERENCES setor (id)
@@ -76,10 +87,12 @@ CREATE TABLE IF NOT EXISTS setor (
 -- 1.4 local_trabalho
 CREATE TABLE IF NOT EXISTS local_trabalho (
   id                CHAR(36)     NOT NULL,
+  codigo_dp         VARCHAR(20)  NULL,   -- código oficial do DP (LOCTRA…)
   nome              VARCHAR(160) NOT NULL,
   nome_normalizado  VARCHAR(160) NOT NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_local_norm (nome_normalizado)
+  UNIQUE KEY uq_local_norm (nome_normalizado),
+  UNIQUE KEY uq_local_dp (codigo_dp)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 1.5 regional
@@ -94,11 +107,13 @@ CREATE TABLE IF NOT EXISTS regional (
 -- 1.6 situacao — lista fechada; ativo_na_arvore controla se aparece no organograma
 CREATE TABLE IF NOT EXISTS situacao (
   id                CHAR(36)    NOT NULL,
+  codigo_dp         VARCHAR(8)  NULL,   -- código-letra do DP (A, F, V, P, …)
   nome              VARCHAR(80) NOT NULL,
   nome_normalizado  VARCHAR(80) NOT NULL,
   ativo_na_arvore   TINYINT(1)  NOT NULL DEFAULT 1,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_situacao_norm (nome_normalizado)
+  UNIQUE KEY uq_situacao_norm (nome_normalizado),
+  UNIQUE KEY uq_situacao_dp (codigo_dp)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
