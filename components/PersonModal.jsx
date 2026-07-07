@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { nivelDe, NIVEIS, inconsistenciasDe, CARGOS, AREAS, LOCAIS, opcoesLider, normalizar } from "@/data/ti";
+import { nivelDe, NIVEIS, inconsistenciasDe, CARGOS, AREAS, LOCAIS, normalizar } from "@/data/ti";
 import { UserIcon, CloseIcon, AlertIcon, SearchIcon, ChevronIcon, CheckIcon } from "@/components/icons";
 
 // Edição direta (líder, aplica na hora): nome, e-mail, local.
@@ -20,8 +20,15 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
   // campos estruturais (editáveis só via solicitação — aqui pré-preenchem a solicitação)
   const [cargo, setCargo] = useState(pessoa.cargo || "");
   const [area, setArea] = useState(areaAtual || AREAS_OPCOES[0] || "");
+  // líder: id (matrícula) + info de exibição (funciona mesmo se o líder é de
+  // outra área, pois não depende do índice byId, que é só da área atual)
   const [liderId, setLiderId] = useState(pessoa.lider || "");
+  const [liderInfo, setLiderInfo] = useState(
+    pessoa.lider ? { matricula: pessoa.lider, nome: pessoa.liderNome || pessoa.lider, cargo: "" } : null
+  );
   const [liderBusca, setLiderBusca] = useState("");
+  const [resultados, setResultados] = useState([]);
+  const [buscando, setBuscando] = useState(false);
   const [pickerAberto, setPickerAberto] = useState(false);
   const [aviso, setAviso] = useState("");
   const [erroSol, setErroSol] = useState("");
@@ -37,16 +44,24 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
   const alertas = inconsistenciasDe(pessoa, byId);
 
   const liderOriginalId = pessoa.lider || "";
+  const liderOriginalNome = pessoa.liderNome || "";
   const mudouLider = liderId !== liderOriginalId;
-  const liderSel = liderId ? byId[liderId] : null;
-  const liderOriginal = liderOriginalId ? byId[liderOriginalId] : null;
 
-  const lideres = useMemo(() => {
-    const q = normalizar(liderBusca);
-    const base = opcoesLider(pessoas, pessoa.id);
-    if (!q) return base.slice(0, 8);
-    return base.filter((l) => normalizar(l.nome).includes(q) || normalizar(l.cargo).includes(q)).slice(0, 8);
-  }, [liderBusca, pessoas, pessoa.id]);
+  // busca de líderes em TODO o banco (não só na área atual), com debounce
+  useEffect(() => {
+    if (!pickerAberto) return;
+    let ativo = true;
+    setBuscando(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/colaboradores?q=${encodeURIComponent(liderBusca)}&excluir=${encodeURIComponent(pessoa.id)}`);
+        const j = await r.json();
+        if (ativo) setResultados(j.ok ? j.resultados : []);
+      } catch { if (ativo) setResultados([]); }
+      if (ativo) setBuscando(false);
+    }, 250);
+    return () => { ativo = false; clearTimeout(t); };
+  }, [liderBusca, pickerAberto, pessoa.id]);
 
   // fecha a lista suspensa ao clicar fora ou apertar Esc
   useEffect(() => {
@@ -68,15 +83,19 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
 
   function abrirPicker() {
     setLiderBusca("");
+    setResultados([]);
     setPickerAberto(true);
   }
-  function escolherLider(id) {
-    setLiderId(id);
+  // res = objeto {matricula, nome, cargo, setor} ou null para "sem líder"
+  function escolherLider(res) {
+    setLiderId(res ? res.matricula : "");
+    setLiderInfo(res || null);
     setPickerAberto(false);
     setLiderBusca("");
   }
   function desfazerTroca() {
     setLiderId(liderOriginalId);
+    setLiderInfo(liderOriginalId ? { matricula: liderOriginalId, nome: liderOriginalNome, cargo: "" } : null);
     setPickerAberto(false);
     setLiderBusca("");
   }
@@ -94,16 +113,15 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
     if ((area || "") !== (areaAtual || ""))
       ms.push({ campo: "area", de: areaAtual || "—", para: area || "—" });
     if (liderId !== liderOriginalId) {
-      const novo = liderId && byId[liderId] ? byId[liderId] : null;
       ms.push({
         campo: "lider",
-        de: liderOriginal ? liderOriginal.nome : "Sem líder (topo)",
-        para: novo ? novo.nome : "Sem líder (topo)",
+        de: liderOriginalNome || "Sem líder (topo)",
+        para: liderInfo ? liderInfo.nome : "Sem líder (topo)",
         paraMatricula: liderId || "",
       });
     }
     return ms;
-  }, [cargo, area, liderId, pessoa.cargo, areaAtual, liderOriginalId, liderOriginal, byId]);
+  }, [cargo, area, liderId, pessoa.cargo, areaAtual, liderOriginalId, liderOriginalNome, liderInfo]);
 
   function abrirConfirmacao() {
     setErroSol("");
@@ -216,8 +234,8 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
             <div className={`lider-atual ${mudouLider ? "trocado" : ""}`}>
               <span className="la-ava"><UserIcon size={20} /></span>
               <span className="la-txt">
-                <b>{liderSel ? liderSel.nome : "Sem líder (topo da área)"}</b>
-                <em>{liderSel ? (liderSel.cargo || "Cargo a definir") : "Não responde a ninguém nesta área"}</em>
+                <b>{liderInfo ? liderInfo.nome : "Sem líder (topo da área)"}</b>
+                <em>{liderInfo ? (liderInfo.cargo || (liderInfo.setor ? liderInfo.setor : "—")) : "Não responde a ninguém"}</em>
               </span>
               {mudouLider ? (
                 <button className="la-btn undo" onClick={desfazerTroca} title="Voltar ao líder atual">Desfazer</button>
@@ -230,7 +248,7 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
 
             {mudouLider && (
               <div className="lider-troca-nota">
-                Novo líder selecionado — líder atual: <b>{liderOriginal ? liderOriginal.nome : "Sem líder (topo)"}</b>.
+                Novo líder selecionado — líder atual: <b>{liderOriginalNome || "Sem líder (topo)"}</b>.
                 A troca só é aplicada após aprovação do RH.
               </div>
             )}
@@ -241,25 +259,26 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
                   <span className="lp-ic"><SearchIcon size={14} /></span>
                   <input
                     ref={buscaRef}
-                    placeholder="Buscar pelo nome do líder..."
+                    placeholder="Buscar pelo nome do líder (todas as áreas)..."
                     value={liderBusca}
                     onChange={(e) => setLiderBusca(e.target.value)}
                   />
                 </div>
-                {/* a busca não filtra por área: o novo líder pode ser de qualquer
-                    setor (troca de área ou de líder na mesma área) */}
                 <div className="lp-hint">Busca em todas as áreas — o novo líder pode ser de outro setor.</div>
                 <div className="lider-list">
-                  <button className={`ll-item ${liderId === "" ? "sel" : ""}`} onClick={() => escolherLider("")}>
+                  <button className={`ll-item ${liderId === "" ? "sel" : ""}`} onClick={() => escolherLider(null)}>
                     <b>— Sem líder (topo da área)</b>
                   </button>
-                  {lideres.map((l) => (
-                    <button key={l.id} className={`ll-item ${liderId === l.id ? "sel" : ""}`} onClick={() => escolherLider(l.id)}>
-                      <b>{l.nome}</b><em>{l.cargo || "Cargo a definir"}</em>
+                  {resultados.map((l) => (
+                    <button key={l.matricula} className={`ll-item ${liderId === l.matricula ? "sel" : ""}`} onClick={() => escolherLider(l)}>
+                      <b>{l.nome}</b><em>{(l.cargo || "Cargo a definir")}{l.setor ? ` · ${l.setor}` : ""}</em>
                     </button>
                   ))}
-                  {lideres.length === 0 && (
-                    <div className="ll-vazio">Nenhuma pessoa encontrada para "{liderBusca}"</div>
+                  {buscando && <div className="ll-vazio">Buscando...</div>}
+                  {!buscando && resultados.length === 0 && (
+                    <div className="ll-vazio">
+                      {liderBusca ? `Nenhuma pessoa encontrada para "${liderBusca}"` : "Digite para buscar em todas as áreas"}
+                    </div>
                   )}
                 </div>
               </div>

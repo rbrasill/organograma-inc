@@ -38,7 +38,7 @@ export async function GET(req) {
       `SELECT c.id, c.codigo_dp, c.nome, c.email, c.tipo_contratacao,
               cg.nome AS cargo, lt.nome AS local, st.nome AS situacao,
               nh.ordem AS nivel_ordem,
-              ld.codigo_dp AS lider_codigo, ld.id AS lider_uuid
+              ld.codigo_dp AS lider_codigo, ld.id AS lider_uuid, ld.nome AS lider_nome
          FROM colaborador c
          LEFT JOIN cargo cg            ON cg.id = c.cargo_id
          LEFT JOIN nivel_hierarquico nh ON nh.id = cg.nivel_id
@@ -60,6 +60,7 @@ export async function GET(req) {
       situacao: r.situacao || "",
       email: r.email || "",
       lider: r.lider_codigo || r.lider_uuid || null,
+      liderNome: r.lider_nome || "",
       pj: r.tipo_contratacao === "PJ",
       nivelOrdem: r.nivel_ordem || null,
     }));
