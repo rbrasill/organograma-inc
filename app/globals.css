@@ -403,6 +403,24 @@ main{padding:28px}
 @media (max-width:560px){ .col-grid2{grid-template-columns:1fr} }
 .col-foot{display:flex;align-items:center;gap:9px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line-soft)}
 
+/* ===== catálogos da base (dados não-colaborador) ===== */
+.ct-board{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:var(--shadow-soft)}
+.ct-topo{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+.ct-busca{flex:1;margin-bottom:0}
+.ct-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10.5px;font-weight:700;color:#3b5bdb;background:#eef2ff;border:1px solid #dbe3fd;border-radius:7px;padding:2px 7px;margin-left:8px}
+.ct-meta{font-size:11px;font-weight:600;color:var(--ink-faint);margin-left:8px}
+.ct-meta.ok{color:#177245}
+.ct-meta.off{color:#b45309}
+.ct-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:11px}
+.ct-form .fld{margin-bottom:0}
+.ct-ex{font-style:normal;font-weight:500;color:var(--ink-faint)}
+.ct-check{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ink-soft);align-self:end;padding-bottom:10px;cursor:pointer}
+.ct-erro{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#b42318;background:#fdeaea;border:1px solid #f6cfcb;border-radius:9px;padding:8px 11px;margin-top:10px}
+.ct-del:hover{color:#b42318;background:#fdeaea}
+.ct-del-confirma{margin-top:10px;display:flex;flex-direction:column;gap:9px}
+.ct-editando{border-color:var(--inc);box-shadow:0 0 0 3px rgba(255,83,15,.08)}
+.ct-form-titulo{font-size:13.5px;font-weight:800;color:var(--brand)}
+
 /* ===== painel de gestão de áreas ===== */
 .area-modal{max-width:620px}
 .ar-vazio{color:var(--ink-faint);font-size:13px;text-align:center;padding:20px}

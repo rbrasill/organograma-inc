@@ -472,6 +472,9 @@ export default function OrgChart() {
           <button className="btn btn-import" onClick={() => setShowAreas(true)} title="Renomear e mesclar áreas">
             <span className="ic"><GridIcon size={13} /></span>Gerenciar áreas
           </button>
+          <Link href="/catalogos" className="btn btn-import" title="Editar áreas, cargos, níveis, locais, regionais e situações">
+            <span className="ic"><GridIcon size={13} /></span>Catálogos
+          </Link>
           <div className="select">
             <GridIcon /> Área:
             <select
