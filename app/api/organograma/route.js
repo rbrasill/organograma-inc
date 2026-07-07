@@ -52,7 +52,41 @@ export async function GET(req) {
       [areaId]
     );
 
-    const pessoas = rows.map((r) => ({
+    // líderes EXTERNOS: pessoas de outras áreas que lideram alguém desta área.
+    // Entram no desenho como raiz (âncora) da árvore — ex.: um Diretor de
+    // outro setor que lidera a área inteira. O campo `externo` marca o nó.
+    const [extRows] = await pool.query(
+      `SELECT DISTINCT c.id, c.codigo_dp, c.nome, c.email, c.tipo_contratacao,
+              cg.nome AS cargo, lt.nome AS local, st.nome AS situacao,
+              nh.ordem AS nivel_ordem, se.nome AS setor_nome
+         FROM colaborador c
+         JOIN colaborador sub ON sub.lider_id = c.id AND sub.ativo = 1 AND sub.setor_id = ?
+         LEFT JOIN cargo cg             ON cg.id = c.cargo_id
+         LEFT JOIN nivel_hierarquico nh ON nh.id = cg.nivel_id
+         LEFT JOIN local_trabalho lt    ON lt.id = c.local_id
+         LEFT JOIN situacao st          ON st.id = c.situacao_id
+         LEFT JOIN setor se             ON se.id = c.setor_id
+        WHERE c.ativo = 1 AND (c.setor_id IS NULL OR c.setor_id <> ?)
+        ORDER BY c.nome`,
+      [areaId, areaId]
+    );
+
+    const externos = extRows.map((r) => ({
+      id: r.codigo_dp || r.id,
+      nome: r.nome,
+      cargo: r.cargo || "",
+      local: r.local || "",
+      situacao: r.situacao || "",
+      email: r.email || "",
+      lider: null, // âncora da área: a cadeia acima dele não é desenhada aqui
+      liderNome: "",
+      pj: r.tipo_contratacao === "PJ",
+      nivelOrdem: r.nivel_ordem || null,
+      externo: true,
+      setorOrigem: r.setor_nome || "",
+    }));
+
+    const membros = rows.map((r) => ({
       id: r.codigo_dp || r.id,
       nome: r.nome,
       cargo: r.cargo || "",
@@ -64,6 +98,8 @@ export async function GET(req) {
       pj: r.tipo_contratacao === "PJ",
       nivelOrdem: r.nivel_ordem || null,
     }));
+
+    const pessoas = [...externos, ...membros];
 
     const [cargos] = await pool.query("SELECT nome FROM cargo ORDER BY nome");
     const [locais] = await pool.query("SELECT nome FROM local_trabalho ORDER BY nome");

@@ -99,6 +99,14 @@ main{padding:28px}
 .tree > ul > li{padding-top:0}
 .tree > ul > li::before,.tree > ul > li::after{display:none}
 
+/* degraus por nível hierárquico: irmãos de níveis diferentes descem em
+   linhas distintas (--drop = rank × passo); .lv-line estende o fio vertical
+   do leque (que tem 26px) até o card rebaixado */
+.tree li.lv-drop{padding-top:calc(26px + var(--drop))}
+.tree li .lv-line{position:absolute;top:26px;left:50%;width:2px;height:var(--drop,0px);background:var(--wire);transform:translateX(-50%)}
+.tree > ul > li.lv-drop{padding-top:var(--drop)}
+.tree > ul > li > .lv-line{display:none}
+
 /* colunas verticais de equipe: cards empilhados conectados por fio */
 .leaf-col{display:flex;flex-direction:column;align-items:center}
 .leaf-col .card{width:230px}
@@ -138,6 +146,9 @@ main{padding:28px}
 .lider-externo{margin:-14px -14px 10px;padding:6px 12px;background:#eef4ff;border-bottom:1px solid #d6e3fa;border-radius:18px 18px 0 0;font-size:10.5px;font-weight:600;color:#4468b3;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lider-externo b{color:#1f3f82}
 .lider-externo em{color:#7891c2;font-style:normal;font-weight:500}
+/* variante do card ÂNCORA: o líder (de outra área) desenhado no topo da árvore */
+.lider-externo.chefe{background:#eefaf3;border-bottom-color:#c9ecd7;color:#177245;font-weight:800}
+.lider-externo.chefe em{color:#4d9c72;font-weight:500}
 
 .toggle{position:absolute;bottom:-13px;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid var(--wire-soft);color:var(--inc);border-radius:999px;padding:3px 9px;font:inherit;font-size:11px;font-weight:700;cursor:pointer;box-shadow:var(--shadow-soft);z-index:3;transition:transform .3s var(--ease),background .3s}
 .toggle:hover{background:#fff6f2}

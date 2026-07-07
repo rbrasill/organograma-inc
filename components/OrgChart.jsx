@@ -11,6 +11,7 @@ import {
 import PersonModal from "@/components/PersonModal";
 import ImportModal from "@/components/ImportModal";
 import AreaModal from "@/components/AreaModal";
+import LiderAreaModal from "@/components/LiderAreaModal";
 
 // nível visual (cor/legenda): usa a ordem do banco quando o cargo tem nível
 // vinculado; senão deriva do nome do cargo (fallback até a curadoria)
@@ -18,6 +19,18 @@ const ORDEM_PARA_NIVEL = { 1: 1, 2: 1, 3: 1, 4: 2, 5: 2, 6: 3, 7: 4, 8: 4, 9: 5,
 function nivelVisual(node) {
   if (node.nivelOrdem && ORDEM_PARA_NIVEL[node.nivelOrdem]) return ORDEM_PARA_NIVEL[node.nivelOrdem];
   return nivelDe(node.cargo);
+}
+
+// ordem do nível hierárquico do banco (1 = topo); sem nível vai para o fim.
+// Define a LINHA vertical do card: irmãos de mesmo nível ficam alinhados na
+// mesma linha; níveis diferentes descem em degraus (NIVEL_STEP px por degrau).
+const ordemDe = (n) => (n.nivelOrdem == null ? 99 : n.nivelOrdem);
+const NIVEL_STEP = 150;
+
+// ranks distintos de nível entre irmãos (posição relativa, não o valor bruto —
+// senão um Aprendiz (17) ao lado de um Supervisor (9) desceria 8 linhas)
+function ranksDe(nodes) {
+  return [...new Set(nodes.map(ordemDe))].sort((a, b) => a - b);
 }
 
 function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
@@ -35,6 +48,11 @@ function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
       style={{ "--lvl": cor }}
       onClick={() => onOpen(node)}
     >
+      {node.externo && (
+        <div className="lider-externo chefe" title={`Líder desta área — pertence à área ${node.setorOrigem || "—"}`}>
+          Líder da área <em>· vem de {node.setorOrigem || "outra área"}</em>
+        </div>
+      )}
       {liderExterno && (
         <div className="lider-externo" title={`Responde a ${liderExterno}, que está em outra área`}>
           ↑ Responde a <b>{liderExterno}</b> <em>(fora desta área)</em>
@@ -81,16 +99,47 @@ function dividirEmColunas(leaves) {
   return cols;
 }
 
-function TreeNode({ node, rest }) {
-  const collapsed = rest.collapsedSet.has(node.id);
-  const kids = node.children || [];
-  const hasKids = kids.length > 0;
-  const branches = kids.filter((c) => (c.children || []).length > 0);
-  const leaves = kids.filter((c) => (c.children || []).length === 0);
-  const emColunas = leaves.length > 4;
+// props de degrau (nível): classe + variável CSS + linha de conexão estendida
+function propsDegrau(rank) {
+  if (!rank) return { className: "", style: undefined, linha: null };
+  return {
+    className: "lv-drop",
+    style: { "--drop": `${rank * NIVEL_STEP}px` },
+    linha: <span className="lv-line" />,
+  };
+}
 
+function TreeNode({ node, rest, rank = 0 }) {
+  const collapsed = rest.collapsedSet.has(node.id);
+  const hasKids = (node.children || []).length > 0;
+
+  // filhos ordenados pelo nível hierárquico do banco (depois por nome);
+  // o degrau vertical de cada um é o rank do seu nível entre os irmãos
+  const kids = [...(node.children || [])].sort(
+    (a, b) => ordemDe(a) - ordemDe(b) || a.nome.localeCompare(b.nome, "pt-BR")
+  );
+  const ranks = ranksDe(kids);
+
+  // blocos por nível: ramos (com equipe) são individuais; folhas do mesmo
+  // nível ficam lado a lado (mesma linha) — grupos grandes viram colunas
+  const blocos = [];
+  ranks.forEach((nv, rk) => {
+    const doNivel = kids.filter((c) => ordemDe(c) === nv);
+    doNivel.filter((c) => (c.children || []).length > 0)
+      .forEach((c) => blocos.push({ tipo: "ramo", rank: rk, node: c, key: c.id }));
+    const folhas = doNivel.filter((c) => (c.children || []).length === 0);
+    if (folhas.length > 4) {
+      dividirEmColunas(folhas).forEach((col, ci) =>
+        blocos.push({ tipo: "coluna", rank: rk, col, key: `col-${nv}-${ci}` }));
+    } else {
+      folhas.forEach((c) => blocos.push({ tipo: "folha", rank: rk, node: c, key: c.id }));
+    }
+  });
+
+  const d = propsDegrau(rank);
   return (
-    <li>
+    <li className={d.className} style={d.style}>
+      {d.linha}
       <Card
         node={node}
         byId={rest.byId}
@@ -101,33 +150,38 @@ function TreeNode({ node, rest }) {
       />
       {hasKids && !collapsed && (
         <ul>
-          {branches.map((c) => (
-            <TreeNode key={c.id} node={c} rest={rest} />
-          ))}
-          {!emColunas && leaves.map((c) => (
-            <li key={c.id}>
-              <Card
-                node={c} byId={rest.byId} collapsed={false}
-                onToggle={rest.onToggle} onOpen={rest.onOpen}
-                highlight={rest.highlightId === c.id}
-              />
-            </li>
-          ))}
-          {emColunas && dividirEmColunas(leaves).map((col, i) => (
-            <li key={`col-${i}`}>
-              <div className="leaf-col">
-                {col.map((c) => (
-                  <div className="leaf-item" key={c.id}>
-                    <Card
-                      node={c} byId={rest.byId} collapsed={false}
-                      onToggle={rest.onToggle} onOpen={rest.onOpen}
-                      highlight={rest.highlightId === c.id}
-                    />
-                  </div>
-                ))}
-              </div>
-            </li>
-          ))}
+          {blocos.map((b) => {
+            if (b.tipo === "ramo")
+              return <TreeNode key={b.key} node={b.node} rest={rest} rank={b.rank} />;
+            const bd = propsDegrau(b.rank);
+            if (b.tipo === "folha")
+              return (
+                <li key={b.key} className={bd.className} style={bd.style}>
+                  {bd.linha}
+                  <Card
+                    node={b.node} byId={rest.byId} collapsed={false}
+                    onToggle={rest.onToggle} onOpen={rest.onOpen}
+                    highlight={rest.highlightId === b.node.id}
+                  />
+                </li>
+              );
+            return (
+              <li key={b.key} className={bd.className} style={bd.style}>
+                {bd.linha}
+                <div className="leaf-col">
+                  {b.col.map((c) => (
+                    <div className="leaf-item" key={c.id}>
+                      <Card
+                        node={c} byId={rest.byId} collapsed={false}
+                        onToggle={rest.onToggle} onOpen={rest.onOpen}
+                        highlight={rest.highlightId === c.id}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </li>
@@ -150,6 +204,7 @@ export default function OrgChart() {
   const [showSug, setShowSug] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showAreas, setShowAreas] = useState(false);
+  const [liderAreaAlvo, setLiderAreaAlvo] = useState(null); // card do líder externo aberto
   const [baixando, setBaixando] = useState(false);
   const [pendentes, setPendentes] = useState(0);
   const boxRef = useRef(null);
@@ -368,9 +423,26 @@ export default function OrgChart() {
     setTimeout(() => setHighlightId(null), 2600);
   }
 
-  const rest = { byId, collapsedSet, onToggle, onOpen: (n) => setOpenId(n.id), highlightId };
+  // card do líder externo abre o modal da ÁREA (troca em massa);
+  // os demais abrem o modal normal do colaborador
+  const rest = {
+    byId, collapsedSet, onToggle, highlightId,
+    onOpen: (n) => (n.externo ? setLiderAreaAlvo(n) : setOpenId(n.id)),
+  };
   const aberta = openId ? byId[openId] : null;
-  const liderArea = roots[0]?.nome || "—";
+
+  // raízes ordenadas por nível (o líder externo, de nível mais alto, fica à
+  // frente) e com degraus verticais quando os níveis diferem
+  const rootsOrdenadas = useMemo(
+    () => [...roots].sort((a, b) => ordemDe(a) - ordemDe(b) || a.nome.localeCompare(b.nome, "pt-BR")),
+    [roots]
+  );
+  const rootRanks = ranksDe(rootsOrdenadas);
+
+  // líder da área = o líder externo (âncora) quando existe; senão a raiz de
+  // nível mais alto da própria área
+  const liderArea = rootsOrdenadas.find((r) => r.externo)?.nome || rootsOrdenadas[0]?.nome || "—";
+  const totalArea = pessoas.filter((p) => !p.externo).length;
 
   return (
     <div className="shell">
@@ -444,7 +516,7 @@ export default function OrgChart() {
               <span className="eyebrow">Organograma da área</span>
               <h2>{nomeArea}</h2>
               <p className="subline">
-                {pessoas.length} pessoas &nbsp;·&nbsp; Líder da área: <b>{liderArea}</b> &nbsp;·&nbsp; Última validação: <b>pendente</b>
+                {totalArea} pessoas &nbsp;·&nbsp; Líder da área: <b>{liderArea}</b> &nbsp;·&nbsp; Última validação: <b>pendente</b>
               </p>
             </div>
             <div className="actions">
@@ -496,7 +568,9 @@ export default function OrgChart() {
             <div className="tree" ref={treeRef} style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}>
               {roots.length > 0 && (
                 <ul>
-                  {roots.map((r) => <TreeNode key={r.id} node={r} rest={rest} />)}
+                  {rootsOrdenadas.map((r) => (
+                    <TreeNode key={r.id} node={r} rest={rest} rank={rootRanks.indexOf(ordemDe(r))} />
+                  ))}
                 </ul>
               )}
             </div>
@@ -520,6 +594,17 @@ export default function OrgChart() {
 
       {showAreas && (
         <AreaModal onClose={() => setShowAreas(false)} onMudou={() => carregar(areaId)} />
+      )}
+
+      {liderAreaAlvo && (
+        <LiderAreaModal
+          lider={liderAreaAlvo}
+          areaId={areaId}
+          areaNome={nomeArea}
+          qtdDiretos={pessoas.filter((p) => !p.externo && p.lider === liderAreaAlvo.id).length}
+          onClose={() => setLiderAreaAlvo(null)}
+          onTrocado={() => { setLiderAreaAlvo(null); carregar(areaId); }}
+        />
       )}
 
       {aberta && (
