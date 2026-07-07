@@ -6,7 +6,7 @@ import { NIVEIS, nivelDe, inconsistenciasDe, construirArvore, normalizar } from 
 import {
   UserIcon, PinIcon, CheckIcon, CloseIcon, GridIcon,
   ChevronIcon, SearchIcon, FullscreenIcon, AlertIcon,
-  PlusIcon, MinusIcon, TargetIcon, UploadIcon, DownloadIcon, InboxIcon, PencilIcon,
+  PlusIcon, MinusIcon, TargetIcon, UploadIcon, DownloadIcon, InboxIcon, PencilIcon, MergeIcon,
 } from "@/components/icons";
 import PersonModal from "@/components/PersonModal";
 import ImportModal from "@/components/ImportModal";
@@ -205,6 +205,17 @@ export default function OrgChart() {
   const [showImport, setShowImport] = useState(false);
   const [showAreas, setShowAreas] = useState(false);
   const [liderAreaAlvo, setLiderAreaAlvo] = useState(null); // card do líder externo aberto
+  const [showMenu, setShowMenu] = useState(false); // menu "Gerenciar"
+  const menuRef = useRef(null);
+
+  // fecha o menu "Gerenciar" ao clicar fora ou apertar Esc
+  useEffect(() => {
+    function fora(e) { if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false); }
+    function esc(e) { if (e.key === "Escape") setShowMenu(false); }
+    document.addEventListener("mousedown", fora);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc); };
+  }, []);
   const [baixando, setBaixando] = useState(false);
   const [pendentes, setPendentes] = useState(0);
   const boxRef = useRef(null);
@@ -455,26 +466,7 @@ export default function OrgChart() {
           </div>
         </div>
         <div className="controls">
-          {/* botões no cabeçalho (níveis de acesso virão depois) */}
-          <Link href="/solicitacoes" className="btn btn-import btn-solic" title="Solicitações de ajuste recebidas pelo RH">
-            <span className="ic"><InboxIcon size={13} /></span>Solicitações
-            {pendentes > 0 && <span className="solic-badge">{pendentes}</span>}
-          </Link>
-          <Link href="/colaboradores" className="btn btn-import" title="Localizar e editar dados de um colaborador">
-            <span className="ic"><PencilIcon size={13} /></span>Editar colaboradores
-          </Link>
-          <button className="btn btn-import" onClick={() => setShowImport(true)} title="Subir a base por Excel para o banco de dados">
-            <span className="ic"><UploadIcon size={13} /></span>Importar Excel
-          </button>
-          <a className="btn btn-import" href="/api/colaboradores/exportar" title="Baixar toda a base de colaboradores em Excel (formato de importação)">
-            <span className="ic"><DownloadIcon size={13} /></span>Exportar base
-          </a>
-          <button className="btn btn-import" onClick={() => setShowAreas(true)} title="Renomear e mesclar áreas">
-            <span className="ic"><GridIcon size={13} /></span>Gerenciar áreas
-          </button>
-          <Link href="/catalogos" className="btn btn-import" title="Editar áreas, cargos, níveis, locais, regionais e situações">
-            <span className="ic"><GridIcon size={13} /></span>Catálogos
-          </Link>
+          {/* controles do dia a dia visíveis; ações administrativas agrupadas no menu "Gerenciar" */}
           <div className="select">
             <GridIcon /> Área:
             <select
@@ -506,6 +498,48 @@ export default function OrgChart() {
                     </span>
                   </button>
                 ))}
+              </div>
+            )}
+          </div>
+
+          <Link href="/solicitacoes" className="btn btn-import btn-solic" title="Solicitações de ajuste recebidas pelo RH">
+            <span className="ic"><InboxIcon size={13} /></span>Solicitações
+            {pendentes > 0 && <span className="solic-badge">{pendentes}</span>}
+          </Link>
+
+          <div className="menu-wrap" ref={menuRef}>
+            <button
+              className={`btn btn-import menu-btn ${showMenu ? "on" : ""}`}
+              onClick={() => setShowMenu((v) => !v)}
+              aria-expanded={showMenu}
+            >
+              <span className="ic"><GridIcon size={13} /></span>Gerenciar
+              <ChevronIcon size={11} />
+            </button>
+            {showMenu && (
+              <div className="menu-pop">
+                <span className="menu-titulo">Colaboradores</span>
+                <Link href="/colaboradores" className="menu-item" onClick={() => setShowMenu(false)}>
+                  <span className="mi-ic"><PencilIcon size={15} /></span>
+                  <span className="mi-txt"><b>Editar colaboradores</b><em>Localizar e corrigir dados direto no banco</em></span>
+                </Link>
+                <button className="menu-item" onClick={() => { setShowMenu(false); setShowImport(true); }}>
+                  <span className="mi-ic"><UploadIcon size={15} /></span>
+                  <span className="mi-txt"><b>Importar Excel</b><em>Subir a base oficial (upsert por matrícula)</em></span>
+                </button>
+                <a className="menu-item" href="/api/colaboradores/exportar" onClick={() => setShowMenu(false)}>
+                  <span className="mi-ic"><DownloadIcon size={15} /></span>
+                  <span className="mi-txt"><b>Exportar base</b><em>Baixar todos em .xlsx (formato de importação)</em></span>
+                </a>
+                <span className="menu-titulo">Estrutura</span>
+                <button className="menu-item" onClick={() => { setShowMenu(false); setShowAreas(true); }}>
+                  <span className="mi-ic"><MergeIcon size={15} /></span>
+                  <span className="mi-txt"><b>Gerenciar áreas</b><em>Renomear e mesclar áreas duplicadas</em></span>
+                </button>
+                <Link href="/catalogos" className="menu-item" onClick={() => setShowMenu(false)}>
+                  <span className="mi-ic"><GridIcon size={15} /></span>
+                  <span className="mi-txt"><b>Catálogos da base</b><em>Cargos, níveis, locais, regionais e situações</em></span>
+                </Link>
               </div>
             )}
           </div>
