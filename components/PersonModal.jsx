@@ -21,11 +21,17 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
   const [cargo, setCargo] = useState(pessoa.cargo || "");
   const [area, setArea] = useState(areaAtual || AREAS_OPCOES[0] || "");
   // líder: id (matrícula) + info de exibição (funciona mesmo se o líder é de
-  // outra área, pois não depende do índice byId, que é só da área atual)
+  // outra área, pois não depende do índice byId, que é só da área atual).
+  // liderOriginalInfo guarda o líder de partida enriquecido (cargo/setor
+  // vêm de /api/colaboradores quando o líder é de fora da área carregada).
+  const [liderOriginalInfo, setLiderOriginalInfo] = useState({
+    matricula: pessoa.lider || "",
+    nome: pessoa.liderNome || pessoa.lider || "",
+    cargo: "",
+    setor: "",
+  });
   const [liderId, setLiderId] = useState(pessoa.lider || "");
-  const [liderInfo, setLiderInfo] = useState(
-    pessoa.lider ? { matricula: pessoa.lider, nome: pessoa.liderNome || pessoa.lider, cargo: "" } : null
-  );
+  const [liderInfo, setLiderInfo] = useState(pessoa.lider ? liderOriginalInfo : null);
   const [liderBusca, setLiderBusca] = useState("");
   const [resultados, setResultados] = useState([]);
   const [buscando, setBuscando] = useState(false);
@@ -46,6 +52,28 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
   const liderOriginalId = pessoa.lider || "";
   const liderOriginalNome = pessoa.liderNome || "";
   const mudouLider = liderId !== liderOriginalId;
+
+  // busca os dados completos (cargo/setor) do líder original, que podem não
+  // estar disponíveis se ele for de outra área (só vem o nome via a API do organograma)
+  useEffect(() => {
+    if (!pessoa.lider) return;
+    let ativo = true;
+    fetch(`/api/colaboradores?matricula=${encodeURIComponent(pessoa.lider)}`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!ativo || !j.ok || !j.pessoa) return;
+        const enriquecido = {
+          matricula: pessoa.lider,
+          nome: j.pessoa.nome || pessoa.liderNome || pessoa.lider,
+          cargo: j.pessoa.cargo || "",
+          setor: j.pessoa.setor || "",
+        };
+        setLiderOriginalInfo(enriquecido);
+        setLiderInfo((atual) => (atual && atual.matricula === pessoa.lider ? enriquecido : atual));
+      })
+      .catch(() => {});
+    return () => { ativo = false; };
+  }, [pessoa.lider, pessoa.liderNome]);
 
   // busca de líderes em TODO o banco (não só na área atual), com debounce
   useEffect(() => {
@@ -95,7 +123,7 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
   }
   function desfazerTroca() {
     setLiderId(liderOriginalId);
-    setLiderInfo(liderOriginalId ? { matricula: liderOriginalId, nome: liderOriginalNome, cargo: "" } : null);
+    setLiderInfo(liderOriginalId ? liderOriginalInfo : null);
     setPickerAberto(false);
     setLiderBusca("");
   }

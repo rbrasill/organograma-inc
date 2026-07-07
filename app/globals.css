@@ -129,6 +129,12 @@ main{padding:28px}
 .alert{position:absolute;top:-8px;left:-8px;width:24px;height:24px;border-radius:999px;background:#fff4e6;color:#e08600;display:grid;place-items:center;border:1px solid #ffe0b0;box-shadow:var(--shadow-soft);z-index:2}
 .alert.stat{position:static;width:20px;height:20px}
 
+/* raiz da área com líder real fora dela: faixa no topo do card indicando a
+   ligação, já que a árvore desta área não desenha a linha até lá */
+.lider-externo{margin:-14px -14px 10px;padding:6px 12px;background:#eef4ff;border-bottom:1px solid #d6e3fa;border-radius:18px 18px 0 0;font-size:10.5px;font-weight:600;color:#4468b3;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lider-externo b{color:#1f3f82}
+.lider-externo em{color:#7891c2;font-style:normal;font-weight:500}
+
 .toggle{position:absolute;bottom:-13px;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid var(--wire-soft);color:var(--inc);border-radius:999px;padding:3px 9px;font:inherit;font-size:11px;font-weight:700;cursor:pointer;box-shadow:var(--shadow-soft);z-index:3;transition:transform .3s var(--ease),background .3s}
 .toggle:hover{background:#fff6f2}
 .toggle .tct{color:var(--ink-soft)}

@@ -48,11 +48,15 @@ export const NIVEIS = [
 export const RAIZES_PERMITIDAS = new Set([null]); // no exemplo, o topo da área (Felipe) é raiz
 
 // Inconsistências (ilustrativo). Em produção, as regras rodam no banco.
+// byId só cobre a área carregada — um líder fora dela é válido (ex.: líder
+// de área que responde a um Diretor de outro setor). A API já resolve o
+// nome do líder cross-area (liderNome), então só é "não encontrado" de
+// verdade quando nem o nome veio preenchido.
 export function inconsistenciasDe(p, byId) {
   const alertas = [];
   if (!p.cargo) alertas.push("Cargo não informado");
   if (!p.situacao) alertas.push("Situação não informada");
-  if (p.lider && !byId[p.lider]) alertas.push("Líder não encontrado na base");
+  if (p.lider && !byId[p.lider] && !p.liderNome) alertas.push("Líder não encontrado na base");
   if (p.lider === p.id) alertas.push("Colaborador é o próprio líder");
   return alertas;
 }

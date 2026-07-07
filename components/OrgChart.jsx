@@ -25,6 +25,9 @@ function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
   const cor = NIVEIS[nivel - 1].cor;
   const kids = node.children ? node.children.length : 0;
   const alertas = inconsistenciasDe(node, byId);
+  // raiz da área cujo líder real existe fora dela (ex.: responde a um
+  // Diretor de outro setor) — mostra a ligação em vez de deixar "solto"
+  const liderExterno = node.lider && !byId[node.lider] && node.liderNome ? node.liderNome : null;
   return (
     <div
       id={`card-${node.id}`}
@@ -32,6 +35,11 @@ function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
       style={{ "--lvl": cor }}
       onClick={() => onOpen(node)}
     >
+      {liderExterno && (
+        <div className="lider-externo" title={`Responde a ${liderExterno}, que está em outra área`}>
+          ↑ Responde a <b>{liderExterno}</b> <em>(fora desta área)</em>
+        </div>
+      )}
       {alertas.length > 0 && (
         <span className="alert" title={alertas.join(" · ")}><AlertIcon size={14} /></span>
       )}
