@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS colaborador (
   email             VARCHAR(200)     NULL,
   tipo_contratacao  ENUM('CLT','PJ') NOT NULL DEFAULT 'CLT',
   cargo_id          CHAR(36)         NULL,
+  nivel_id          CHAR(36)         NULL,   -- variação de nível DA PESSOA (sobrepõe o padrão do cargo; NULL = herda)
   setor_id          CHAR(36)         NULL,
   local_id          CHAR(36)         NULL,
   regional_id       CHAR(36)         NULL,
@@ -150,6 +151,7 @@ CREATE TABLE IF NOT EXISTS colaborador (
   KEY ix_colab_lider (lider_id),
   KEY ix_colab_ativo (ativo),
   CONSTRAINT fk_colab_cargo    FOREIGN KEY (cargo_id)    REFERENCES cargo (id),
+  CONSTRAINT fk_colab_nivel    FOREIGN KEY (nivel_id)    REFERENCES nivel_hierarquico (id),
   CONSTRAINT fk_colab_setor    FOREIGN KEY (setor_id)    REFERENCES setor (id),
   CONSTRAINT fk_colab_local    FOREIGN KEY (local_id)    REFERENCES local_trabalho (id),
   CONSTRAINT fk_colab_regional FOREIGN KEY (regional_id) REFERENCES regional (id),

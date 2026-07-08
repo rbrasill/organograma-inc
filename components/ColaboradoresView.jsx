@@ -133,7 +133,9 @@ export default function ColaboradoresView() {
       const j = await r.json();
       if (!j.ok) throw new Error(j.erro || "Falha ao carregar o colaborador.");
       const c = j.colaborador;
-      const nv = nivelPorId(c.cargo_nivel_id);
+      // nível EFETIVO: variação própria da pessoa; senão, o padrão do cargo
+      const nivelEfetivo = c.nivel_pessoal_id || c.cargo_nivel_id || "";
+      const nv = nivelPorId(nivelEfetivo);
       setForm({
         matricula: c.codigo_dp || "",
         nome: c.nome || "",
@@ -146,7 +148,7 @@ export default function ColaboradoresView() {
         situacaoId: c.situacao_id || "",
         liderMatricula: c.lider_mat || "",
         liderNome: c.lider_nome || "",
-        nivelId: c.cargo_nivel_id || "",
+        nivelId: nivelEfetivo,
         nivelOrdem: nv ? String(nv.ordem) : "",
       });
       setOriginal({
@@ -154,7 +156,7 @@ export default function ColaboradoresView() {
         cargo: c.cargo || "", setor: c.setor || "", local: c.local || "",
         regional: c.regional || "", situacao: c.situacao || "",
         liderMatricula: c.lider_mat || "", liderNome: c.lider_nome || "",
-        nivelId: c.cargo_nivel_id || "",
+        nivelId: nivelEfetivo,
       });
     } catch (e) { setErro(e.message); }
     setCarregandoDet(false);
@@ -237,16 +239,8 @@ export default function ColaboradoresView() {
         cargo: c.cargo || "", setor: c.setor || "", local: c.local || "",
         regional: c.regional || "", situacao: c.situacao || "",
         liderMatricula: c.lider_mat || "", liderNome: c.lider_nome || "",
-        nivelId: c.cargo_nivel_id || "",
+        nivelId: c.nivel_pessoal_id || c.cargo_nivel_id || "",
       });
-      // mantém o cache de cargos coerente (o nível pertence ao cargo)
-      if (c.cargo_id) {
-        setListas((ls) => ls ? {
-          ...ls,
-          cargos: (ls.cargos || []).map((cg) =>
-            cg.id === c.cargo_id ? { ...cg, nivelId: c.cargo_nivel_id || null } : cg),
-        } : ls);
-      }
       setResultados((rs) => rs.map((x) => (x.id === selId ? { ...x, nome: c.nome, cargo: c.cargo, setor: c.setor } : x)));
       setConfirmando(false); setSalvo(true);
     } catch (e) { setErro(`Falha ao salvar: ${e.message}`); }
@@ -388,8 +382,12 @@ export default function ColaboradoresView() {
                 </div>
                 {form.cargoId && (
                   <p className="col-nivel-nota">
-                    O nível pertence ao <b>cargo</b> — alterar aqui atualiza o cargo
-                    &quot;<b>{nomeDe("cargos", form.cargoId) || "—"}</b>&quot; para todos os colaboradores que o possuem.
+                    A variação vale <b>somente para este colaborador</b>
+                    {(() => {
+                      const padrao = nivelPorId((listas?.cargos || []).find((cg) => cg.id === form.cargoId)?.nivelId);
+                      return padrao ? <> — o padrão do cargo continua <b>{rotuloNivel(padrao)}</b></> : null;
+                    })()}
+                    . Para mudar o padrão do cargo para todos, use Gerenciar → Catálogos → Cargos.
                   </p>
                 )}
                 <div className="col-grid2">

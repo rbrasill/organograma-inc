@@ -47,11 +47,13 @@ export async function GET(req) {
     const [rows] = await pool.query(
       `SELECT c.id, c.codigo_dp, c.nome, c.email, c.tipo_contratacao,
               cg.nome AS cargo, lt.nome AS local, st.nome AS situacao,
-              nh.ordem AS nivel_ordem, nh.familia AS familia,
+              COALESCE(nhp.ordem, nh.ordem) AS nivel_ordem,
+              COALESCE(nhp.familia, nh.familia) AS familia,
               ld.codigo_dp AS lider_codigo, ld.id AS lider_uuid, ld.nome AS lider_nome
          FROM colaborador c
          LEFT JOIN cargo cg            ON cg.id = c.cargo_id
          LEFT JOIN nivel_hierarquico nh ON nh.id = cg.nivel_id
+         LEFT JOIN nivel_hierarquico nhp ON nhp.id = c.nivel_id
          LEFT JOIN local_trabalho lt   ON lt.id = c.local_id
          LEFT JOIN situacao st         ON st.id = c.situacao_id
          LEFT JOIN colaborador ld      ON ld.id = c.lider_id
@@ -68,11 +70,13 @@ export async function GET(req) {
     const [extRows] = await pool.query(
       `SELECT DISTINCT c.id, c.codigo_dp, c.nome, c.email, c.tipo_contratacao,
               cg.nome AS cargo, lt.nome AS local, st.nome AS situacao,
-              nh.ordem AS nivel_ordem, nh.familia AS familia, se.nome AS setor_nome
+              COALESCE(nhp.ordem, nh.ordem) AS nivel_ordem,
+              COALESCE(nhp.familia, nh.familia) AS familia, se.nome AS setor_nome
          FROM colaborador c
          JOIN colaborador sub ON sub.lider_id = c.id AND sub.ativo = 1 AND sub.setor_id = ?
          LEFT JOIN cargo cg             ON cg.id = c.cargo_id
          LEFT JOIN nivel_hierarquico nh ON nh.id = cg.nivel_id
+         LEFT JOIN nivel_hierarquico nhp ON nhp.id = c.nivel_id
          LEFT JOIN local_trabalho lt    ON lt.id = c.local_id
          LEFT JOIN situacao st          ON st.id = c.situacao_id
          LEFT JOIN setor se             ON se.id = c.setor_id

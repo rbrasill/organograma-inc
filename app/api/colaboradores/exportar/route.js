@@ -42,7 +42,10 @@ export async function GET(req) {
       `SELECT c.codigo_dp, c.nome, c.tipo_contratacao,
               reg.nome AS regional,
               cg.nome AS cargo, cg.codigo_cargo_dp,
-              nh.ordem AS nh_ordem, nh.cod_var AS nh_var, nh.familia AS nh_familia, nh.codigo_nh,
+              COALESCE(nhp.ordem, nh.ordem) AS nh_ordem,
+              COALESCE(nhp.cod_var, nh.cod_var) AS nh_var,
+              COALESCE(nhp.familia, nh.familia) AS nh_familia,
+              COALESCE(nhp.codigo_nh, nh.codigo_nh) AS codigo_nh,
               s.nome AS setor, s.codigo_dp AS setor_cod,
               lt.nome AS local, lt.codigo_dp AS local_cod,
               sit.nome AS situacao, sit.codigo_dp AS sit_cod,
@@ -51,6 +54,7 @@ export async function GET(req) {
          LEFT JOIN regional reg          ON reg.id = c.regional_id
          LEFT JOIN cargo cg              ON cg.id = c.cargo_id
          LEFT JOIN nivel_hierarquico nh  ON nh.id = cg.nivel_id
+         LEFT JOIN nivel_hierarquico nhp ON nhp.id = c.nivel_id
          LEFT JOIN setor s               ON s.id = c.setor_id
          LEFT JOIN local_trabalho lt     ON lt.id = c.local_id
          LEFT JOIN situacao sit          ON sit.id = c.situacao_id

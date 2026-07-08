@@ -21,7 +21,7 @@ async function carregarColaborador(pool, id) {
   const [rows] = await pool.query(
     `SELECT c.id, c.codigo_dp, c.nome, c.email, c.tipo_contratacao, c.ativo,
             c.cargo_id, c.setor_id, c.local_id, c.regional_id, c.situacao_id, c.lider_id,
-            cg.nivel_id AS cargo_nivel_id,
+            c.nivel_id AS nivel_pessoal_id, cg.nivel_id AS cargo_nivel_id,
             cg.nome AS cargo, s.nome AS setor, lt.nome AS local,
             reg.nome AS regional, sit.nome AS situacao,
             ld.codigo_dp AS lider_mat, ld.nome AS lider_nome
@@ -110,7 +110,7 @@ export async function POST(req) {
     const { id, campos } = body;
     if (!id || !campos) return Response.json({ ok: false, erro: "Dados incompletos." }, { status: 400 });
 
-    const [[alvo]] = await pool.query("SELECT id FROM colaborador WHERE id = ?", [id]);
+    const [[alvo]] = await pool.query("SELECT id, nivel_id FROM colaborador WHERE id = ?", [id]);
     if (!alvo) return Response.json({ ok: false, erro: "Colaborador não encontrado." }, { status: 404 });
 
     const nome = (campos.nome || "").trim();
@@ -131,26 +131,34 @@ export async function POST(req) {
     // FKs por id (os selects já mandam o id; string vazia = NULL)
     const fk = (v) => (v ? v : null);
 
-    // nível hierárquico (cascata código → variação/família): o nível pertence
-    // ao CARGO — atualizar aqui muda o cargo escolhido para todos que o têm.
-    if (Object.prototype.hasOwnProperty.call(campos, "nivelId") && campos.cargoId) {
+    // nível hierárquico (cascata código → variação/família): grava NA PESSOA
+    // (colaborador.nivel_id), sem tocar no cargo — cada colaborador pode ter
+    // sua variação (14.A, 14.B...). Igual ao padrão do cargo = NULL (herda),
+    // assim mudar o padrão do cargo no catálogo continua valendo p/ quem herda.
+    let nivelPessoal = alvo.nivel_id || null; // não enviado = preserva o atual
+    if (Object.prototype.hasOwnProperty.call(campos, "nivelId")) {
       const nivelId = campos.nivelId || null;
       if (nivelId) {
         const [[n]] = await pool.query("SELECT id FROM nivel_hierarquico WHERE id = ?", [nivelId]);
         if (!n) return Response.json({ ok: false, erro: "Nível hierárquico selecionado não existe." }, { status: 400 });
       }
-      await pool.query("UPDATE cargo SET nivel_id = ? WHERE id = ?", [nivelId, campos.cargoId]);
+      let padraoCargo = null;
+      if (campos.cargoId) {
+        const [[cg]] = await pool.query("SELECT nivel_id FROM cargo WHERE id = ?", [campos.cargoId]);
+        padraoCargo = cg?.nivel_id || null;
+      }
+      nivelPessoal = nivelId && nivelId !== padraoCargo ? nivelId : null;
     }
 
     await pool.query(
       `UPDATE colaborador
           SET nome = ?, email = ?, tipo_contratacao = ?,
-              cargo_id = ?, setor_id = ?, local_id = ?, regional_id = ?, situacao_id = ?,
+              cargo_id = ?, nivel_id = ?, setor_id = ?, local_id = ?, regional_id = ?, situacao_id = ?,
               lider_id = ?
         WHERE id = ?`,
       [
         nome, (campos.email || "").trim() || null, tipo,
-        fk(campos.cargoId), fk(campos.setorId), fk(campos.localId),
+        fk(campos.cargoId), nivelPessoal, fk(campos.setorId), fk(campos.localId),
         fk(campos.regionalId), fk(campos.situacaoId), liderId, id,
       ]
     );
