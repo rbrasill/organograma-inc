@@ -109,19 +109,22 @@ export default function ColaboradoresView() {
     return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc); };
   }, [liderPicker]);
 
-  // ===== nível hierárquico do cargo (cascata código → variação/família) =====
+  // ===== variação da família (nível hierárquico) =====
+  // O CÓDIGO do nível vem do cargo (editável só no catálogo, para todos);
+  // aqui o usuário escolhe apenas a VARIAÇÃO dentro desse nível (8.A, 8.B...),
+  // que vale só para este colaborador.
   const nivelPorId = useCallback(
     (id) => (listas?.niveis || []).find((n) => n.id === id) || null,
-    [listas]
-  );
-  // códigos de nível distintos (1–18), para o primeiro select da cascata
-  const ordensNivel = useMemo(
-    () => [...new Set((listas?.niveis || []).map((n) => n.ordem))].sort((a, b) => a - b),
     [listas]
   );
   const variacoesDe = useCallback(
     (ordem) => (listas?.niveis || []).filter((n) => String(n.ordem) === String(ordem)),
     [listas]
+  );
+  // nível padrão do cargo selecionado no formulário (define o código)
+  const nivelDoCargo = useCallback(
+    (cargoId) => nivelPorId((listas?.cargos || []).find((c) => c.id === cargoId)?.nivelId),
+    [listas, nivelPorId]
   );
 
   const selecionar = useCallback(async (id) => {
@@ -135,7 +138,6 @@ export default function ColaboradoresView() {
       const c = j.colaborador;
       // nível EFETIVO: variação própria da pessoa; senão, o padrão do cargo
       const nivelEfetivo = c.nivel_pessoal_id || c.cargo_nivel_id || "";
-      const nv = nivelPorId(nivelEfetivo);
       setForm({
         matricula: c.codigo_dp || "",
         nome: c.nome || "",
@@ -149,7 +151,6 @@ export default function ColaboradoresView() {
         liderMatricula: c.lider_mat || "",
         liderNome: c.lider_nome || "",
         nivelId: nivelEfetivo,
-        nivelOrdem: nv ? String(nv.ordem) : "",
       });
       setOriginal({
         nome: c.nome || "", email: c.email || "", tipo: c.tipo_contratacao || "CLT",
@@ -162,25 +163,11 @@ export default function ColaboradoresView() {
     setCarregandoDet(false);
   }, [nivelPorId]);
 
-  // trocar o cargo sincroniza os selects de nível com o nível do cargo novo
+  // trocar o cargo traz junto a variação padrão dele (o usuário pode então
+  // escolher outra variação da MESMA família/nível, se houver)
   function trocaCargo(cargoId) {
     const cg = (listas?.cargos || []).find((c) => c.id === cargoId);
-    const nv = nivelPorId(cg?.nivelId || "");
-    setForm((f) => ({
-      ...f, cargoId,
-      nivelId: cg?.nivelId || "",
-      nivelOrdem: nv ? String(nv.ordem) : "",
-    }));
-    setSalvo(false);
-  }
-
-  // trocar o código do nível: se o nível só tem uma variação, já seleciona
-  function trocaOrdemNivel(ordem) {
-    const vs = variacoesDe(ordem);
-    setForm((f) => ({
-      ...f, nivelOrdem: ordem,
-      nivelId: !ordem ? "" : vs.length === 1 ? vs[0].id : "",
-    }));
+    setForm((f) => ({ ...f, cargoId, nivelId: cg?.nivelId || "" }));
     setSalvo(false);
   }
 
@@ -351,45 +338,46 @@ export default function ColaboradoresView() {
                   </select>
                 </label>
 
-                {/* nível hierárquico do cargo: código (1–18) → variação/família */}
-                <div className="col-grid2">
-                  <label className="fld">
-                    <span>Cód. nível hierárquico</span>
-                    <select
-                      value={form.nivelOrdem}
-                      disabled={!form.cargoId}
-                      title={!form.cargoId ? "Selecione um cargo primeiro" : ""}
-                      onChange={(e) => trocaOrdemNivel(e.target.value)}
-                    >
-                      <option value="">— selecione —</option>
-                      {ordensNivel.map((o) => <option key={o} value={String(o)}>{o}</option>)}
-                    </select>
-                  </label>
-                  <label className="fld">
-                    <span>Variação / Família</span>
-                    <select
-                      value={form.nivelId}
-                      disabled={!form.cargoId || !form.nivelOrdem}
-                      title={!form.cargoId ? "Selecione um cargo primeiro" : !form.nivelOrdem ? "Selecione o código do nível" : ""}
-                      onChange={(e) => set("nivelId", e.target.value)}
-                    >
-                      <option value="">— selecione —</option>
-                      {variacoesDe(form.nivelOrdem).map((n) => (
-                        <option key={n.id} value={n.id}>{rotuloNivel(n)}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                {form.cargoId && (
-                  <p className="col-nivel-nota">
-                    A variação vale <b>somente para este colaborador</b>
-                    {(() => {
-                      const padrao = nivelPorId((listas?.cargos || []).find((cg) => cg.id === form.cargoId)?.nivelId);
-                      return padrao ? <> — o padrão do cargo continua <b>{rotuloNivel(padrao)}</b></> : null;
-                    })()}
-                    . Para mudar o padrão do cargo para todos, use Gerenciar → Catálogos → Cargos.
-                  </p>
-                )}
+                {/* variação da família: o CÓDIGO do nível vem do cargo (edita-se
+                    no catálogo); aqui só a variação dentro desse nível */}
+                {(() => {
+                  const padrao = nivelDoCargo(form.cargoId);
+                  const variacoes = padrao ? variacoesDe(padrao.ordem) : [];
+                  return (
+                    <>
+                      <label className="fld">
+                        <span>
+                          Variação da família
+                          {padrao ? <em className="ct-ex"> · nível {padrao.ordem} (definido pelo cargo)</em> : null}
+                        </span>
+                        <select
+                          value={form.nivelId}
+                          disabled={!form.cargoId || !padrao}
+                          title={!form.cargoId
+                            ? "Selecione um cargo primeiro"
+                            : !padrao ? "Este cargo ainda não tem nível — defina em Gerenciar → Catálogos → Cargos" : ""}
+                          onChange={(e) => set("nivelId", e.target.value)}
+                        >
+                          <option value="">— selecione —</option>
+                          {variacoes.map((n) => (
+                            <option key={n.id} value={n.id}>{rotuloNivel(n)}</option>
+                          ))}
+                        </select>
+                      </label>
+                      {form.cargoId && (
+                        <p className="col-nivel-nota">
+                          {padrao ? (
+                            <>A variação vale <b>somente para este colaborador</b> — o padrão do cargo é <b>{rotuloNivel(padrao)}</b>.
+                            O número do nível é do cargo e se edita em Gerenciar → Catálogos → Cargos (vale para todos).</>
+                          ) : (
+                            <>Este cargo ainda não tem nível hierárquico vinculado — defina primeiro em
+                            Gerenciar → Catálogos → Cargos para liberar as variações.</>
+                          )}
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
                 <div className="col-grid2">
                   <label className="fld">
                     <span>Área / Setor</span>

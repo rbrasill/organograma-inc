@@ -135,19 +135,32 @@ export async function POST(req) {
     // (colaborador.nivel_id), sem tocar no cargo — cada colaborador pode ter
     // sua variação (14.A, 14.B...). Igual ao padrão do cargo = NULL (herda),
     // assim mudar o padrão do cargo no catálogo continua valendo p/ quem herda.
+    // variação da família: só pode variar DENTRO do nível do cargo (o número
+    // do nível é do cargo e se edita no catálogo). Igual ao padrão = NULL (herda).
     let nivelPessoal = alvo.nivel_id || null; // não enviado = preserva o atual
     if (Object.prototype.hasOwnProperty.call(campos, "nivelId")) {
       const nivelId = campos.nivelId || null;
-      if (nivelId) {
-        const [[n]] = await pool.query("SELECT id FROM nivel_hierarquico WHERE id = ?", [nivelId]);
-        if (!n) return Response.json({ ok: false, erro: "Nível hierárquico selecionado não existe." }, { status: 400 });
-      }
       let padraoCargo = null;
       if (campos.cargoId) {
-        const [[cg]] = await pool.query("SELECT nivel_id FROM cargo WHERE id = ?", [campos.cargoId]);
-        padraoCargo = cg?.nivel_id || null;
+        const [[cg]] = await pool.query(
+          `SELECT cg.nivel_id, nh.ordem FROM cargo cg
+             LEFT JOIN nivel_hierarquico nh ON nh.id = cg.nivel_id
+            WHERE cg.id = ?`,
+          [campos.cargoId]
+        );
+        padraoCargo = cg || null;
       }
-      nivelPessoal = nivelId && nivelId !== padraoCargo ? nivelId : null;
+      if (nivelId) {
+        const [[n]] = await pool.query("SELECT id, ordem, cod_var FROM nivel_hierarquico WHERE id = ?", [nivelId]);
+        if (!n) return Response.json({ ok: false, erro: "Nível hierárquico selecionado não existe." }, { status: 400 });
+        if (padraoCargo?.ordem != null && n.ordem !== padraoCargo.ordem) {
+          return Response.json({
+            ok: false,
+            erro: `A variação ${n.cod_var || ""} é do nível ${n.ordem}, mas o cargo escolhido é do nível ${padraoCargo.ordem}. Escolha uma variação do mesmo nível — o número do nível se edita no catálogo de cargos.`,
+          }, { status: 400 });
+        }
+      }
+      nivelPessoal = nivelId && nivelId !== (padraoCargo?.nivel_id || null) ? nivelId : null;
     }
 
     await pool.query(
