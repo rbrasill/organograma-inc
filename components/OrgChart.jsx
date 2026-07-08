@@ -198,6 +198,9 @@ export default function OrgChart() {
   const [erroApi, setErroApi] = useState("");
 
   const [query, setQuery] = useState("");
+  const [resultadosBusca, setResultadosBusca] = useState([]); // busca em toda a base
+  const [buscando, setBuscando] = useState(false);
+  const focoPendenteRef = useRef(null); // matrícula a focar após trocar de área
   const [openId, setOpenId] = useState(null);
   const [collapsedSet, setCollapsedSet] = useState(new Set());
   const [highlightId, setHighlightId] = useState(null);
@@ -404,13 +407,22 @@ export default function OrgChart() {
     }
   }
 
-  const sugestoes = useMemo(() => {
-    const q = normalizar(query.trim());
-    if (q.length < 2) return [];
-    return pessoas
-      .filter((p) => normalizar(p.nome).includes(q) || normalizar(p.cargo).includes(q))
-      .slice(0, 6);
-  }, [query, pessoas]);
+  // busca de pessoa em TODA a base (não só na área carregada), com debounce
+  useEffect(() => {
+    const q = query.trim();
+    if (!showSug || q.length < 2) { setResultadosBusca([]); return; }
+    let ativo = true;
+    setBuscando(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/colaboradores?q=${encodeURIComponent(q)}`);
+        const j = await r.json();
+        if (ativo) setResultadosBusca(j.ok ? j.resultados : []);
+      } catch { if (ativo) setResultadosBusca([]); }
+      if (ativo) setBuscando(false);
+    }, 250);
+    return () => { ativo = false; clearTimeout(t); };
+  }, [query, showSug]);
 
   function onToggle(id) {
     setCollapsedSet((prev) => {
@@ -420,19 +432,46 @@ export default function OrgChart() {
     });
   }
 
-  function irPara(p) {
+  // expande a cadeia até a pessoa, destaca e centraliza nela
+  const focarEExpandir = useCallback((id) => {
+    const alvo = byId[id];
+    if (!alvo) return;
     setCollapsedSet((prev) => {
       const n = new Set(prev);
-      let cur = p;
+      let cur = alvo;
       while (cur && cur.lider) { n.delete(cur.lider); cur = byId[cur.lider]; }
       return n;
     });
-    setQuery(p.nome);
+    setHighlightId(id);
+    setTimeout(() => focarPessoa(id), 140);
+    setTimeout(() => setHighlightId(null), 3000);
+  }, [byId]);
+
+  // clique num resultado da busca: abre a área da pessoa (trocando o seletor)
+  // e, quando os dados chegam, foca nela. Se já estiver na área carregada,
+  // foca direto.
+  function irParaPessoa(res) {
     setShowSug(false);
-    setHighlightId(p.id);
-    setTimeout(() => focarPessoa(p.id), 120);
-    setTimeout(() => setHighlightId(null), 2600);
+    setResultadosBusca([]);
+    setQuery("");
+    if (byId[res.matricula]) {
+      focoPendenteRef.current = null;
+      focarEExpandir(res.matricula);
+      return;
+    }
+    focoPendenteRef.current = res.matricula;
+    carregar(res.setorId || null);
   }
+
+  // quando a área nova termina de carregar (byId muda), foca a pessoa pendente
+  useEffect(() => {
+    const id = focoPendenteRef.current;
+    if (!id || !byId[id]) return;
+    focoPendenteRef.current = null;
+    // espera o auto-centralizar (≈140ms) acontecer antes de focar na pessoa
+    const t = setTimeout(() => focarEExpandir(id), 360);
+    return () => clearTimeout(t);
+  }, [byId, focarEExpandir]);
 
   // card do líder externo abre o modal da ÁREA (troca em massa);
   // os demais abrem o modal normal do colaborador
@@ -472,32 +511,36 @@ export default function OrgChart() {
             <select
               className="area-select"
               value={areaId || ""}
-              onChange={(e) => carregar(e.target.value)}
+              onChange={(e) => carregar(e.target.value || null)}
               disabled={carregando || setores.length === 0}
             >
-              {setores.length === 0 && <option value="">—</option>}
+              <option value="">Selecione uma área...</option>
               {setores.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
             </select>
           </div>
           <div className="search" ref={boxRef}>
             <SearchIcon />
             <input
-              placeholder="Buscar pessoa..."
+              placeholder="Buscar pessoa em toda a base..."
               value={query}
               onChange={(e) => { setQuery(e.target.value); setShowSug(true); }}
               onFocus={() => setShowSug(true)}
             />
-            {showSug && sugestoes.length > 0 && (
-              <div className="sug">
-                {sugestoes.map((p) => (
-                  <button key={p.id} className="sug-item" onClick={() => irPara(p)}>
+            {showSug && query.trim().length >= 2 && (
+              <div className="sug sug-busca">
+                {resultadosBusca.map((p) => (
+                  <button key={p.matricula} className="sug-item" onClick={() => irParaPessoa(p)}>
                     <span className="si-ava"><UserIcon size={16} /></span>
                     <span className="si-txt">
                       <b>{p.nome}</b>
-                      <em>{p.cargo || "Cargo a definir"} · {nomeArea}</em>
+                      <em>{p.cargo || "Cargo a definir"}{p.setor ? ` · ${p.setor}` : ""}</em>
                     </span>
                   </button>
                 ))}
+                {buscando && <div className="sug-vazio">Buscando...</div>}
+                {!buscando && resultadosBusca.length === 0 && (
+                  <div className="sug-vazio">Nenhuma pessoa encontrada.</div>
+                )}
               </div>
             )}
           </div>
@@ -551,10 +594,16 @@ export default function OrgChart() {
           <div className="board-head">
             <div className="title-wrap">
               <span className="eyebrow">Organograma da área</span>
-              <h2>{nomeArea}</h2>
-              <p className="subline">
-                {totalArea} pessoas &nbsp;·&nbsp; Líder da área: <b>{liderArea}</b> &nbsp;·&nbsp; Última validação: <b>pendente</b>
-              </p>
+              <h2>{areaId ? nomeArea : "Selecione uma área"}</h2>
+              {areaId ? (
+                <p className="subline">
+                  {totalArea} pessoas &nbsp;·&nbsp; Líder da área: <b>{liderArea}</b> &nbsp;·&nbsp; Última validação: <b>pendente</b>
+                </p>
+              ) : (
+                <p className="subline">
+                  Escolha uma área no seletor acima — ou busque uma pessoa para abrir a área dela.
+                </p>
+              )}
             </div>
             <div className="actions">
               <button
@@ -595,10 +644,17 @@ export default function OrgChart() {
                 <em>{erroApi}</em>
               </div>
             )}
-            {!carregando && !erroApi && roots.length === 0 && (
+            {!carregando && !erroApi && !areaId && (
+              <div className="tree-vazio">
+                <GridIcon size={22} />
+                <b>Selecione uma área para começar</b>
+                <em>Use o seletor "Área" acima, ou busque uma pessoa — o organograma abre direto na área dela.</em>
+              </div>
+            )}
+            {!carregando && !erroApi && areaId && roots.length === 0 && (
               <div className="tree-vazio">
                 <b>Nenhum colaborador ativo nesta área</b>
-                <em>Use o botão "Importar Excel" no topo para carregar a base.</em>
+                <em>Abra o menu "Gerenciar" → "Importar Excel" para carregar a base.</em>
               </div>
             )}
 

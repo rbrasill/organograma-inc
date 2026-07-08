@@ -22,7 +22,8 @@ export async function GET(req) {
     const matricula = url.searchParams.get("matricula");
 
     const base =
-      `SELECT c.codigo_dp AS matricula, c.nome, cg.nome AS cargo, st.nome AS setor
+      `SELECT c.codigo_dp AS matricula, c.nome, cg.nome AS cargo,
+              st.nome AS setor, st.id AS setorId
          FROM colaborador c
          LEFT JOIN cargo cg ON cg.id = c.cargo_id
          LEFT JOIN setor st ON st.id = c.setor_id

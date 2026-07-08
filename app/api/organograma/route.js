@@ -25,13 +25,23 @@ export async function GET(req) {
       });
     }
 
-    let areaId = areaParam && setores.some((s) => s.id === areaParam) ? areaParam : null;
+    // listas dos dropdowns do modal (baratas — carregam sempre)
+    const [cargos] = await pool.query("SELECT nome FROM cargo ORDER BY nome");
+    const [locais] = await pool.query("SELECT nome FROM local_trabalho ORDER BY nome");
+    const [sits] = await pool.query("SELECT nome FROM situacao ORDER BY nome");
+    const listas = {
+      cargos: cargos.map((x) => x.nome),
+      locais: locais.map((x) => x.nome),
+      areas: setores.map((s) => s.nome),
+      situacoes: sits.map((x) => x.nome),
+    };
+
+    // Sem área selecionada NÃO carrega ninguém (evita abrir a Obra, a mais
+    // pesada, por padrão). O usuário escolhe a área no seletor ou busca a
+    // pessoa — que abre direto a área dela.
+    const areaId = areaParam && setores.some((s) => s.id === areaParam) ? areaParam : null;
     if (!areaId) {
-      // padrão: a área com mais colaboradores ativos
-      const [top] = await pool.query(
-        "SELECT setor_id, COUNT(*) n FROM colaborador WHERE ativo = 1 AND setor_id IS NOT NULL GROUP BY setor_id ORDER BY n DESC LIMIT 1"
-      );
-      areaId = top[0]?.setor_id || setores[0].id;
+      return Response.json({ ok: true, setores, areaId: null, pessoas: [], listas });
     }
 
     const [rows] = await pool.query(
@@ -101,22 +111,7 @@ export async function GET(req) {
 
     const pessoas = [...externos, ...membros];
 
-    const [cargos] = await pool.query("SELECT nome FROM cargo ORDER BY nome");
-    const [locais] = await pool.query("SELECT nome FROM local_trabalho ORDER BY nome");
-    const [sits] = await pool.query("SELECT nome FROM situacao ORDER BY nome");
-
-    return Response.json({
-      ok: true,
-      setores,
-      areaId,
-      pessoas,
-      listas: {
-        cargos: cargos.map((x) => x.nome),
-        locais: locais.map((x) => x.nome),
-        areas: setores.map((s) => s.nome),
-        situacoes: sits.map((x) => x.nome),
-      },
-    });
+    return Response.json({ ok: true, setores, areaId, pessoas, listas });
   } catch (e) {
     const msg = e?.codigo === "SEM_CONFIG" ? e.message : `Falha ao acessar o banco: ${e.message}`;
     return Response.json({ ok: false, erro: msg }, { status: 500 });
