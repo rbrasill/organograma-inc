@@ -36,16 +36,9 @@ function nivelVisual(node) {
 }
 
 // ordem do nível hierárquico do banco (1 = topo); sem nível vai para o fim.
-// Define a LINHA vertical do card: irmãos de mesmo nível ficam alinhados na
-// mesma linha; níveis diferentes descem em degraus (NIVEL_STEP px por degrau).
+// Usada só para ORDENAR os filhos da esquerda (mais sênior) para a direita —
+// todos os irmãos ficam na mesma linha (árvore clássica, sem degraus).
 const ordemDe = (n) => (n.nivelOrdem == null ? 99 : n.nivelOrdem);
-const NIVEL_STEP = 150;
-
-// ranks distintos de nível entre irmãos (posição relativa, não o valor bruto —
-// senão um Aprendiz (17) ao lado de um Supervisor (9) desceria 8 linhas)
-function ranksDe(nodes) {
-  return [...new Set(nodes.map(ordemDe))].sort((a, b) => a - b);
-}
 
 function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
   const nivel = nivelVisual(node);
@@ -93,10 +86,9 @@ function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
         <button
           className={`toggle ${collapsed ? "off" : ""}`}
           onClick={(e) => { e.stopPropagation(); onToggle(node.id); }}
-          title={collapsed ? "Expandir equipe" : "Recolher equipe"}
+          title={collapsed ? `Expandir equipe (${kids})` : "Recolher equipe"}
         >
-          <span className="tct">{kids}</span>
-          <ChevronIcon size={13} />
+          {collapsed ? <PlusIcon size={13} /> : <MinusIcon size={13} />}
         </button>
       )}
     </div>
@@ -113,47 +105,22 @@ function dividirEmColunas(leaves) {
   return cols;
 }
 
-// props de degrau (nível): classe + variável CSS + linha de conexão estendida
-function propsDegrau(rank) {
-  if (!rank) return { className: "", style: undefined, linha: null };
-  return {
-    className: "lv-drop",
-    style: { "--drop": `${rank * NIVEL_STEP}px` },
-    linha: <span className="lv-line" />,
-  };
-}
-
-function TreeNode({ node, rest, rank = 0 }) {
+function TreeNode({ node, rest }) {
   const collapsed = rest.collapsedSet.has(node.id);
-  const hasKids = (node.children || []).length > 0;
 
-  // filhos ordenados pelo nível hierárquico do banco (depois por nome);
-  // o degrau vertical de cada um é o rank do seu nível entre os irmãos
+  // filhos ordenados por nível (mais sênior à esquerda), depois por nome.
+  // Ramos (quem tem equipe) primeiro, folhas depois — mas todos na MESMA
+  // linha horizontal, ligados pela mesma barra (árvore clássica).
   const kids = [...(node.children || [])].sort(
     (a, b) => ordemDe(a) - ordemDe(b) || a.nome.localeCompare(b.nome, "pt-BR")
   );
-  const ranks = ranksDe(kids);
+  const hasKids = kids.length > 0;
+  const branches = kids.filter((c) => (c.children || []).length > 0);
+  const leaves = kids.filter((c) => (c.children || []).length === 0);
+  const emColunas = leaves.length > 4;
 
-  // blocos por nível: ramos (com equipe) são individuais; folhas do mesmo
-  // nível ficam lado a lado (mesma linha) — grupos grandes viram colunas
-  const blocos = [];
-  ranks.forEach((nv, rk) => {
-    const doNivel = kids.filter((c) => ordemDe(c) === nv);
-    doNivel.filter((c) => (c.children || []).length > 0)
-      .forEach((c) => blocos.push({ tipo: "ramo", rank: rk, node: c, key: c.id }));
-    const folhas = doNivel.filter((c) => (c.children || []).length === 0);
-    if (folhas.length > 4) {
-      dividirEmColunas(folhas).forEach((col, ci) =>
-        blocos.push({ tipo: "coluna", rank: rk, col, key: `col-${nv}-${ci}` }));
-    } else {
-      folhas.forEach((c) => blocos.push({ tipo: "folha", rank: rk, node: c, key: c.id }));
-    }
-  });
-
-  const d = propsDegrau(rank);
   return (
-    <li className={d.className} style={d.style}>
-      {d.linha}
+    <li>
       <Card
         node={node}
         byId={rest.byId}
@@ -164,38 +131,33 @@ function TreeNode({ node, rest, rank = 0 }) {
       />
       {hasKids && !collapsed && (
         <ul>
-          {blocos.map((b) => {
-            if (b.tipo === "ramo")
-              return <TreeNode key={b.key} node={b.node} rest={rest} rank={b.rank} />;
-            const bd = propsDegrau(b.rank);
-            if (b.tipo === "folha")
-              return (
-                <li key={b.key} className={bd.className} style={bd.style}>
-                  {bd.linha}
-                  <Card
-                    node={b.node} byId={rest.byId} collapsed={false}
-                    onToggle={rest.onToggle} onOpen={rest.onOpen}
-                    highlight={rest.highlightId === b.node.id}
-                  />
-                </li>
-              );
-            return (
-              <li key={b.key} className={bd.className} style={bd.style}>
-                {bd.linha}
-                <div className="leaf-col">
-                  {b.col.map((c) => (
-                    <div className="leaf-item" key={c.id}>
-                      <Card
-                        node={c} byId={rest.byId} collapsed={false}
-                        onToggle={rest.onToggle} onOpen={rest.onOpen}
-                        highlight={rest.highlightId === c.id}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </li>
-            );
-          })}
+          {branches.map((c) => (
+            <TreeNode key={c.id} node={c} rest={rest} />
+          ))}
+          {!emColunas && leaves.map((c) => (
+            <li key={c.id}>
+              <Card
+                node={c} byId={rest.byId} collapsed={false}
+                onToggle={rest.onToggle} onOpen={rest.onOpen}
+                highlight={rest.highlightId === c.id}
+              />
+            </li>
+          ))}
+          {emColunas && dividirEmColunas(leaves).map((col, i) => (
+            <li key={`col-${i}`}>
+              <div className="leaf-col">
+                {col.map((c) => (
+                  <div className="leaf-item" key={c.id}>
+                    <Card
+                      node={c} byId={rest.byId} collapsed={false}
+                      onToggle={rest.onToggle} onOpen={rest.onOpen}
+                      highlight={rest.highlightId === c.id}
+                    />
+                  </div>
+                ))}
+              </div>
+            </li>
+          ))}
         </ul>
       )}
     </li>
@@ -501,7 +463,6 @@ export default function OrgChart() {
     () => [...roots].sort((a, b) => ordemDe(a) - ordemDe(b) || a.nome.localeCompare(b.nome, "pt-BR")),
     [roots]
   );
-  const rootRanks = ranksDe(rootsOrdenadas);
 
   // líder da área = o líder externo (âncora) quando existe; senão a raiz de
   // nível mais alto da própria área
@@ -692,7 +653,7 @@ export default function OrgChart() {
               {roots.length > 0 && (
                 <ul>
                   {rootsOrdenadas.map((r) => (
-                    <TreeNode key={r.id} node={r} rest={rest} rank={rootRanks.indexOf(ordemDe(r))} />
+                    <TreeNode key={r.id} node={r} rest={rest} />
                   ))}
                 </ul>
               )}
