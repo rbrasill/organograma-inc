@@ -244,6 +244,20 @@ export default function ColaboradoresView() {
     setSalvando(false);
   }
 
+  // POST na API de gestão com resposta tolerante a erro não-JSON
+  async function post(payload) {
+    try {
+      const r = await fetch("/api/colaboradores/gestao", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const txt = await r.text();
+      try { return JSON.parse(txt); } catch { return { ok: false, erro: `Servidor respondeu ${r.status}.` }; }
+    } catch (e) {
+      return { ok: false, erro: `Falha de rede: ${e.message}` };
+    }
+  }
+
   async function desativar() {
     setProcessandoAtivo(true); setErro("");
     const j = await post({ acao: "desativar", id: selId });
