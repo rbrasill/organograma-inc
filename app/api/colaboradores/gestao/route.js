@@ -4,8 +4,11 @@
 //   GET (sem params) → { areas, listas } para montar filtros e selects
 //   GET ?setor=<id>&q=<termo> → { colaboradores } (lista para localizar)
 //   GET ?id=<uuid>            → { colaborador } com todos os campos e ids
-//   POST { id, campos }       → atualiza o colaborador e devolve o registro novo
+//   POST { id, campos }          → atualiza o colaborador e devolve o registro novo
+//   POST { acao:"desativar", id} → arquiva (ativo=0) e reaponta subordinados
+//   POST { acao:"reativar",  id} → volta ativo=1
 
+import { randomUUID } from "crypto";
 import { getPool } from "@/lib/db";
 import { normalizar } from "@/data/ti";
 
@@ -14,6 +17,14 @@ export const dynamic = "force-dynamic";
 function erroResposta(e) {
   const msg = e?.codigo === "SEM_CONFIG" ? e.message : `Falha ao acessar o banco: ${e.message}`;
   return Response.json({ ok: false, erro: msg }, { status: 500 });
+}
+
+// nº de subordinados diretos ativos (para avisar ao desativar um líder)
+async function contarSubordinados(conn, id) {
+  const [[r]] = await conn.query(
+    "SELECT COUNT(*) n FROM colaborador WHERE lider_id = ? AND ativo = 1", [id]
+  );
+  return Number(r.n);
 }
 
 // registro completo do colaborador (campos + ids das FKs + nomes resolvidos)
@@ -50,26 +61,30 @@ export async function GET(req) {
     if (id) {
       const c = await carregarColaborador(pool, id);
       if (!c) return Response.json({ ok: false, erro: "Colaborador não encontrado." }, { status: 404 });
+      c.subordinados = await contarSubordinados(pool, id);
       return Response.json({ ok: true, colaborador: c });
     }
 
     // busca (área e/ou nome). Sem filtro nenhum não lista tudo (base grande):
-    // exige área OU um termo de busca.
+    // exige área OU um termo de busca. Por padrão só ativos; incluirInativos=1
+    // traz também os arquivados (para reativar).
     if (setor || q) {
-      const cond = ["c.ativo = 1"];
+      const incluirInativos = url.searchParams.get("incluirInativos") === "1";
+      const cond = [];
       const args = [];
+      if (!incluirInativos) cond.push("c.ativo = 1");
       if (setor) { cond.push("c.setor_id = ?"); args.push(setor); }
       if (q) {
         cond.push("c.nome LIKE ? COLLATE utf8mb4_unicode_ci");
         args.push(`%${q}%`);
       }
       const [rows] = await pool.query(
-        `SELECT c.id, c.codigo_dp AS matricula, c.nome, cg.nome AS cargo, s.nome AS setor
+        `SELECT c.id, c.codigo_dp AS matricula, c.nome, c.ativo, cg.nome AS cargo, s.nome AS setor
            FROM colaborador c
            LEFT JOIN cargo cg ON cg.id = c.cargo_id
            LEFT JOIN setor s  ON s.id = c.setor_id
           WHERE ${cond.join(" AND ")}
-          ORDER BY c.nome
+          ORDER BY c.ativo DESC, c.nome
           LIMIT 200`,
         args
       );
@@ -104,11 +119,57 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
+  let conn;
   try {
     const pool = getPool();
     const body = await req.json();
-    const { id, campos } = body;
-    if (!id || !campos) return Response.json({ ok: false, erro: "Dados incompletos." }, { status: 400 });
+    const { id, acao } = body;
+    if (!id) return Response.json({ ok: false, erro: "Colaborador não informado." }, { status: 400 });
+
+    // ---- desativar: arquiva (ativo=0) e reaponta os subordinados diretos
+    // para o líder do desativado (mantém a árvore conectada). Nada é apagado.
+    if (acao === "desativar") {
+      conn = await pool.getConnection();
+      await conn.beginTransaction();
+      const [[c]] = await conn.query(
+        "SELECT id, nome, lider_id, ativo FROM colaborador WHERE id = ? FOR UPDATE", [id]
+      );
+      if (!c) { await conn.rollback(); return Response.json({ ok: false, erro: "Colaborador não encontrado." }, { status: 404 }); }
+      if (!c.ativo) { await conn.rollback(); return Response.json({ ok: false, erro: "Este colaborador já está desativado." }, { status: 409 }); }
+
+      // subordinados sobem para o líder de cima (pode ser NULL = viram raiz)
+      const [sub] = await conn.query(
+        "UPDATE colaborador SET lider_id = ? WHERE lider_id = ? AND ativo = 1 AND id <> ?",
+        [c.lider_id || null, id, id]
+      );
+      // arquiva o colaborador
+      await conn.query("UPDATE colaborador SET ativo = 0, lider_id = NULL WHERE id = ?", [id]);
+      // fecha o vínculo vigente no histórico + auditoria
+      await conn.query("UPDATE colaborador_historico SET data_fim = NOW() WHERE colaborador_id = ? AND data_fim IS NULL", [id]);
+      await conn.query(
+        "INSERT INTO log_auditoria (id, entidade, registro_id, campo, valor_antigo, valor_novo) VALUES (?, 'colaborador', ?, 'ativo', '1', '0')",
+        [randomUUID(), id]
+      );
+      await conn.commit();
+      return Response.json({ ok: true, reapontados: sub.affectedRows || 0 });
+    }
+
+    // ---- reativar: volta ativo=1 (entra sem líder — reatribuir depois) ----
+    if (acao === "reativar") {
+      const [[c]] = await pool.query("SELECT id, ativo FROM colaborador WHERE id = ?", [id]);
+      if (!c) return Response.json({ ok: false, erro: "Colaborador não encontrado." }, { status: 404 });
+      if (c.ativo) return Response.json({ ok: false, erro: "Este colaborador já está ativo." }, { status: 409 });
+      await pool.query("UPDATE colaborador SET ativo = 1 WHERE id = ?", [id]);
+      await pool.query(
+        "INSERT INTO log_auditoria (id, entidade, registro_id, campo, valor_antigo, valor_novo) VALUES (?, 'colaborador', ?, 'ativo', '0', '1')",
+        [randomUUID(), id]
+      );
+      return Response.json({ ok: true });
+    }
+
+    // ---- salvar (edição de campos) ----
+    const { campos } = body;
+    if (!campos) return Response.json({ ok: false, erro: "Dados incompletos." }, { status: 400 });
 
     const [[alvo]] = await pool.query("SELECT id, nivel_id FROM colaborador WHERE id = ?", [id]);
     if (!alvo) return Response.json({ ok: false, erro: "Colaborador não encontrado." }, { status: 404 });
@@ -179,6 +240,9 @@ export async function POST(req) {
     const atualizado = await carregarColaborador(pool, id);
     return Response.json({ ok: true, colaborador: atualizado });
   } catch (e) {
+    if (conn) { try { await conn.rollback(); } catch {} }
     return erroResposta(e);
+  } finally {
+    if (conn) conn.release();
   }
 }

@@ -30,9 +30,15 @@ export default function ColaboradoresView() {
   // filtros de busca
   const [areaFiltro, setAreaFiltro] = useState("");
   const [busca, setBusca] = useState("");
+  const [incluirInativos, setIncluirInativos] = useState(false);
   const [resultados, setResultados] = useState([]);
   const [buscando, setBuscando] = useState(false);
   const [buscaFeita, setBuscaFeita] = useState(false);
+
+  // desativar / reativar
+  const [confirmandoDesativar, setConfirmandoDesativar] = useState(false);
+  const [processandoAtivo, setProcessandoAtivo] = useState(false);
+  const [msgAtivo, setMsgAtivo] = useState("");
 
   // seleção + edição
   const [selId, setSelId] = useState(null);
@@ -74,6 +80,7 @@ export default function ColaboradoresView() {
         const p = new URLSearchParams();
         if (areaFiltro) p.set("setor", areaFiltro);
         if (busca.trim()) p.set("q", busca.trim());
+        if (incluirInativos) p.set("incluirInativos", "1");
         const r = await fetch(`/api/colaboradores/gestao?${p.toString()}`);
         const j = await r.json();
         if (ativo) { setResultados(j.ok ? j.colaboradores : []); setBuscaFeita(true); }
@@ -81,7 +88,7 @@ export default function ColaboradoresView() {
       if (ativo) setBuscando(false);
     }, 250);
     return () => { ativo = false; clearTimeout(t); };
-  }, [areaFiltro, busca]);
+  }, [areaFiltro, busca, incluirInativos]);
 
   // ---- picker de líder: busca em todas as áreas ----
   useEffect(() => {
@@ -130,6 +137,7 @@ export default function ColaboradoresView() {
   const selecionar = useCallback(async (id) => {
     setSelId(id);
     setErro(""); setConfirmando(false); setSalvo(false); setLiderPicker(false);
+    setConfirmandoDesativar(false); setMsgAtivo("");
     setCarregandoDet(true); setForm(null); setOriginal(null);
     try {
       const r = await fetch(`/api/colaboradores/gestao?id=${encodeURIComponent(id)}`);
@@ -151,6 +159,8 @@ export default function ColaboradoresView() {
         liderMatricula: c.lider_mat || "",
         liderNome: c.lider_nome || "",
         nivelId: nivelEfetivo,
+        ativo: c.ativo,
+        subordinados: c.subordinados || 0,
       });
       setOriginal({
         nome: c.nome || "", email: c.email || "", tipo: c.tipo_contratacao || "CLT",
@@ -234,6 +244,29 @@ export default function ColaboradoresView() {
     setSalvando(false);
   }
 
+  async function desativar() {
+    setProcessandoAtivo(true); setErro("");
+    const j = await post({ acao: "desativar", id: selId });
+    setProcessandoAtivo(false);
+    if (!j.ok) { setErro(j.erro || "Falha ao desativar."); setConfirmandoDesativar(false); return; }
+    setForm((f) => f ? { ...f, ativo: 0, subordinados: 0, liderMatricula: "", liderNome: "" } : f);
+    setResultados((rs) => rs.map((x) => (x.id === selId ? { ...x, ativo: 0 } : x)));
+    setConfirmandoDesativar(false);
+    setSalvo(false);
+    setErro("");
+    setMsgAtivo(`Colaborador desativado.${j.reapontados ? ` ${j.reapontados} subordinado(s) passaram a responder ao líder acima.` : ""}`);
+  }
+
+  async function reativar() {
+    setProcessandoAtivo(true); setErro("");
+    const j = await post({ acao: "reativar", id: selId });
+    setProcessandoAtivo(false);
+    if (!j.ok) { setErro(j.erro || "Falha ao reativar."); return; }
+    setForm((f) => f ? { ...f, ativo: 1 } : f);
+    setResultados((rs) => rs.map((x) => (x.id === selId ? { ...x, ativo: 1 } : x)));
+    setMsgAtivo("Colaborador reativado. Ele entra sem líder — defina o líder direto se necessário.");
+  }
+
   return (
     <div className="sol-shell">
       <div className="sol-topbar">
@@ -262,6 +295,10 @@ export default function ColaboradoresView() {
               <SearchIcon size={14} />
               <input placeholder="Buscar por nome..." value={busca} onChange={(e) => setBusca(e.target.value)} />
             </div>
+            <label className="col-inativos">
+              <input type="checkbox" checked={incluirInativos} onChange={(e) => setIncluirInativos(e.target.checked)} />
+              Mostrar desativados
+            </label>
           </div>
 
           <div className="sol-lista">
@@ -274,10 +311,10 @@ export default function ColaboradoresView() {
               <div className="sol-info">Nenhum colaborador encontrado com esses filtros.</div>
             )}
             {resultados.map((c) => (
-              <button key={c.id} className={`sol-card ${selId === c.id ? "sel" : ""}`} onClick={() => selecionar(c.id)}>
+              <button key={c.id} className={`sol-card ${selId === c.id ? "sel" : ""} ${c.ativo === 0 ? "inativo" : ""}`} onClick={() => selecionar(c.id)}>
                 <span className="sc-ava"><UserIcon size={18} /></span>
                 <span className="sc-txt">
-                  <b>{c.nome}</b>
+                  <b>{c.nome}{c.ativo === 0 && <span className="col-tag-off">desativado</span>}</b>
                   <em>{c.cargo || "Cargo a definir"}</em>
                   <small>{c.matricula} · {c.setor || "sem área"}</small>
                 </span>
@@ -299,11 +336,21 @@ export default function ColaboradoresView() {
                   <h2>{original?.nome || form.nome}</h2>
                   <p>Matrícula {form.matricula || "—"}</p>
                 </div>
-                <span className="col-edit-tag"><PencilIcon size={13} /> Edição direta</span>
+                {form.ativo === 0
+                  ? <span className="col-edit-tag off">Desativado</span>
+                  : <span className="col-edit-tag"><PencilIcon size={13} /> Edição direta</span>}
               </div>
+
+              {form.ativo === 0 && (
+                <div className="modal-note col-arquivado">
+                  <b>Este colaborador está desativado (arquivado).</b> Não aparece no organograma, nas contagens
+                  nem na busca padrão. O registro e o histórico foram preservados — use <b>Reativar</b> para trazê-lo de volta.
+                </div>
+              )}
 
               {erro && <div className="modal-alert"><AlertIcon size={16} /><div><b>{erro}</b></div></div>}
               {salvo && <div className="modal-note sol-ok"><b>Alterações salvas no banco.</b></div>}
+              {msgAtivo && <div className="modal-note sol-ok"><b>{msgAtivo}</b></div>}
 
               <div className="col-form">
                 <label className="fld">
@@ -458,6 +505,51 @@ export default function ColaboradoresView() {
                         </li>
                       ))}
                     </ul>
+                  )}
+                </div>
+              )}
+
+              {/* zona de ativação: desativar (arquivar) ou reativar */}
+              {!confirmando && (
+                <div className="col-perigo">
+                  {form.ativo === 0 ? (
+                    <div className="cp-linha">
+                      <div className="cp-txt">
+                        <b>Reativar colaborador</b>
+                        <em>Volta a aparecer no organograma e na busca. Entra sem líder — defina depois se precisar.</em>
+                      </div>
+                      <button className="btn btn-neutral" disabled={processandoAtivo} onClick={reativar}>
+                        {processandoAtivo ? "Reativando..." : "Reativar"}
+                      </button>
+                    </div>
+                  ) : confirmandoDesativar ? (
+                    <div className="cp-confirma">
+                      <b className="cp-tit"><AlertIcon size={14} /> Desativar {original?.nome || form.nome}?</b>
+                      <p className="sol-texto">
+                        O colaborador é <b>arquivado</b> (sai do organograma, das contagens e da busca), mas o
+                        registro e o histórico são preservados — dá para reativar depois.
+                        {form.subordinados > 0 && (
+                          <> Os <b>{form.subordinados}</b> subordinado(s) diretos passam a responder ao
+                          líder acima ({form.liderNome || "sem líder / viram topo da área"}).</>
+                        )}
+                      </p>
+                      <div className="cp-acoes">
+                        <button className="btn btn-neutral btn-sm" onClick={() => setConfirmandoDesativar(false)}>Cancelar</button>
+                        <button className="btn btn-ghost btn-sm" disabled={processandoAtivo} onClick={desativar}>
+                          {processandoAtivo ? "Desativando..." : "Confirmar desativação"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="cp-linha">
+                      <div className="cp-txt">
+                        <b>Desativar colaborador</b>
+                        <em>Para quem saiu da empresa. Arquiva sem apagar — reversível.</em>
+                      </div>
+                      <button className="btn btn-ghost btn-sm" onClick={() => { setErro(""); setMsgAtivo(""); setConfirmandoDesativar(true); }}>
+                        Desativar
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
