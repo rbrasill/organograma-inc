@@ -14,8 +14,12 @@ import {
 const CAMPOS_LABEL = {
   nome: "Nome", email: "E-mail", tipo: "Contratação", cargo: "Cargo",
   setor: "Área / Setor", local: "Local de trabalho", regional: "Regional",
-  situacao: "Situação", lider: "Líder direto",
+  situacao: "Situação", lider: "Líder direto", nivel: "Nível do cargo",
 };
+
+// rótulo de um nível hierárquico: "14.E · Secretária"
+const rotuloNivel = (n) =>
+  n ? `${n.codVar || `${n.ordem}${n.variacao ? `.${n.variacao}` : ""}`} · ${n.familia || n.codigo || "—"}` : "";
 
 export default function ColaboradoresView() {
   const [areas, setAreas] = useState([]);
@@ -105,6 +109,21 @@ export default function ColaboradoresView() {
     return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc); };
   }, [liderPicker]);
 
+  // ===== nível hierárquico do cargo (cascata código → variação/família) =====
+  const nivelPorId = useCallback(
+    (id) => (listas?.niveis || []).find((n) => n.id === id) || null,
+    [listas]
+  );
+  // códigos de nível distintos (1–18), para o primeiro select da cascata
+  const ordensNivel = useMemo(
+    () => [...new Set((listas?.niveis || []).map((n) => n.ordem))].sort((a, b) => a - b),
+    [listas]
+  );
+  const variacoesDe = useCallback(
+    (ordem) => (listas?.niveis || []).filter((n) => String(n.ordem) === String(ordem)),
+    [listas]
+  );
+
   const selecionar = useCallback(async (id) => {
     setSelId(id);
     setErro(""); setConfirmando(false); setSalvo(false); setLiderPicker(false);
@@ -114,6 +133,7 @@ export default function ColaboradoresView() {
       const j = await r.json();
       if (!j.ok) throw new Error(j.erro || "Falha ao carregar o colaborador.");
       const c = j.colaborador;
+      const nv = nivelPorId(c.cargo_nivel_id);
       setForm({
         matricula: c.codigo_dp || "",
         nome: c.nome || "",
@@ -126,16 +146,41 @@ export default function ColaboradoresView() {
         situacaoId: c.situacao_id || "",
         liderMatricula: c.lider_mat || "",
         liderNome: c.lider_nome || "",
+        nivelId: c.cargo_nivel_id || "",
+        nivelOrdem: nv ? String(nv.ordem) : "",
       });
       setOriginal({
         nome: c.nome || "", email: c.email || "", tipo: c.tipo_contratacao || "CLT",
         cargo: c.cargo || "", setor: c.setor || "", local: c.local || "",
         regional: c.regional || "", situacao: c.situacao || "",
         liderMatricula: c.lider_mat || "", liderNome: c.lider_nome || "",
+        nivelId: c.cargo_nivel_id || "",
       });
     } catch (e) { setErro(e.message); }
     setCarregandoDet(false);
-  }, []);
+  }, [nivelPorId]);
+
+  // trocar o cargo sincroniza os selects de nível com o nível do cargo novo
+  function trocaCargo(cargoId) {
+    const cg = (listas?.cargos || []).find((c) => c.id === cargoId);
+    const nv = nivelPorId(cg?.nivelId || "");
+    setForm((f) => ({
+      ...f, cargoId,
+      nivelId: cg?.nivelId || "",
+      nivelOrdem: nv ? String(nv.ordem) : "",
+    }));
+    setSalvo(false);
+  }
+
+  // trocar o código do nível: se o nível só tem uma variação, já seleciona
+  function trocaOrdemNivel(ordem) {
+    const vs = variacoesDe(ordem);
+    setForm((f) => ({
+      ...f, nivelOrdem: ordem,
+      nivelId: !ordem ? "" : vs.length === 1 ? vs[0].id : "",
+    }));
+    setSalvo(false);
+  }
 
   // áreas em ordem alfabética pelo nome (acentos tratados via pt-BR)
   const areasOrdenadas = useMemo(
@@ -159,8 +204,14 @@ export default function ColaboradoresView() {
     if (nomeDe("situacoes", form.situacaoId) !== original.situacao) ms.push({ campo: "situacao", de: original.situacao || "—", para: nomeDe("situacoes", form.situacaoId) || "—" });
     if ((form.liderMatricula || "") !== original.liderMatricula)
       ms.push({ campo: "lider", de: original.liderNome || "Sem líder", para: form.liderNome || "Sem líder" });
+    if ((form.nivelId || "") !== (original.nivelId || ""))
+      ms.push({
+        campo: "nivel",
+        de: rotuloNivel(nivelPorId(original.nivelId)) || "Sem nível",
+        para: rotuloNivel(nivelPorId(form.nivelId)) || "Sem nível",
+      });
     return ms;
-  }, [form, original, nomeDe]);
+  }, [form, original, nomeDe, nivelPorId]);
 
   function set(campo, valor) { setForm((f) => ({ ...f, [campo]: valor })); setSalvo(false); }
 
@@ -186,7 +237,16 @@ export default function ColaboradoresView() {
         cargo: c.cargo || "", setor: c.setor || "", local: c.local || "",
         regional: c.regional || "", situacao: c.situacao || "",
         liderMatricula: c.lider_mat || "", liderNome: c.lider_nome || "",
+        nivelId: c.cargo_nivel_id || "",
       });
+      // mantém o cache de cargos coerente (o nível pertence ao cargo)
+      if (c.cargo_id) {
+        setListas((ls) => ls ? {
+          ...ls,
+          cargos: (ls.cargos || []).map((cg) =>
+            cg.id === c.cargo_id ? { ...cg, nivelId: c.cargo_nivel_id || null } : cg),
+        } : ls);
+      }
       setResultados((rs) => rs.map((x) => (x.id === selId ? { ...x, nome: c.nome, cargo: c.cargo, setor: c.setor } : x)));
       setConfirmando(false); setSalvo(true);
     } catch (e) { setErro(`Falha ao salvar: ${e.message}`); }
@@ -291,11 +351,47 @@ export default function ColaboradoresView() {
                 </div>
                 <label className="fld">
                   <span>Cargo</span>
-                  <select value={form.cargoId} onChange={(e) => set("cargoId", e.target.value)}>
+                  <select value={form.cargoId} onChange={(e) => trocaCargo(e.target.value)}>
                     <option value="">— selecione —</option>
                     {(listas?.cargos || []).map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                   </select>
                 </label>
+
+                {/* nível hierárquico do cargo: código (1–18) → variação/família */}
+                <div className="col-grid2">
+                  <label className="fld">
+                    <span>Cód. nível hierárquico</span>
+                    <select
+                      value={form.nivelOrdem}
+                      disabled={!form.cargoId}
+                      title={!form.cargoId ? "Selecione um cargo primeiro" : ""}
+                      onChange={(e) => trocaOrdemNivel(e.target.value)}
+                    >
+                      <option value="">— selecione —</option>
+                      {ordensNivel.map((o) => <option key={o} value={String(o)}>{o}</option>)}
+                    </select>
+                  </label>
+                  <label className="fld">
+                    <span>Variação / Família</span>
+                    <select
+                      value={form.nivelId}
+                      disabled={!form.cargoId || !form.nivelOrdem}
+                      title={!form.cargoId ? "Selecione um cargo primeiro" : !form.nivelOrdem ? "Selecione o código do nível" : ""}
+                      onChange={(e) => set("nivelId", e.target.value)}
+                    >
+                      <option value="">— selecione —</option>
+                      {variacoesDe(form.nivelOrdem).map((n) => (
+                        <option key={n.id} value={n.id}>{rotuloNivel(n)}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                {form.cargoId && (
+                  <p className="col-nivel-nota">
+                    O nível pertence ao <b>cargo</b> — alterar aqui atualiza o cargo
+                    &quot;<b>{nomeDe("cargos", form.cargoId) || "—"}</b>&quot; para todos os colaboradores que o possuem.
+                  </p>
+                )}
                 <div className="col-grid2">
                   <label className="fld">
                     <span>Área / Setor</span>

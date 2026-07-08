@@ -418,6 +418,8 @@ main{padding:20px 24px 24px}
 .col-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media (max-width:560px){ .col-grid2{grid-template-columns:1fr} }
 .col-foot{display:flex;align-items:center;gap:9px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line-soft)}
+.col-nivel-nota{font-size:11.5px;color:var(--ink-faint);line-height:1.5;margin:-4px 0 0;background:var(--inc-soft);border:1px solid var(--inc-line);border-radius:9px;padding:7px 11px}
+.col-nivel-nota b{color:var(--ink-soft)}
 
 /* ===== catálogos da base (dados não-colaborador) ===== */
 .ct-board{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:var(--shadow-soft)}
