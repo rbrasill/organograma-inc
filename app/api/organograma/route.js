@@ -47,7 +47,7 @@ export async function GET(req) {
     const [rows] = await pool.query(
       `SELECT c.id, c.codigo_dp, c.nome, c.email, c.tipo_contratacao,
               cg.nome AS cargo, lt.nome AS local, st.nome AS situacao,
-              nh.ordem AS nivel_ordem,
+              nh.ordem AS nivel_ordem, nh.familia AS familia,
               ld.codigo_dp AS lider_codigo, ld.id AS lider_uuid, ld.nome AS lider_nome
          FROM colaborador c
          LEFT JOIN cargo cg            ON cg.id = c.cargo_id
@@ -68,7 +68,7 @@ export async function GET(req) {
     const [extRows] = await pool.query(
       `SELECT DISTINCT c.id, c.codigo_dp, c.nome, c.email, c.tipo_contratacao,
               cg.nome AS cargo, lt.nome AS local, st.nome AS situacao,
-              nh.ordem AS nivel_ordem, se.nome AS setor_nome
+              nh.ordem AS nivel_ordem, nh.familia AS familia, se.nome AS setor_nome
          FROM colaborador c
          JOIN colaborador sub ON sub.lider_id = c.id AND sub.ativo = 1 AND sub.setor_id = ?
          LEFT JOIN cargo cg             ON cg.id = c.cargo_id
@@ -92,6 +92,7 @@ export async function GET(req) {
       liderNome: "",
       pj: r.tipo_contratacao === "PJ",
       nivelOrdem: r.nivel_ordem || null,
+      familia: r.familia || "",
       externo: true,
       setorOrigem: r.setor_nome || "",
     }));
@@ -107,6 +108,7 @@ export async function GET(req) {
       liderNome: r.lider_nome || "",
       pj: r.tipo_contratacao === "PJ",
       nivelOrdem: r.nivel_ordem || null,
+      familia: r.familia || "",
     }));
 
     const pessoas = [...externos, ...membros];

@@ -13,9 +13,23 @@ import ImportModal from "@/components/ImportModal";
 import AreaModal from "@/components/AreaModal";
 import LiderAreaModal from "@/components/LiderAreaModal";
 
-// nível visual (cor/legenda): usa a ordem do banco quando o cargo tem nível
-// vinculado; senão deriva do nome do cargo (fallback até a curadoria)
-const ORDEM_PARA_NIVEL = { 1: 1, 2: 1, 3: 1, 4: 2, 5: 2, 6: 3, 7: 4, 8: 4, 9: 5, 10: 6 };
+// nível visual (cor da faixa/legenda): mapeia a ORDEM do banco (1 = topo,
+// 18 = base, base v2) para as 6 faixas de cor, num gradiente por hierarquia.
+// Cargos sem nível vinculado caem no fallback pelo nome do cargo.
+//   1–4  direção (Presidente, Conselheiro, CFO, Diretor)
+//   5–7  gerência (Vice-Diretor, Gerente)
+//   8–10 liderança tática (Coordenador/Head/Gestor, Supervisor, Encarregado)
+//   11–13 especialista/técnico (Eng., Adv., Analista, operacional qualificado)
+//   14–15 apoio (Assistente, Auxiliar)
+//   16–18 base (Estagiário, Aprendiz, Servente)
+const ORDEM_PARA_NIVEL = {
+  1: 1, 2: 1, 3: 1, 4: 1,
+  5: 2, 6: 2, 7: 2,
+  8: 3, 9: 3, 10: 3,
+  11: 4, 12: 4, 13: 4,
+  14: 5, 15: 5,
+  16: 6, 17: 6, 18: 6,
+};
 function nivelVisual(node) {
   if (node.nivelOrdem && ORDEM_PARA_NIVEL[node.nivelOrdem]) return ORDEM_PARA_NIVEL[node.nivelOrdem];
   return nivelDe(node.cargo);
@@ -494,6 +508,22 @@ export default function OrgChart() {
   const liderArea = rootsOrdenadas.find((r) => r.externo)?.nome || rootsOrdenadas[0]?.nome || "—";
   const totalArea = pessoas.filter((p) => !p.externo).length;
 
+  // legenda dinâmica: só as FAMÍLIAS de cargo (nome abreviado — Diretor,
+  // Analista, Auxiliar...) presentes nesta área, cada uma com a cor do seu
+  // card. Ordenadas pelo nível (topo → base).
+  const legenda = useMemo(() => {
+    const map = new Map();
+    for (const p of pessoas) {
+      const fam = (p.familia || "").trim() || "Sem nível definido";
+      if (map.has(fam)) continue;
+      const lvl = nivelVisual(p);
+      map.set(fam, { familia: fam, ordem: p.nivelOrdem ?? 999, cor: NIVEIS[lvl - 1].cor });
+    }
+    return [...map.values()].sort(
+      (a, b) => a.ordem - b.ordem || a.familia.localeCompare(b.familia, "pt-BR")
+    );
+  }, [pessoas]);
+
   return (
     <div className="shell">
       <div className="topbar">
@@ -670,10 +700,14 @@ export default function OrgChart() {
           </div>
 
           <div className="legend">
-            <span className="lg-title">Nível hierárquico</span>
-            {NIVEIS.map((lv) => (
-              <span className="chip" key={lv.n}><i style={{ background: lv.cor }} />{lv.label}</span>
-            ))}
+            <span className="lg-title">Famílias de cargo</span>
+            {legenda.length === 0 ? (
+              <span className="lg-vazio">aparecem conforme a área aberta</span>
+            ) : (
+              legenda.map((lv) => (
+                <span className="chip" key={lv.familia}><i style={{ background: lv.cor }} />{lv.familia}</span>
+              ))
+            )}
             <span className="chip" style={{ marginLeft: "auto" }}>
               <span className="alert stat"><AlertIcon size={13} /></span> Inconsistência
             </span>
