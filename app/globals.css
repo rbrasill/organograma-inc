@@ -10,7 +10,9 @@
   --line-soft:#eef1f7;
   --brand:#1f3864;
   --accent:#3b5bdb;
-  --inc:#ff530f;
+  --inc:#fe5e19;          /* laranja oficial INC (rgb 254,94,25) */
+  --inc-soft:#fff2ec;     /* tint claro do laranja — usar em fundos sutis */
+  --inc-line:#ffd9c6;     /* borda/realce leve na cor da marca */
   --wire:#ff9a70;
   --wire-soft:#ffcbb4;
   --n1:#4f46e5; --n2:#0ea5e9; --n3:#10b981; --n4:#f59e0b; --n5:#ec4899; --n6:#64748b;
@@ -34,7 +36,8 @@ main{padding:20px 24px 24px}
 
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
 .brand{display:flex;align-items:center;gap:14px}
-.logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(150deg,var(--brand),#2c4f8f);display:grid;place-items:center;color:#fff;font-weight:800;font-size:17px;letter-spacing:.5px;box-shadow:0 8px 20px -10px rgba(31,56,100,.7)}
+/* logo oficial INC (SVG) — o texto "INC" do markup fica oculto */
+.logo{width:46px;height:46px;border-radius:13px;overflow:hidden;background:var(--inc) url('/inc-logo.svg') center/100% 100% no-repeat;font-size:0;color:transparent;box-shadow:0 8px 20px -10px rgba(254,94,25,.6)}
 .brand h1{font-size:15px;margin:0;font-weight:700;letter-spacing:-.01em}
 .brand p{margin:2px 0 0;font-size:12px;color:var(--ink-faint);font-weight:500}
 .controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -70,7 +73,7 @@ main{padding:20px 24px 24px}
 .board-shell{background:rgba(255,255,255,.6);border:1px solid var(--line);border-radius:26px;padding:8px;box-shadow:var(--shadow-card)}
 .board{background:var(--panel);border-radius:20px;border:1px solid var(--line-soft);padding:26px 26px 30px;position:relative}
 .board-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:6px}
-.title-wrap .eyebrow{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--inc);background:#fff1eb;padding:5px 10px;border-radius:999px;margin-bottom:10px}
+.title-wrap .eyebrow{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--inc);background:var(--inc-soft);border:1px solid var(--inc-line);padding:5px 10px;border-radius:999px;margin-bottom:10px}
 .title-wrap h2{margin:0;font-size:27px;font-weight:800;letter-spacing:-.02em;color:var(--brand)}
 .subline{margin:8px 0 0;font-size:13px;color:var(--ink-soft);font-weight:500}
 .subline b{color:var(--ink)}

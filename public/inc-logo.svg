@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="INC Empreendimentos">
+  <rect width="120" height="120" fill="#FE5E19"/>
+  <g stroke="#101010" stroke-width="10" stroke-linecap="butt" stroke-linejoin="miter" fill="none">
+    <!-- I -->
+    <line x1="27" y1="44" x2="27" y2="76"/>
+    <!-- N -->
+    <line x1="47" y1="44" x2="47" y2="76"/>
+    <line x1="69" y1="44" x2="69" y2="76"/>
+    <line x1="47" y1="44" x2="69" y2="76"/>
+    <!-- C (aberto à direita) -->
+    <path d="M 101 50 A 15 15 0 1 0 101 70"/>
+  </g>
+</svg>
