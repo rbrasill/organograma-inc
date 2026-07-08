@@ -104,7 +104,9 @@ main{padding:20px 24px 24px}
 .tree-tools{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;gap:8px;z-index:20}
 .pan-hint{position:absolute;left:14px;bottom:12px;z-index:20;font-size:11px;font-weight:600;color:var(--ink-faint);background:rgba(255,255,255,.85);border:1px solid var(--line-soft);border-radius:999px;padding:5px 11px;pointer-events:none}
 .tree{display:block;width:max-content;max-width:none;position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform}
-.tree ul{display:flex;justify-content:center;padding-top:26px;position:relative;margin:0;list-style:none}
+/* padding zerado nas laterais: o padrão do navegador (40px à esquerda)
+   deslocava todos os filhos ~20px do centro do pai */
+.tree ul{display:flex;justify-content:center;padding:26px 0 0;position:relative;margin:0;list-style:none}
 .tree li{list-style:none;position:relative;padding:26px 12px 0;display:flex;flex-direction:column;align-items:center}
 .tree ul::before{content:"";position:absolute;top:0;left:50%;width:2px;height:26px;background:var(--wire);transform:translateX(-50%)}
 .tree li::before,.tree li::after{content:"";position:absolute;top:0;height:26px;width:50%;border-top:2px solid var(--wire)}
@@ -115,11 +117,15 @@ main{padding:20px 24px 24px}
 .tree li:last-child::after{border:0}
 .tree li:last-child::before{border-right:2px solid var(--wire);border-top-right-radius:7px}
 .tree li:first-child::after{border-left:2px solid var(--wire);border-top-left-radius:7px}
-.tree li:only-child::before,.tree li:only-child::after{display:none}
-.tree > ul{padding-top:0}
+/* filho único: sem leque horizontal, mas a linha vertical continua até o
+   card (antes era display:none e o fio "apagava" no meio do caminho) */
+.tree li:only-child::before{display:none}
+.tree li:only-child::after{width:0;border-top:0;border-top-left-radius:0;border-top-right-radius:0}
+.tree > ul{padding:0}
 .tree > ul::before{display:none}
 .tree > ul > li{padding-top:0}
 .tree > ul > li::before,.tree > ul > li::after{display:none}
+.tree > ul > li:only-child::before,.tree > ul > li:only-child::after{display:none}
 
 
 /* colunas verticais de equipe: cards empilhados conectados por fio */
