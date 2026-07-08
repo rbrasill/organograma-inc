@@ -357,8 +357,9 @@ export default function ColaboradoresView() {
 
               {form.ativo === 0 && (
                 <div className="modal-note col-arquivado">
-                  <b>Este colaborador está desativado (arquivado).</b> Não aparece no organograma, nas contagens
-                  nem na busca padrão. O registro e o histórico foram preservados — use <b>Reativar</b> para trazê-lo de volta.
+                  <b>Este colaborador está desativado (arquivado) — os dados abaixo são somente visualização.</b>{" "}
+                  Ele não aparece no organograma, nas contagens nem na busca padrão. O registro e o histórico
+                  foram preservados — use <b>Reativar</b> para trazê-lo de volta e poder editar.
                 </div>
               )}
 
@@ -366,7 +367,9 @@ export default function ColaboradoresView() {
               {salvo && <div className="modal-note sol-ok"><b>Alterações salvas no banco.</b></div>}
               {msgAtivo && <div className="modal-note sol-ok"><b>{msgAtivo}</b></div>}
 
-              <div className="col-form">
+              {/* desativado = somente visualização: o fieldset desabilita
+                  todos os campos e botões internos (inclusive trocar líder) */}
+              <fieldset className="col-form" disabled={form.ativo === 0}>
                 <label className="fld">
                   <span>Nome</span>
                   <input value={form.nome} onChange={(e) => set("nome", e.target.value)} />
@@ -501,7 +504,7 @@ export default function ColaboradoresView() {
                     </div>
                   )}
                 </div>
-              </div>
+              </fieldset>
 
               {confirmando && (
                 <div className="sol-confirma">
@@ -568,6 +571,7 @@ export default function ColaboradoresView() {
                 </div>
               )}
 
+              {form.ativo !== 0 && (
               <div className="col-foot">
                 {confirmando ? (
                   <>
@@ -591,6 +595,7 @@ export default function ColaboradoresView() {
                   </>
                 )}
               </div>
+              )}
             </>
           )}
         </section>

@@ -171,8 +171,14 @@ export async function POST(req) {
     const { campos } = body;
     if (!campos) return Response.json({ ok: false, erro: "Dados incompletos." }, { status: 400 });
 
-    const [[alvo]] = await pool.query("SELECT id, nivel_id FROM colaborador WHERE id = ?", [id]);
+    const [[alvo]] = await pool.query("SELECT id, nivel_id, ativo FROM colaborador WHERE id = ?", [id]);
     if (!alvo) return Response.json({ ok: false, erro: "Colaborador não encontrado." }, { status: 404 });
+    if (!alvo.ativo) {
+      return Response.json({
+        ok: false,
+        erro: "Colaborador desativado é somente visualização — reative-o para poder editar.",
+      }, { status: 409 });
+    }
 
     const nome = (campos.nome || "").trim();
     if (!nome) return Response.json({ ok: false, erro: "O nome não pode ficar em branco." }, { status: 400 });
