@@ -89,8 +89,9 @@ main{padding:20px 24px 24px}
 
 .tree-viewport{
   position:relative;overflow:hidden;margin-top:16px;
-  /* ocupa a altura restante do monitor (não trava mais em 720px) */
-  height:max(480px, calc(100dvh - 350px));
+  /* ocupa a altura restante do monitor (não trava mais em 720px);
+     desconto menor = área um pouco mais alta, mas sempre dentro da tela */
+  height:max(520px, calc(100dvh - 288px));
   border:1px solid var(--line-soft);border-radius:16px;
   background:radial-gradient(var(--line) 1px, transparent 1px) 0 0/22px 22px, #fbfcfe;
   cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;
