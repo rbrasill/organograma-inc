@@ -128,7 +128,7 @@ main{padding:20px 24px 24px}
 
 /* colunas verticais de equipe: cards empilhados conectados por fio */
 .leaf-col{display:flex;flex-direction:column;align-items:center}
-.leaf-col .card{width:230px}
+.leaf-col .card{width:282px}
 .leaf-item{position:relative;padding-top:16px}
 .leaf-item:first-child{padding-top:0}
 .leaf-item::before{content:"";position:absolute;top:0;left:50%;width:2px;height:16px;background:var(--wire);transform:translateX(-50%)}
@@ -136,7 +136,7 @@ main{padding:20px 24px 24px}
 
 /* sem transform no hover: o card não pode se mover sob o cursor,
    senão o navegador descarta o clique nos botões (expandir/recolher) */
-.card{width:236px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:var(--shadow-card);position:relative;cursor:pointer;transition:box-shadow .4s var(--ease),border-color .3s}
+.card{width:288px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:var(--shadow-card);position:relative;cursor:pointer;transition:box-shadow .4s var(--ease),border-color .3s}
 .card:hover{border-color:#d8dfeb;box-shadow:0 2px 4px rgba(16,24,40,.05),0 22px 40px -18px rgba(16,24,40,.32)}
 .card.hl{border-color:var(--inc);box-shadow:0 0 0 3px rgba(255,83,15,.25),0 22px 44px -18px rgba(255,83,15,.4)}
 .card-top{display:flex;align-items:center;gap:12px}
@@ -215,7 +215,8 @@ main{padding:20px 24px 24px}
 @media (max-width:640px){
   main{padding:14px}
   .ro-grid{grid-template-columns:1fr}
-  .card,.leaf-grid .card{width:210px}
+  /* card mantém a largura fixa (a árvore rola por pan/zoom); não encolhe
+     para não virar "card grande / card pequeno" entre telas */
 }
 
 /* selects e seletor de líder no modal */
