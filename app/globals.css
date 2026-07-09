@@ -488,8 +488,11 @@ main{padding:20px 24px 24px}
 .ld-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
 @media (max-width:1100px){ .ld-grid{grid-template-columns:repeat(2,1fr)} }
 @media (max-width:700px){ .ld-grid{grid-template-columns:1fr} }
-/* card da área: neutro (a cor fica só no cabeçalho do diretor) */
-.ld-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;transition:border-color .2s,box-shadow .2s}
+/* card da área: neutro (a cor fica só no cabeçalho do diretor).
+   min-width:0 deixa o card encolher dentro da coluna — sem isso os textos
+   nowrap ditam a largura mínima e a grade estoura a tela (scroll lateral) */
+.ld-card{min-width:0;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;transition:border-color .2s,box-shadow .2s}
+.ld-area b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .ld-card:hover{border-color:#d8dfeb;box-shadow:var(--shadow-soft)}
 .ld-area{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:9px}
 .ld-area b{font-size:13.5px;font-weight:800;color:var(--ink)}
