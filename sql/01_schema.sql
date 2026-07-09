@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS nivel_hierarquico (
   variacao   VARCHAR(4)   NULL,
   cod_var    VARCHAR(10)  NULL,
   familia    VARCHAR(120) NULL,
+  cor        VARCHAR(9)   NULL,   -- cor oficial da família (hex, ex.: #1565C0)
   PRIMARY KEY (id),
   UNIQUE KEY uq_nivel_nh (codigo_nh),
   KEY ix_nivel_ordem (ordem)
