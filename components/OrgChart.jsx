@@ -566,6 +566,10 @@ export default function OrgChart() {
                   <span className="mi-txt"><b>Exportar base</b><em>Baixar todos em .xlsx (formato de importação)</em></span>
                 </a>
                 <span className="menu-titulo">Estrutura</span>
+                <Link href="/lideres" className="menu-item" onClick={() => setShowMenu(false)}>
+                  <span className="mi-ic"><UserIcon size={15} /></span>
+                  <span className="mi-txt"><b>Líderes por área</b><em>Diretores, áreas e troca de líder em massa</em></span>
+                </Link>
                 <button className="menu-item" onClick={() => { setShowMenu(false); setShowAreas(true); }}>
                   <span className="mi-ic"><MergeIcon size={15} /></span>
                   <span className="mi-txt"><b>Gerenciar áreas</b><em>Renomear e mesclar áreas duplicadas</em></span>
