@@ -123,8 +123,13 @@ export default function LideresView() {
         <div className="lider-atual">
           <span className="la-ava"><UserIcon size={20} /></span>
           <span className="la-txt">
-            <b>{area.lider.nome}</b>
-            <em>{area.lider.cargo || "Cargo a definir"} · lidera {area.lider.diretos} direto(s)</em>
+            <b>{area.lider.nome}{area.lider.externo && <span className="ld-tag-dir">diretor</span>}</b>
+            <em>
+              {area.lider.cargo || "Cargo a definir"} ·{" "}
+              {area.lider.externo
+                ? `lidera a área diretamente (${area.lider.diretos} na área)`
+                : `lidera ${area.lider.diretos} direto(s)`}
+            </em>
           </span>
           <button className="la-btn" onClick={() => abrirTroca(area, diretorNome)}>
             Alterar líder
@@ -263,10 +268,17 @@ export default function LideresView() {
                   </ul>
                   <p className="sol-texto" style={{ marginTop: 8 }}>
                     <b>{alvo.lider.diretos}</b> colaborador(es) que respondem a {alvo.lider.nome} passam a
-                    responder a <b>{novo.nome}</b>, e {alvo.lider.nome} passa a responder ao novo líder.{" "}
-                    {novo.setor ? (novo.setor === alvo.areaNome
-                      ? "Como o novo líder é da própria área, ele herda o diretor atual."
-                      : `O novo líder é de ${novo.setor} — entra como líder externo (padrão diretor).`) : ""}
+                    responder a <b>{novo.nome}</b>
+                    {alvo.lider.externo
+                      ? (novo.setor === alvo.areaNome
+                        ? <>, e <b>{novo.nome}</b> passa a responder ao diretor {alvo.lider.nome}.</>
+                        : ".")
+                      : <>, e {alvo.lider.nome} passa a responder ao novo líder.</>}{" "}
+                    {novo.setor && novo.setor !== alvo.areaNome
+                      ? `O novo líder é de ${novo.setor} — entra como líder externo (padrão diretor).`
+                      : (!alvo.lider.externo && novo.setor === alvo.areaNome
+                        ? "Como o novo líder é da própria área, ele herda o diretor atual."
+                        : "")}
                   </p>
                 </div>
               )}

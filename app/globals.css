@@ -493,6 +493,8 @@ main{padding:20px 24px 24px}
    nowrap ditam a largura mínima e a grade estoura a tela (scroll lateral) */
 .ld-card{min-width:0;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;transition:border-color .2s,box-shadow .2s}
 .ld-area b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* selo "diretor" quando a área é liderada direto pelo diretor */
+.ld-tag-dir{margin-left:7px;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--inc);background:var(--inc-soft);border:1px solid var(--inc-line);border-radius:6px;padding:1px 6px;vertical-align:1px}
 .ld-card:hover{border-color:#d8dfeb;box-shadow:var(--shadow-soft)}
 .ld-area{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:9px}
 .ld-area b{font-size:13.5px;font-weight:800;color:var(--ink)}

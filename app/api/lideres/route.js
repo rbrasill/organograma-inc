@@ -66,8 +66,33 @@ export async function GET() {
         ord(a) - ord(b) || (diretos.get(b.id) || 0) - (diretos.get(a.id) || 0) ||
         a.nome.localeCompare(b.nome, "pt-BR")
       );
-      const lider = raizes[0];
-      const diretor = lider.liderId ? byId.get(lider.liderId) || null : null;
+
+      // UMA raiz interna → ela é o líder da área (ex.: DP → Rodrigo Agreli).
+      // VÁRIAS raízes → ninguém lidera internamente: o líder da área é a
+      // pessoa EXTERNA a quem o topo responde — tipicamente o próprio
+      // diretor (ex.: Controladoria Gerencial → Rodrigo Faria direto).
+      let lider, liderExterno = false, diretor, diretosNaArea;
+      if (raizes.length === 1) {
+        lider = raizes[0];
+        diretor = lider.liderId ? byId.get(lider.liderId) || null : null;
+        diretosNaArea = diretos.get(lider.id) || 0;
+      } else {
+        const cont = new Map();
+        raizes.forEach((r) => { if (r.liderId) cont.set(r.liderId, (cont.get(r.liderId) || 0) + 1); });
+        let extId = null, max = 0;
+        for (const [eid, n] of cont) if (n > max) { max = n; extId = eid; }
+        const ext = extId ? byId.get(extId) : null;
+        if (ext) {
+          lider = ext;
+          liderExterno = true;
+          diretor = ext; // o grupo da área é o próprio líder externo
+          diretosNaArea = max; // diretos DENTRO da área (não os globais dele)
+        } else {
+          lider = raizes[0]; // todas as raízes sem líder algum (topo absoluto)
+          diretor = null;
+          diretosNaArea = diretos.get(lider.id) || 0;
+        }
+      }
 
       const area = {
         id: setorId,
@@ -78,7 +103,8 @@ export async function GET() {
           matricula: lider.matricula || "",
           nome: lider.nome,
           cargo: lider.cargo || "",
-          diretos: diretos.get(lider.id) || 0,
+          diretos: diretosNaArea,
+          externo: liderExterno,
         },
       };
 
@@ -136,10 +162,15 @@ export async function POST(req) {
     if (!antigo) { await conn.rollback(); return Response.json({ ok: false, erro: "Líder atual não encontrado." }, { status: 404 }); }
     if (!novo) { await conn.rollback(); return Response.json({ ok: false, erro: "Novo líder não encontrado (ou inativo)." }, { status: 404 }); }
 
-    // 1. novo líder da própria área herda o diretor do antigo (quem é de fora
-    //    mantém o próprio líder — vira âncora externa, como um diretor)
+    // 1. novo líder da própria área assume o posto do antigo:
+    //    - antigo era MEMBRO da área → novo herda o diretor dele;
+    //    - antigo era EXTERNO (diretor liderando direto) → novo passa a
+    //      responder ao próprio antigo (o diretor continua diretor).
+    //    Quem é de fora mantém o próprio líder (vira âncora externa).
     if (novo.setor_id === areaId) {
-      await conn.query("UPDATE colaborador SET lider_id = ? WHERE id = ?", [antigo.lider_id || null, novo.id]);
+      let novoChefe = antigo.setor_id === areaId ? (antigo.lider_id || null) : antigo.id;
+      if (novoChefe === novo.id) novoChefe = null; // nunca auto-liderança
+      await conn.query("UPDATE colaborador SET lider_id = ? WHERE id = ?", [novoChefe, novo.id]);
     }
     // 2. todos da área que respondiam ao antigo passam ao novo
     const [r] = await conn.query(
