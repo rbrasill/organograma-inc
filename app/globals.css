@@ -186,7 +186,7 @@ main{padding:20px 24px 24px}
 .modal{width:100%;max-width:520px;max-height:calc(100dvh - 40px);display:flex;flex-direction:column;overflow:hidden;background:#fff;border-radius:22px;box-shadow:0 30px 80px -20px rgba(16,24,40,.5);position:relative;animation:pop .35s var(--ease)}
 /* cabeçalho e rodapé fixos; só o miolo rola — Salvar/Cancelar e o X
    ficam sempre visíveis, sem cortar em telas baixas */
-.modal-head{padding:22px 22px 14px}
+.modal-head{padding:22px 44px 14px 22px} /* folga à direita p/ o botão fechar */
 .modal-body{flex:1;overflow-y:auto;padding:0 22px}
 .modal-foot{padding:14px 22px 18px;border-top:1px solid var(--line-soft)}
 @keyframes fade{from{opacity:0}to{opacity:1}}
@@ -464,23 +464,38 @@ main{padding:20px 24px 24px}
 .ct-form-titulo{font-size:13.5px;font-weight:800;color:var(--brand)}
 
 /* ===== líderes por área (agrupado por diretor) ===== */
+/* paleta de tons leves e discretos (atribuídos pelo nome da área/diretor) */
+.tone-0{--tone-soft:#eff4ff;--tone-line:#d8e4fc;--tone-text:#3457c4}
+.tone-1{--tone-soft:#eefaf2;--tone-line:#cdeada;--tone-text:#1d7a4b}
+.tone-2{--tone-soft:#f6f3ff;--tone-line:#e4dcfa;--tone-text:#6b45c8}
+.tone-3{--tone-soft:#fff8ea;--tone-line:#f3e2b6;--tone-text:#a16207}
+.tone-4{--tone-soft:#fff1f5;--tone-line:#fad5e0;--tone-text:#b1447a}
+.tone-5{--tone-soft:#eefafa;--tone-line:#c9ebe8;--tone-text:#0f766e}
+.tone-6{--tone-soft:#f0f2ff;--tone-line:#dde2fc;--tone-text:#4f46b5}
+.tone-7{--tone-soft:#fff4ec;--tone-line:#fbdcc8;--tone-text:#c05621}
+
 .ld-grupo{margin-bottom:26px}
-.ld-dir{display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:2px solid var(--inc-line);margin-bottom:13px}
+.ld-dir{display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:2px solid var(--tone-line,var(--inc-line));margin-bottom:13px}
 .ld-dir.topo{border-bottom-color:var(--line)}
-.ld-dir-ava{width:42px;height:42px;border-radius:12px;background:var(--inc-soft);border:1px solid var(--inc-line);color:var(--inc);display:grid;place-items:center;flex:none}
+.ld-dir-ava{width:42px;height:42px;border-radius:12px;background:var(--tone-soft,var(--inc-soft));border:1px solid var(--tone-line,var(--inc-line));color:var(--tone-text,var(--inc));display:grid;place-items:center;flex:none}
 .ld-dir.topo .ld-dir-ava{background:#f1f5fb;border-color:var(--line);color:#8ea0bd}
 .ld-dir-txt{display:flex;flex-direction:column;min-width:0;flex:1}
-.ld-dir-txt b{font-size:15px;font-weight:800;color:var(--brand)}
+.ld-dir-txt b{font-size:15px;font-weight:800;color:var(--tone-text,var(--brand))}
+.ld-dir.topo .ld-dir-txt b{color:var(--brand)}
 .ld-dir-txt em{font-size:12px;color:var(--ink-faint);font-style:normal;font-weight:500}
 .ld-dir-chip{font-size:11px;font-weight:700;color:var(--ink-soft);background:#f1f5fb;border-radius:999px;padding:5px 11px;white-space:nowrap}
 .ld-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;align-items:start}
-.ld-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px;transition:border-color .2s}
-.ld-card:hover{border-color:#d8dfeb}
+/* card da área: tom leve no topo, no nome e no avatar do líder */
+.ld-card{background:#fff;border:1px solid var(--line);border-top:3px solid var(--tone-line,var(--line));border-radius:14px;padding:13px;transition:border-color .2s,box-shadow .2s}
+.ld-card:hover{border-color:var(--tone-line,#d8dfeb);box-shadow:var(--shadow-soft)}
 .ld-area{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:9px}
-.ld-area b{font-size:13.5px;font-weight:800;color:var(--ink)}
+.ld-area b{font-size:13.5px;font-weight:800;color:var(--tone-text,var(--ink))}
+.ld-card .lider-atual{background:var(--tone-soft,#f7f9fd);border-color:var(--tone-line,var(--line))}
+.ld-card .la-ava{background:#fff;color:var(--tone-text,#8ea0bd)}
 .ld-nota{font-size:11px;color:var(--ink-faint);margin:8px 0 0}
-.ld-troca{margin-top:10px}
-.ld-troca .lider-list{max-height:210px;overflow-y:auto}
+/* modal de alterar líder */
+.ld-modal-ava{width:52px;height:52px;border-radius:14px;background:var(--tone-soft,#f1f5fb);border:1px solid var(--tone-line,var(--line));color:var(--tone-text,#8ea0bd);display:grid;place-items:center;flex:none}
+.ld-modal-lista{max-height:240px;overflow-y:auto}
 
 /* ===== painel de gestão de áreas ===== */
 .area-modal{max-width:620px}
