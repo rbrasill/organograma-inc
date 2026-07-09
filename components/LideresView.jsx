@@ -114,7 +114,7 @@ export default function LideresView() {
 
   function CardArea({ area, diretorNome }) {
     return (
-      <div className={`ld-card ${tomDe(area.nome)}`}>
+      <div className="ld-card">
         <div className="ld-area">
           <b>{area.nome}</b>
           <span className="ar-count">{area.pessoas} colab.</span>
@@ -130,9 +130,6 @@ export default function LideresView() {
             Alterar líder
           </button>
         </div>
-        {area.outrosTopo > 0 && (
-          <p className="ld-nota">+ {area.outrosTopo} pessoa(s) também no topo desta área (sem líder interno).</p>
-        )}
       </div>
     );
   }
@@ -195,7 +192,7 @@ export default function LideresView() {
             <button className="modal-x" onClick={fecharTroca} aria-label="Fechar"><CloseIcon size={16} /></button>
 
             <div className="modal-head">
-              <div className={`ld-modal-ava ${tomDe(alvo.areaNome)}`}><UserIcon size={26} /></div>
+              <div className="ld-modal-ava"><UserIcon size={26} /></div>
               <div>
                 <h3>Alterar líder — {alvo.areaNome}</h3>
                 <p>A troca vale para todos os colaboradores da área</p>
