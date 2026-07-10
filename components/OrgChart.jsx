@@ -212,6 +212,7 @@ export default function OrgChart() {
   const [showImport, setShowImport] = useState(false);
   const [liderAreaAlvo, setLiderAreaAlvo] = useState(null); // card do líder externo aberto
   const [baixando, setBaixando] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const boxRef = useRef(null);
   const viewportRef = useRef(null);
   const treeRef = useRef(null);
@@ -263,6 +264,20 @@ export default function OrgChart() {
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
+
+  // tela cheia: ESC fecha; recentraliza ao entrar/sair (o viewport muda de
+  // tamanho e o ResizeObserver já dispara centerView, mas garantimos aqui)
+  useEffect(() => {
+    if (!fullscreen) return;
+    function onKey(e) { if (e.key === "Escape") setFullscreen(false); }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [fullscreen]);
+  useEffect(() => {
+    const t = setTimeout(() => centerView(), 130);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullscreen]);
 
   function centerView() {
     const vp = viewportRef.current, t = treeRef.current;
@@ -551,7 +566,7 @@ export default function OrgChart() {
         </div>
       </div>
 
-      <div className="board-shell">
+      <div className={`board-shell ${fullscreen ? "fs" : ""}`}>
         <div className="board">
           <div className="board-head">
             <div className="title-wrap">
@@ -578,7 +593,13 @@ export default function OrgChart() {
                 {baixando ? "Gerando imagem..." : "Baixar imagem"}
               </button>
               <button className="btn btn-primary"><span className="ic"><CheckIcon /></span>Validar organograma</button>
-              <button className="icon-btn" title="Tela cheia"><FullscreenIcon /></button>
+              <button
+                className={`icon-btn ${fullscreen ? "on" : ""}`}
+                onClick={() => setFullscreen((v) => !v)}
+                title={fullscreen ? "Sair da tela cheia (Esc)" : "Ver em tela cheia"}
+              >
+                {fullscreen ? <CloseIcon /> : <FullscreenIcon />}
+              </button>
             </div>
           </div>
 
