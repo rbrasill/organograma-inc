@@ -35,9 +35,19 @@ function nivelVisual(node) {
 }
 
 // ordem do nível hierárquico do banco (1 = topo); sem nível vai para o fim.
-// Usada só para ORDENAR os filhos da esquerda (mais sênior) para a direita —
-// todos os irmãos ficam na mesma linha (árvore clássica, sem degraus).
+// Usada para ORDENAR os filhos da esquerda (mais sênior) para a direita e
+// para calcular o DEGRAU vertical entre irmãos de níveis diferentes.
 const ordemDe = (n) => (n.nivelOrdem == null ? 99 : n.nivelOrdem);
+
+// degrau vertical entre irmãos: quem tem nível mais baixo desce em relação
+// ao irmão mais sênior, deixando visível que não são do mesmo nível mesmo
+// respondendo ao mesmo líder. O degrau é por POSIÇÃO entre os níveis
+// distintos do grupo (não pela distância absoluta), para não abrir buracos.
+const DEGRAU_PX = 46;
+function degrausDe(kids) {
+  const ordens = [...new Set(kids.map(ordemDe))].sort((a, b) => a - b);
+  return (n) => Math.min(ordens.indexOf(ordemDe(n)), 4) * DEGRAU_PX;
+}
 
 function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
   const nivel = nivelVisual(node);
@@ -104,12 +114,13 @@ function dividirEmColunas(leaves) {
   return cols;
 }
 
-function TreeNode({ node, rest }) {
+function TreeNode({ node, rest, deg = 0 }) {
   const collapsed = rest.collapsedSet.has(node.id);
 
   // filhos ordenados por nível (mais sênior à esquerda), depois por nome.
-  // Ramos (quem tem equipe) primeiro, folhas depois — mas todos na MESMA
-  // linha horizontal, ligados pela mesma barra (árvore clássica).
+  // Ramos (quem tem equipe) primeiro, folhas depois — todos ligados à mesma
+  // barra, mas com DEGRAU vertical quando os níveis diferem (o mais sênior
+  // fica mais alto; ver degrausDe).
   const kids = [...(node.children || [])].sort(
     (a, b) => ordemDe(a) - ordemDe(b) || a.nome.localeCompare(b.nome, "pt-BR")
   );
@@ -117,9 +128,10 @@ function TreeNode({ node, rest }) {
   const branches = kids.filter((c) => (c.children || []).length > 0);
   const leaves = kids.filter((c) => (c.children || []).length === 0);
   const emColunas = leaves.length > 4;
+  const degDe = degrausDe(kids);
 
   return (
-    <li>
+    <li style={{ "--deg": `${deg}px` }}>
       <Card
         node={node}
         byId={rest.byId}
@@ -131,10 +143,10 @@ function TreeNode({ node, rest }) {
       {hasKids && !collapsed && (
         <ul>
           {branches.map((c) => (
-            <TreeNode key={c.id} node={c} rest={rest} />
+            <TreeNode key={c.id} node={c} rest={rest} deg={degDe(c)} />
           ))}
           {!emColunas && leaves.map((c) => (
-            <li key={c.id}>
+            <li key={c.id} style={{ "--deg": `${degDe(c)}px` }}>
               <Card
                 node={c} byId={rest.byId} collapsed={false}
                 onToggle={rest.onToggle} onOpen={rest.onOpen}
@@ -143,7 +155,7 @@ function TreeNode({ node, rest }) {
             </li>
           ))}
           {emColunas && dividirEmColunas(leaves).map((col, i) => (
-            <li key={`col-${i}`}>
+            <li key={`col-${i}`} style={{ "--deg": `${degDe(col[0])}px` }}>
               <div className="leaf-col">
                 {col.map((c) => (
                   <div className="leaf-item" key={c.id}>
@@ -595,7 +607,7 @@ export default function OrgChart() {
               {roots.length > 0 && (
                 <ul>
                   {rootsOrdenadas.map((r) => (
-                    <TreeNode key={r.id} node={r} rest={rest} />
+                    <TreeNode key={r.id} node={r} rest={rest} deg={degrausDe(rootsOrdenadas)(r)} />
                   ))}
                 </ul>
               )}

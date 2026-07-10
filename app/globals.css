@@ -115,9 +115,11 @@ main{padding:20px 24px 24px}
 /* padding zerado nas laterais: o padrão do navegador (40px à esquerda)
    deslocava todos os filhos ~20px do centro do pai */
 .tree ul{display:flex;justify-content:center;padding:26px 0 0;position:relative;margin:0;list-style:none}
-.tree li{list-style:none;position:relative;padding:26px 12px 0;display:flex;flex-direction:column;align-items:center}
+/* --deg = degrau vertical extra do card (níveis mais baixos descem);
+   a linha de conexão (::before/::after) se estende junto até o card */
+.tree li{list-style:none;position:relative;padding:calc(26px + var(--deg,0px)) 12px 0;display:flex;flex-direction:column;align-items:center}
 .tree ul::before{content:"";position:absolute;top:0;left:50%;width:2px;height:26px;background:var(--wire);transform:translateX(-50%)}
-.tree li::before,.tree li::after{content:"";position:absolute;top:0;height:26px;width:50%;border-top:2px solid var(--wire)}
+.tree li::before,.tree li::after{content:"";position:absolute;top:0;height:calc(26px + var(--deg,0px));width:50%;border-top:2px solid var(--wire)}
 .tree li::before{right:50%}
 .tree li::after{left:50%}
 .tree li::after{border-left:2px solid var(--wire)}
@@ -131,7 +133,7 @@ main{padding:20px 24px 24px}
 .tree li:only-child::after{width:0;border-top:0;border-top-left-radius:0;border-top-right-radius:0}
 .tree > ul{padding:0}
 .tree > ul::before{display:none}
-.tree > ul > li{padding-top:0}
+.tree > ul > li{padding-top:var(--deg,0px)}
 .tree > ul > li::before,.tree > ul > li::after{display:none}
 .tree > ul > li:only-child::before,.tree > ul > li:only-child::after{display:none}
 
