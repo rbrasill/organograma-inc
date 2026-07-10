@@ -153,15 +153,11 @@ export default function LideresView() {
             <button className="la-nome-btn" onClick={() => abrirPerfil(area.lider.matricula)} title="Ver perfil completo do líder">
               {area.lider.nome}
             </button>
-            {/* linha discreta (sempre presente → todos os cards com a mesma altura):
-                tag da família + quantos lidera */}
+            {/* linha discreta reservada (sempre presente → todos os cards com
+                a mesma altura, com ou sem tag). Detalhe de quantos lidera
+                fica só no perfil completo (clique no nome). */}
             <span className="la-meta">
               {area.lider.tag && <span className="ld-tag-dir">{area.lider.tag}</span>}
-              <span className="la-lidera">
-                {area.lider.externo
-                  ? `lidera a área diretamente · ${area.lider.diretos} na área`
-                  : `lidera ${area.lider.diretos} direto(s)`}
-              </span>
             </span>
             <em>{area.lider.cargo || "Cargo a definir"}</em>
           </span>
