@@ -28,6 +28,7 @@ export async function GET() {
       `SELECT c.id, c.codigo_dp AS matricula, c.nome, c.setor_id AS setorId,
               c.lider_id AS liderId, cg.nome AS cargo,
               COALESCE(nhp.ordem, nh.ordem) AS ordem,
+              COALESCE(nhp.familia, nh.familia) AS familia,
               s.nome AS setorNome
          FROM colaborador c
          LEFT JOIN cargo cg              ON cg.id = c.cargo_id
@@ -52,7 +53,29 @@ export async function GET() {
     });
 
     const ord = (r) => (r.ordem == null ? 99 : r.ordem);
-    const grupos = new Map(); // chave: diretor.id ou "sem"
+
+    // Regra de negócio: toda área é ligada a um DIRETOR (níveis 2–5: CFO,
+    // Diretor, Vice-Diretor); quando não há diretor na cadeia, é ligada ao
+    // Presidente/Conselheiro (nível 1 — os únicos nesse nível).
+    const ehDiretoria = (p) => p && p.ordem != null && p.ordem >= 2 && p.ordem <= 5;
+    const ehPresidencia = (p) => p && p.ordem === 1;
+
+    // sobe a cadeia A PARTIR DO PRÓPRIO líder da área: o primeiro com nível
+    // de diretoria é o diretor responsável (se o líder já é diretor, é ele
+    // mesmo); chegando ao nível 1 sem diretor, o grupo é a presidência.
+    function responsavelDe(liderRow) {
+      const vistos = new Set();
+      let cur = liderRow;
+      while (cur && !vistos.has(cur.id)) {
+        vistos.add(cur.id);
+        if (ehDiretoria(cur)) return { pessoa: cur, tipo: "diretor" };
+        if (ehPresidencia(cur)) return { pessoa: cur, tipo: "presidencia" };
+        cur = cur.liderId ? byId.get(cur.liderId) : null;
+      }
+      return { pessoa: null, tipo: "topo" };
+    }
+
+    const grupos = new Map(); // chave: pessoa responsável (diretor/presidência) ou "topo"
 
     for (const [setorId, membros] of porSetor) {
       const raizes = membros.filter((m) => {
@@ -69,12 +92,10 @@ export async function GET() {
 
       // UMA raiz interna → ela é o líder da área (ex.: DP → Rodrigo Agreli).
       // VÁRIAS raízes → ninguém lidera internamente: o líder da área é a
-      // pessoa EXTERNA a quem o topo responde — tipicamente o próprio
-      // diretor (ex.: Controladoria Gerencial → Rodrigo Faria direto).
-      let lider, liderExterno = false, diretor, diretosNaArea;
+      // pessoa EXTERNA a quem o topo responde.
+      let lider, liderExterno = false, diretosNaArea;
       if (raizes.length === 1) {
         lider = raizes[0];
-        diretor = lider.liderId ? byId.get(lider.liderId) || null : null;
         diretosNaArea = diretos.get(lider.id) || 0;
       } else {
         const cont = new Map();
@@ -85,14 +106,16 @@ export async function GET() {
         if (ext) {
           lider = ext;
           liderExterno = true;
-          diretor = ext; // o grupo da área é o próprio líder externo
           diretosNaArea = max; // diretos DENTRO da área (não os globais dele)
         } else {
           lider = raizes[0]; // todas as raízes sem líder algum (topo absoluto)
-          diretor = null;
           diretosNaArea = diretos.get(lider.id) || 0;
         }
       }
+
+      // diretor responsável: sobe a cadeia a partir do líder (inclui ele próprio)
+      const resp = responsavelDe(lider);
+      const ehOResponsavel = !!(resp.pessoa && resp.pessoa.id === lider.id);
 
       const area = {
         id: setorId,
@@ -105,17 +128,22 @@ export async function GET() {
           cargo: lider.cargo || "",
           diretos: diretosNaArea,
           externo: liderExterno,
+          // selo no card quando o líder É o responsável (Diretor/CFO/Presidente…)
+          tag: ehOResponsavel ? (lider.familia || "Diretor") : "",
         },
       };
 
-      const chave = diretor ? diretor.id : "sem";
+      const chave = resp.pessoa ? resp.pessoa.id : "topo";
       if (!grupos.has(chave)) {
+        const p = resp.pessoa;
         grupos.set(chave, {
-          diretor: diretor ? {
-            matricula: diretor.matricula || "",
-            nome: diretor.nome,
-            cargo: diretor.cargo || "",
-            setor: diretor.setorNome || "",
+          tipo: resp.tipo,
+          diretor: p ? {
+            matricula: p.matricula || "",
+            nome: p.nome,
+            cargo: p.cargo || "",
+            setor: p.setorNome || "",
+            respondeA: p.liderId ? (byId.get(p.liderId)?.nome || "") : "",
           } : null,
           areas: [],
         });
@@ -125,8 +153,13 @@ export async function GET() {
 
     const todos = [...grupos.values()];
     todos.forEach((g) => g.areas.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")));
+    // presidência primeiro (nível 1), depois os diretores
+    const pesoTipo = { presidencia: 0, diretor: 1 };
     const diretores = todos.filter((g) => g.diretor)
-      .sort((a, b) => b.areas.length - a.areas.length || a.diretor.nome.localeCompare(b.diretor.nome, "pt-BR"));
+      .sort((a, b) =>
+        (pesoTipo[a.tipo] ?? 9) - (pesoTipo[b.tipo] ?? 9) ||
+        b.areas.length - a.areas.length ||
+        a.diretor.nome.localeCompare(b.diretor.nome, "pt-BR"));
     const semDiretor = todos.find((g) => !g.diretor)?.areas || [];
 
     return Response.json({ ok: true, diretores, semDiretor });

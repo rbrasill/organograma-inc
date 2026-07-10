@@ -123,7 +123,7 @@ export default function LideresView() {
         <div className="lider-atual">
           <span className="la-ava"><UserIcon size={20} /></span>
           <span className="la-txt">
-            <b>{area.lider.nome}{area.lider.externo && <span className="ld-tag-dir">diretor</span>}</b>
+            <b>{area.lider.nome}{area.lider.tag && <span className="ld-tag-dir">{area.lider.tag}</span>}</b>
             <em>
               {area.lider.cargo || "Cargo a definir"} ·{" "}
               {area.lider.externo
@@ -163,7 +163,11 @@ export default function LideresView() {
               <span className="ld-dir-ava"><UserIcon size={22} /></span>
               <span className="ld-dir-txt">
                 <b>{g.diretor.nome}</b>
-                <em>{g.diretor.cargo || "Cargo a definir"}{g.diretor.setor ? ` · ${g.diretor.setor}` : ""}</em>
+                <em>
+                  {g.diretor.cargo || "Cargo a definir"}
+                  {g.diretor.setor ? ` · ${g.diretor.setor}` : ""}
+                  {g.diretor.respondeA ? ` · responde a ${g.diretor.respondeA}` : ""}
+                </em>
               </span>
               <span className="ld-dir-chip">{g.areas.length} área(s) sob gestão</span>
             </div>
@@ -178,8 +182,8 @@ export default function LideresView() {
             <div className="ld-dir topo">
               <span className="ld-dir-ava"><UserIcon size={22} /></span>
               <span className="ld-dir-txt">
-                <b>Topo da hierarquia</b>
-                <em>Áreas cujo líder não responde a ninguém (ex.: Presidência)</em>
+                <b>Sem diretor na cadeia</b>
+                <em>Áreas cujo líder não chega a nenhum diretor nem à presidência</em>
               </span>
               <span className="ld-dir-chip">{dados.semDiretor.length} área(s)</span>
             </div>
