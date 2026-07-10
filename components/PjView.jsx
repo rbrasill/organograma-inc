@@ -1,9 +1,9 @@
 "use client";
 
-// Gestão dedicada de colaboradores PJ (prestadores). Lista só os PJ, permite
-// cadastrar novos, editar (inclui dados de empresa: razão social, CNPJ,
-// telefone), trocar situação/área/cargo/líder, ativar/desativar e EXCLUIR de
-// vez. Usa a API /api/colaboradores/gestao (com tipo=PJ e ações criar/excluir).
+// Gestão dedicada de colaboradores PJ (PJ = tipo de contratação da pessoa,
+// não uma empresa). Lista só os PJ, permite cadastrar novos, editar (inclui
+// CPF e telefone), trocar situação/área/cargo/líder, ativar/desativar e
+// EXCLUIR de vez. Usa /api/colaboradores/gestao (tipo=PJ + ações criar/excluir).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import HeroNav from "@/components/HeroNav";
@@ -16,7 +16,7 @@ const rotuloNivel = (n) =>
   n ? `${n.codVar || `${n.ordem}${n.variacao ? `.${n.variacao}` : ""}`} · ${n.familia || n.codigo || "—"}` : "";
 
 const VAZIO = {
-  matricula: "", nome: "", empresa: "", cnpj: "", telefone: "", email: "",
+  matricula: "", nome: "", cpf: "", telefone: "", email: "",
   situacaoId: "", cargoId: "", nivelId: "", setorId: "", regionalId: "", localId: "",
   liderMatricula: "", liderNome: "", ativo: 1,
 };
@@ -68,7 +68,7 @@ export default function PjView() {
   const listaFiltrada = useMemo(() => {
     const nq = normalizar(busca.trim());
     if (!nq) return pjs;
-    return pjs.filter((p) => normalizar(p.nome).includes(nq) || normalizar(p.empresa || "").includes(nq) || (p.matricula || "").includes(busca.trim()));
+    return pjs.filter((p) => normalizar(p.nome).includes(nq) || normalizar(p.cargo || "").includes(nq) || (p.matricula || "").includes(busca.trim()));
   }, [pjs, busca]);
 
   // ===== nível (cascata código do cargo → variação) =====
@@ -95,8 +95,8 @@ export default function PjView() {
       if (!j.ok) throw new Error(j.erro || "Falha ao carregar.");
       const c = j.colaborador;
       setForm({
-        matricula: c.codigo_dp || "", nome: c.nome || "", empresa: c.empresa || "",
-        cnpj: c.cnpj || "", telefone: c.telefone || "", email: c.email || "",
+        matricula: c.codigo_dp || "", nome: c.nome || "",
+        cpf: c.cpf || "", telefone: c.telefone || "", email: c.email || "",
         situacaoId: c.situacao_id || "", cargoId: c.cargo_id || "",
         nivelId: c.nivel_pessoal_id || c.cargo_nivel_id || "",
         setorId: c.setor_id || "", regionalId: c.regional_id || "", localId: c.local_id || "",
@@ -191,7 +191,7 @@ export default function PjView() {
             </button>
             <div className="sol-busca">
               <SearchIcon size={14} />
-              <input placeholder="Buscar por nome, empresa ou matrícula..." value={busca} onChange={(e) => setBusca(e.target.value)} />
+              <input placeholder="Buscar por nome, cargo ou matrícula..." value={busca} onChange={(e) => setBusca(e.target.value)} />
             </div>
             <label className="col-inativos">
               <input type="checkbox" checked={incluirInativos} onChange={(e) => setIncluirInativos(e.target.checked)} />
@@ -208,7 +208,7 @@ export default function PjView() {
                 <span className="sc-ava"><BriefcaseIcon size={17} /></span>
                 <span className="sc-txt">
                   <b>{c.nome}{c.ativo === 0 && <span className="col-tag-off">desativado</span>}</b>
-                  <em>{c.empresa || c.cargo || "—"}</em>
+                  <em>{c.cargo || "Cargo a definir"}</em>
                   <small>{c.matricula}{c.setor ? ` · ${c.setor}` : ""}</small>
                 </span>
               </button>
@@ -246,17 +246,13 @@ export default function PjView() {
                 <label className="fld"><span>Nome</span>
                   <input value={form.nome} onChange={(e) => set("nome", e.target.value)} /></label>
                 <div className="col-grid2">
-                  <label className="fld"><span>Empresa / Razão social</span>
-                    <input value={form.empresa} onChange={(e) => set("empresa", e.target.value)} /></label>
-                  <label className="fld"><span>CNPJ</span>
-                    <input value={form.cnpj} placeholder="00.000.000/0000-00" onChange={(e) => set("cnpj", e.target.value)} /></label>
-                </div>
-                <div className="col-grid2">
+                  <label className="fld"><span>CPF</span>
+                    <input value={form.cpf} placeholder="000.000.000-00" onChange={(e) => set("cpf", e.target.value)} /></label>
                   <label className="fld"><span>Telefone</span>
                     <input value={form.telefone} placeholder="(00) 00000-0000" onChange={(e) => set("telefone", e.target.value)} /></label>
-                  <label className="fld"><span>E-mail</span>
-                    <input value={form.email} placeholder="nome@empresa.com.br" onChange={(e) => set("email", e.target.value)} /></label>
                 </div>
+                <label className="fld"><span>E-mail</span>
+                  <input value={form.email} placeholder="nome@meuinc.com.br" onChange={(e) => set("email", e.target.value)} /></label>
                 <div className="col-grid2">
                   <label className="fld"><span>Situação</span>
                     <select value={form.situacaoId} onChange={(e) => set("situacaoId", e.target.value)}>

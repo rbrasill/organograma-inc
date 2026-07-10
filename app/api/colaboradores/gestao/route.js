@@ -31,7 +31,7 @@ async function contarSubordinados(conn, id) {
 async function carregarColaborador(pool, id) {
   const [rows] = await pool.query(
     `SELECT c.id, c.codigo_dp, c.nome, c.email, c.tipo_contratacao, c.ativo,
-            c.empresa, c.cnpj, c.telefone,
+            c.cpf, c.telefone,
             c.cargo_id, c.setor_id, c.local_id, c.regional_id, c.situacao_id, c.lider_id,
             c.nivel_id AS nivel_pessoal_id, cg.nivel_id AS cargo_nivel_id,
             cg.nome AS cargo, s.nome AS setor, lt.nome AS local,
@@ -128,7 +128,7 @@ export async function GET(req) {
         args.push(`%${q}%`);
       }
       const [rows] = await pool.query(
-        `SELECT c.id, c.codigo_dp AS matricula, c.nome, c.ativo, c.empresa,
+        `SELECT c.id, c.codigo_dp AS matricula, c.nome, c.ativo,
                 cg.nome AS cargo, s.nome AS setor
            FROM colaborador c
            LEFT JOIN cargo cg ON cg.id = c.cargo_id
@@ -197,12 +197,12 @@ export async function POST(req) {
       const fk = (v) => (v ? v : null);
       await pool.query(
         `INSERT INTO colaborador
-           (id, codigo_dp, nome, email, tipo_contratacao, empresa, cnpj, telefone,
+           (id, codigo_dp, nome, email, tipo_contratacao, cpf, telefone,
             cargo_id, nivel_id, setor_id, local_id, regional_id, situacao_id, lider_id, ativo)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
         [
           novoId, codigo, nome, (campos.email || "").trim() || null, tipo,
-          (campos.empresa || "").trim() || null, (campos.cnpj || "").trim() || null, (campos.telefone || "").trim() || null,
+          (campos.cpf || "").trim() || null, (campos.telefone || "").trim() || null,
           fk(campos.cargoId), vinc.nivelPessoal, fk(campos.setorId), fk(campos.localId),
           fk(campos.regionalId), fk(campos.situacaoId), vinc.liderId,
         ]
@@ -309,13 +309,13 @@ export async function POST(req) {
     await pool.query(
       `UPDATE colaborador
           SET nome = ?, email = ?, tipo_contratacao = ?,
-              empresa = ?, cnpj = ?, telefone = ?,
+              cpf = ?, telefone = ?,
               cargo_id = ?, nivel_id = ?, setor_id = ?, local_id = ?, regional_id = ?, situacao_id = ?,
               lider_id = ?
         WHERE id = ?`,
       [
         nome, (campos.email || "").trim() || null, tipo,
-        (campos.empresa || "").trim() || null, (campos.cnpj || "").trim() || null, (campos.telefone || "").trim() || null,
+        (campos.cpf || "").trim() || null, (campos.telefone || "").trim() || null,
         fk(campos.cargoId), vinc.nivelPessoal, fk(campos.setorId), fk(campos.localId),
         fk(campos.regionalId), fk(campos.situacaoId), vinc.liderId, id,
       ]

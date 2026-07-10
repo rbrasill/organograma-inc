@@ -35,26 +35,32 @@ main{padding:20px 24px 24px}
 .shell{max-width:none;margin:0}
 
 /* ===== banner "hero" do topo (menu global, presente em todas as páginas) ===== */
-.hero{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;
+/* uma única linha: marca à esquerda (encolhe), cards à direita (não quebram;
+   rolam na horizontal só se a tela for estreita demais) */
+.hero{display:flex;align-items:center;gap:22px;flex-wrap:nowrap;
   background:linear-gradient(105deg,#F16021 0%,#e0559a 42%,#9f60b7 68%,#40419f 100%);
-  border-radius:22px;padding:20px 26px;margin-bottom:16px;
+  border-radius:22px;padding:18px 22px;margin-bottom:16px;
   box-shadow:0 18px 44px -22px rgba(64,65,159,.55)}
-.hero-brand{display:flex;align-items:center;gap:20px;min-width:0}
-.hero-logo{height:44px;width:auto;display:block;flex:none}
-.hero-txt h1{margin:0;font-size:23px;font-weight:800;letter-spacing:-.02em;color:#fff;line-height:1.1}
-.hero-txt p{margin:5px 0 0;font-size:13px;font-weight:500;color:rgba(255,255,255,.88)}
-.hero-cards{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
-.hero-card{display:flex;align-items:center;gap:11px;text-decoration:none;cursor:pointer;font:inherit;
-  background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);border-radius:14px;
-  padding:11px 15px 11px 11px;color:#fff;font-size:12.5px;font-weight:700;position:relative;
+.hero-brand{display:flex;align-items:center;gap:16px;min-width:0;flex-shrink:1}
+.hero-logo{height:42px;width:auto;display:block;flex:none}
+.hero-txt{min-width:0}
+.hero-txt h1{margin:0;font-size:21px;font-weight:800;letter-spacing:-.02em;color:#fff;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero-txt p{margin:4px 0 0;font-size:12.5px;font-weight:500;color:rgba(255,255,255,.88);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero-cards{display:flex;gap:8px;flex-wrap:nowrap;justify-content:flex-end;overflow-x:auto;padding-bottom:2px;flex:1 1 auto;scrollbar-width:thin}
+.hero-cards::-webkit-scrollbar{height:6px}
+.hero-cards::-webkit-scrollbar-thumb{background:rgba(255,255,255,.35);border-radius:999px}
+.hero-card{display:flex;align-items:center;gap:9px;text-decoration:none;cursor:pointer;font:inherit;flex:none;
+  background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);border-radius:13px;
+  padding:9px 13px 9px 9px;color:#fff;font-size:12px;font-weight:700;position:relative;
   transition:background .2s var(--ease),transform .2s var(--ease),border-color .2s}
 .hero-card:hover{background:rgba(255,255,255,.26);border-color:rgba(255,255,255,.4);transform:translateY(-2px)}
 /* card da página atual */
 .hero-card.on{background:rgba(255,255,255,.92);border-color:#fff;color:var(--ink)}
 .hero-card.on .hc-ic{background:var(--inc-soft);color:var(--inc)}
-.hc-ic{width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,.18);display:grid;place-items:center;flex:none}
+.hc-ic{width:29px;height:29px;border-radius:9px;background:rgba(255,255,255,.18);display:grid;place-items:center;flex:none}
 .hc-nome{white-space:nowrap;display:inline-flex;align-items:center;gap:7px}
 .hc-badge{font-style:normal;font-size:10px;font-weight:800;background:#fff;color:var(--inc);border-radius:999px;padding:1px 6px;line-height:1.4}
+@media (max-width:820px){ .hero{flex-wrap:wrap} .hero-cards{justify-content:flex-start} }
 
 .controls-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 .select,.search{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--line);padding:9px 13px;border-radius:12px;box-shadow:var(--shadow-soft);font-size:13px;color:var(--ink-soft);font-weight:500;position:relative}
