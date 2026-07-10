@@ -50,8 +50,9 @@ function degrausDe(kids) {
 }
 
 function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
-  const nivel = nivelVisual(node);
-  const cor = NIVEIS[nivel - 1].cor;
+  // cor oficial da FAMÍLIA (nivel_hierarquico.cor) quando existe; senão cai
+  // no mapa de 6 faixas por ordem/nome do cargo (cargos sem nível vinculado).
+  const cor = node.cor || NIVEIS[nivelVisual(node) - 1].cor;
   const kids = node.children ? node.children.length : 0;
   const alertas = inconsistenciasDe(node, byId);
   // raiz da área cujo líder real existe fora dela (ex.: responde a um
@@ -490,8 +491,8 @@ export default function OrgChart() {
     for (const p of pessoas) {
       const fam = (p.familia || "").trim() || "Sem nível definido";
       if (map.has(fam)) continue;
-      const lvl = nivelVisual(p);
-      map.set(fam, { familia: fam, ordem: p.nivelOrdem ?? 999, cor: NIVEIS[lvl - 1].cor });
+      const cor = p.cor || NIVEIS[nivelVisual(p) - 1].cor;
+      map.set(fam, { familia: fam, ordem: p.nivelOrdem ?? 999, cor });
     }
     return [...map.values()].sort(
       (a, b) => a.ordem - b.ordem || a.familia.localeCompare(b.familia, "pt-BR")

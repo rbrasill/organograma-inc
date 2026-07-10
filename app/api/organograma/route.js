@@ -49,6 +49,7 @@ export async function GET(req) {
               cg.nome AS cargo, lt.nome AS local, st.nome AS situacao,
               COALESCE(nhp.ordem, nh.ordem) AS nivel_ordem,
               COALESCE(nhp.familia, nh.familia) AS familia,
+              COALESCE(nhp.cor, nh.cor) AS cor,
               ld.codigo_dp AS lider_codigo, ld.id AS lider_uuid, ld.nome AS lider_nome
          FROM colaborador c
          LEFT JOIN cargo cg            ON cg.id = c.cargo_id
@@ -71,7 +72,8 @@ export async function GET(req) {
       `SELECT DISTINCT c.id, c.codigo_dp, c.nome, c.email, c.tipo_contratacao,
               cg.nome AS cargo, lt.nome AS local, st.nome AS situacao,
               COALESCE(nhp.ordem, nh.ordem) AS nivel_ordem,
-              COALESCE(nhp.familia, nh.familia) AS familia, se.nome AS setor_nome
+              COALESCE(nhp.familia, nh.familia) AS familia,
+              COALESCE(nhp.cor, nh.cor) AS cor, se.nome AS setor_nome
          FROM colaborador c
          JOIN colaborador sub ON sub.lider_id = c.id AND sub.ativo = 1 AND sub.setor_id = ?
          LEFT JOIN cargo cg             ON cg.id = c.cargo_id
@@ -97,6 +99,7 @@ export async function GET(req) {
       pj: r.tipo_contratacao === "PJ",
       nivelOrdem: r.nivel_ordem || null,
       familia: r.familia || "",
+      cor: r.cor || null,
       externo: true,
       setorOrigem: r.setor_nome || "",
     }));
@@ -113,6 +116,7 @@ export async function GET(req) {
       pj: r.tipo_contratacao === "PJ",
       nivelOrdem: r.nivel_ordem || null,
       familia: r.familia || "",
+      cor: r.cor || null,
     }));
 
     const pessoas = [...externos, ...membros];
