@@ -21,9 +21,10 @@ function erroResposta(e) {
   return Response.json({ ok: false, erro: msg }, { status: 500 });
 }
 
-export async function GET() {
+export async function GET(req) {
   try {
     const pool = getPool();
+    const perfilMat = new URL(req.url).searchParams.get("perfil");
     const [rows] = await pool.query(
       `SELECT c.id, c.codigo_dp AS matricula, c.nome, c.setor_id AS setorId,
               c.lider_id AS liderId, cg.nome AS cargo,
@@ -161,6 +162,68 @@ export async function GET() {
         b.areas.length - a.areas.length ||
         a.diretor.nome.localeCompare(b.diretor.nome, "pt-BR"));
     const semDiretor = todos.find((g) => !g.diretor)?.areas || [];
+
+    // ===== perfil de um líder: visão completa dele no organograma =====
+    if (perfilMat) {
+      const pessoa = rows.find((r) => r.matricula === perfilMat);
+      if (!pessoa) return Response.json({ ok: false, erro: "Colaborador não encontrado." }, { status: 404 });
+
+      // dados ricos do card (cor/variação/tipo/situação) — consulta pontual
+      const [[det]] = await pool.query(
+        `SELECT c.tipo_contratacao, sit.nome AS situacao,
+                COALESCE(nhp.cor, nh.cor) AS cor, COALESCE(nhp.cod_var, nh.cod_var) AS cod_var
+           FROM colaborador c
+           LEFT JOIN cargo cg ON cg.id = c.cargo_id
+           LEFT JOIN nivel_hierarquico nh ON nh.id = cg.nivel_id
+           LEFT JOIN nivel_hierarquico nhp ON nhp.id = c.nivel_id
+           LEFT JOIN situacao sit ON sit.id = c.situacao_id
+          WHERE c.id = ? LIMIT 1`,
+        [pessoa.id]
+      );
+
+      // cadeia de comando: da pessoa até o topo (com proteção contra ciclo)
+      const cadeia = [];
+      const vistos = new Set([pessoa.id]);
+      let cur = pessoa.liderId ? byId.get(pessoa.liderId) : null;
+      while (cur && !vistos.has(cur.id)) {
+        vistos.add(cur.id);
+        cadeia.push({ nome: cur.nome, cargo: cur.cargo || "", familia: cur.familia || "" });
+        cur = cur.liderId ? byId.get(cur.liderId) : null;
+      }
+
+      const todasAreas = todos.flatMap((g) => g.areas);
+      const lideraAreas = todasAreas
+        .filter((a) => a.lider.matricula === perfilMat)
+        .map((a) => ({ nome: a.nome, pessoas: a.pessoas }));
+      const areasGeridas = (grupos.get(pessoa.id)?.areas || [])
+        .map((a) => ({ nome: a.nome, liderNome: a.lider.nome }));
+
+      const diretosArr = rows
+        .filter((r) => r.liderId === pessoa.id)
+        .sort((a, b) => ord(a) - ord(b) || a.nome.localeCompare(b.nome, "pt-BR"));
+
+      return Response.json({
+        ok: true,
+        perfil: {
+          matricula: pessoa.matricula || "",
+          nome: pessoa.nome,
+          cargo: pessoa.cargo || "",
+          familia: pessoa.familia || "",
+          cod_var: det?.cod_var || "",
+          cor: det?.cor || "",
+          setor: pessoa.setorNome || "",
+          situacao: det?.situacao || "",
+          pj: det?.tipo_contratacao === "PJ",
+          cadeia,
+          lideraAreas,
+          areasGeridas,
+          totalDiretos: diretosArr.length,
+          diretos: diretosArr.slice(0, 12).map((r) => ({
+            matricula: r.matricula || "", nome: r.nome, cargo: r.cargo || "", setor: r.setorNome || "",
+          })),
+        },
+      });
+    }
 
     return Response.json({ ok: true, diretores, semDiretor });
   } catch (e) {

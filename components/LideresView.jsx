@@ -36,6 +36,12 @@ export default function LideresView() {
   const [erroTroca, setErroTroca] = useState("");
   const buscaRef = useRef(null);
 
+  // modal de perfil do líder (visão completa dele no organograma)
+  const [perfilMat, setPerfilMat] = useState(null);
+  const [perfil, setPerfil] = useState(null);
+  const [perfilCarregando, setPerfilCarregando] = useState(false);
+  const [perfilErro, setPerfilErro] = useState("");
+
   const carregar = useCallback(async () => {
     setCarregando(true);
     setErro("");
@@ -112,6 +118,27 @@ export default function LideresView() {
     setSalvando(false);
   }
 
+  // ===== perfil do líder =====
+  const abrirPerfil = useCallback(async (matricula) => {
+    if (!matricula) return;
+    setPerfilMat(matricula); setPerfil(null); setPerfilErro(""); setPerfilCarregando(true);
+    try {
+      const r = await fetch(`/api/lideres?perfil=${encodeURIComponent(matricula)}`);
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.erro || "Falha ao carregar o perfil.");
+      setPerfil(j.perfil);
+    } catch (e) { setPerfilErro(e.message); }
+    setPerfilCarregando(false);
+  }, []);
+  function fecharPerfil() { setPerfilMat(null); setPerfil(null); setPerfilErro(""); }
+
+  useEffect(() => {
+    if (!perfilMat) return;
+    function esc(e) { if (e.key === "Escape") fecharPerfil(); }
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  }, [perfilMat]);
+
   function CardArea({ area, diretorNome }) {
     return (
       <div className="ld-card">
@@ -123,13 +150,20 @@ export default function LideresView() {
         <div className="lider-atual">
           <span className="la-ava"><UserIcon size={20} /></span>
           <span className="la-txt">
-            <b>{area.lider.nome}{area.lider.tag && <span className="ld-tag-dir">{area.lider.tag}</span>}</b>
-            <em>
-              {area.lider.cargo || "Cargo a definir"} ·{" "}
-              {area.lider.externo
-                ? `lidera a área diretamente (${area.lider.diretos} na área)`
-                : `lidera ${area.lider.diretos} direto(s)`}
-            </em>
+            <button className="la-nome-btn" onClick={() => abrirPerfil(area.lider.matricula)} title="Ver perfil completo do líder">
+              {area.lider.nome}
+            </button>
+            {/* linha discreta (sempre presente → todos os cards com a mesma altura):
+                tag da família + quantos lidera */}
+            <span className="la-meta">
+              {area.lider.tag && <span className="ld-tag-dir">{area.lider.tag}</span>}
+              <span className="la-lidera">
+                {area.lider.externo
+                  ? `lidera a área diretamente · ${area.lider.diretos} na área`
+                  : `lidera ${area.lider.diretos} direto(s)`}
+              </span>
+            </span>
+            <em>{area.lider.cargo || "Cargo a definir"}</em>
           </span>
           <button className="la-btn" onClick={() => abrirTroca(area, diretorNome)}>
             Alterar líder
@@ -297,6 +331,115 @@ export default function LideresView() {
                 <span className="ic"><CheckIcon /></span>{salvando ? "Aplicando..." : "Aplicar troca"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== modal de perfil do líder (visão completa no organograma) ===== */}
+      {perfilMat && (
+        <div className="modal-overlay" onMouseDown={fecharPerfil}>
+          <div className="modal lp-modal" onMouseDown={(e) => e.stopPropagation()}>
+            <button className="modal-x" onClick={fecharPerfil} aria-label="Fechar"><CloseIcon size={16} /></button>
+
+            {perfilCarregando && <div className="modal-body"><div className="ar-vazio">Carregando perfil...</div></div>}
+            {!perfilCarregando && perfilErro && (
+              <div className="modal-body"><div className="modal-alert"><AlertIcon size={16} /><div><b>{perfilErro}</b></div></div></div>
+            )}
+
+            {!perfilCarregando && perfil && (
+              <>
+                <div className="modal-head">
+                  <div className="lp-ava" style={{ "--tone-line": perfil.cor || "var(--line)", "--tone-text": perfil.cor || "var(--ink-soft)" }}>
+                    <UserIcon size={28} />
+                  </div>
+                  <div>
+                    <h3>{perfil.nome}</h3>
+                    <p>
+                      {perfil.cargo || "Cargo a definir"}
+                      {perfil.familia ? ` · ${perfil.familia}${perfil.cod_var ? ` (${perfil.cod_var})` : ""}` : ""}
+                      {perfil.pj ? " · PJ" : ""}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="modal-body">
+                  <div className="ro-grid" style={{ marginBottom: 14 }}>
+                    <div className="ro"><span>Matrícula</span><b>{perfil.matricula || "—"}</b></div>
+                    <div className="ro"><span>Área</span><b>{perfil.setor || "—"}</b></div>
+                    <div className="ro"><span>Situação</span><b>{perfil.situacao || "—"}</b></div>
+                    <div className="ro"><span>Lidera diretamente</span><b>{perfil.totalDiretos} pessoa(s)</b></div>
+                  </div>
+
+                  {/* cadeia de comando: da pessoa até o topo */}
+                  {perfil.cadeia?.length > 0 && (
+                    <div className="modal-section">
+                      <span className="sec-title">Responde a</span>
+                      <div className="lp-cadeia">
+                        {perfil.cadeia.map((p, i) => (
+                          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                            {i > 0 && <span className="lp-seta">↑</span>}
+                            <span className="lp-chip">{p.nome}<em>{p.cargo || p.familia || ""}</em></span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* áreas onde é o líder direto */}
+                  {perfil.lideraAreas?.length > 0 && (
+                    <div className="modal-section">
+                      <span className="sec-title">Líder da(s) área(s)</span>
+                      <div className="lp-tags">
+                        {perfil.lideraAreas.map((a) => (
+                          <span key={a.nome} className="lp-area-tag">{a.nome} <em>{a.pessoas}</em></span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* áreas sob gestão (como diretor responsável) */}
+                  {perfil.areasGeridas?.length > 0 && (
+                    <div className="modal-section">
+                      <span className="sec-title">Áreas sob sua gestão ({perfil.areasGeridas.length})</span>
+                      <div className="lp-geridas">
+                        {perfil.areasGeridas.map((a) => (
+                          <div key={a.nome} className="lp-gerida">
+                            <b>{a.nome}</b>
+                            <em>líder: {a.liderNome}</em>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* equipe direta */}
+                  {perfil.diretos?.length > 0 && (
+                    <div className="modal-section">
+                      <span className="sec-title">Equipe direta ({perfil.totalDiretos})</span>
+                      <div className="lp-equipe">
+                        {perfil.diretos.map((p) => (
+                          <div key={p.matricula || p.nome} className="lp-membro">
+                            <span className="lp-membro-ava"><UserIcon size={15} /></span>
+                            <span className="lp-membro-txt">
+                              <b>{p.nome}</b>
+                              <em>{p.cargo || "Cargo a definir"}{p.setor ? ` · ${p.setor}` : ""}</em>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      {perfil.totalDiretos > perfil.diretos.length && (
+                        <p className="lp-mais">+ {perfil.totalDiretos - perfil.diretos.length} outro(s)</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="modal-foot">
+                  <div style={{ flex: 1 }} />
+                  <button className="btn btn-neutral" onClick={fecharPerfil}>Fechar</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
