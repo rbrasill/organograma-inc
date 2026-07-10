@@ -36,7 +36,7 @@ export default function HeroNav({ titulo, subtitulo, atual, onAcao }) {
     <div className="hero">
       <div className="hero-brand">
         <Link href="/" title="Ir para o organograma">
-          <img className="hero-logo" src="/inc-logo.svg" alt="INC Empreendimentos" />
+          <img className="hero-logo" src="/inc-oficial.svg" alt="INC Empreendimentos" />
         </Link>
         <div className="hero-txt">
           <h1>{titulo}</h1>
