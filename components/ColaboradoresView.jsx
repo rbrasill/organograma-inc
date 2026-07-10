@@ -150,6 +150,7 @@ export default function ColaboradoresView() {
         matricula: c.codigo_dp || "",
         nome: c.nome || "",
         email: c.email || "",
+        cpf: c.cpf || "", // exibição apenas — não é enviado no salvar
         tipo: c.tipo_contratacao || "CLT",
         cargoId: c.cargo_id || "",
         setorId: c.setor_id || "",
@@ -222,9 +223,12 @@ export default function ColaboradoresView() {
   async function salvar() {
     setSalvando(true); setErro("");
     try {
+      // CPF é somente visualização nesta tela: sai do payload para a API
+      // preservar o valor gravado (ela só atualiza cpf quando o campo vem).
+      const { cpf: _cpf, ...campos } = form;
       const r = await fetch("/api/colaboradores/gestao", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: selId, campos: form }),
+        body: JSON.stringify({ id: selId, campos }),
       });
       const txt = await r.text();
       let j; try { j = JSON.parse(txt); } catch { j = { ok: false, erro: `Servidor respondeu ${r.status}.` }; }
@@ -369,10 +373,21 @@ export default function ColaboradoresView() {
                   <span>Nome</span>
                   <input value={form.nome} onChange={(e) => set("nome", e.target.value)} />
                 </label>
-                <label className="fld">
-                  <span>E-mail corporativo</span>
-                  <input value={form.email} placeholder="nome@meuinc.com.br" onChange={(e) => set("email", e.target.value)} />
-                </label>
+                <div className="col-grid2">
+                  <label className="fld">
+                    <span>E-mail corporativo</span>
+                    <input value={form.email} placeholder="nome@meuinc.com.br" onChange={(e) => set("email", e.target.value)} />
+                  </label>
+                  <label className="fld">
+                    <span>CPF <em className="ct-ex">· somente visualização</em></span>
+                    <input
+                      value={form.cpf}
+                      placeholder="Não informado"
+                      disabled
+                      title="O CPF vem da importação por Excel (ou do cadastro PJ) e não é editável aqui."
+                    />
+                  </label>
+                </div>
                 <div className="col-grid2">
                   <label className="fld">
                     <span>Tipo de contratação</span>

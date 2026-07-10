@@ -306,16 +306,25 @@ export async function POST(req) {
     const vinc = await resolverEstruturais(pool, campos, id, alvo.nivel_id);
     if (vinc.erro) return erro400(vinc.erro);
 
+    // cpf/telefone: só entram no UPDATE quando o payload traz o campo.
+    // A tela geral de edição não os envia (CPF lá é somente visualização) —
+    // sem isso, salvar por ela apagaria o CPF/telefone já gravados.
+    const tem = (c) => Object.prototype.hasOwnProperty.call(campos, c);
+    const extraSet = [];
+    const extraVal = [];
+    if (tem("cpf")) { extraSet.push("cpf = ?"); extraVal.push((campos.cpf || "").trim() || null); }
+    if (tem("telefone")) { extraSet.push("telefone = ?"); extraVal.push((campos.telefone || "").trim() || null); }
+
     await pool.query(
       `UPDATE colaborador
           SET nome = ?, email = ?, tipo_contratacao = ?,
-              cpf = ?, telefone = ?,
+              ${extraSet.length ? `${extraSet.join(", ")},` : ""}
               cargo_id = ?, nivel_id = ?, setor_id = ?, local_id = ?, regional_id = ?, situacao_id = ?,
               lider_id = ?
         WHERE id = ?`,
       [
         nome, (campos.email || "").trim() || null, tipo,
-        (campos.cpf || "").trim() || null, (campos.telefone || "").trim() || null,
+        ...extraVal,
         fk(campos.cargoId), vinc.nivelPessoal, fk(campos.setorId), fk(campos.localId),
         fk(campos.regionalId), fk(campos.situacaoId), vinc.liderId, id,
       ]

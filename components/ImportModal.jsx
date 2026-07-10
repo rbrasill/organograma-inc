@@ -107,7 +107,7 @@ export default function ImportModal({ onClose }) {
       const validas = previa.anotadas.filter((l) => l.status !== "erro");
       const comErro = previa.anotadas.filter((l) => l.status === "erro");
       const empacota = (l) => ({
-        linha: l.linha, matricula: l.matricula, nome: l.nome, tipo: l.tipo,
+        linha: l.linha, matricula: l.matricula, nome: l.nome, cpf: l.cpf, tipo: l.tipo,
         cargo: l.cargo, codigoCargo: l.codigoCargo, codigoNH: l.codigoNH,
         setor: l.setor, codigoSetor: l.codigoSetor,
         local: l.local, codigoLocal: l.codigoLocal,
@@ -236,7 +236,7 @@ export default function ImportModal({ onClose }) {
                 <table className="imp-tabela">
                   <thead>
                     <tr>
-                      <th>Linha</th><th>Matrícula</th><th>Nome</th><th>Cargo</th>
+                      <th>Linha</th><th>Matrícula</th><th>Nome</th><th>CPF</th><th>Cargo</th>
                       <th>Setor</th><th>Líder</th><th>Situação</th><th>Status</th>
                     </tr>
                   </thead>
@@ -246,6 +246,7 @@ export default function ImportModal({ onClose }) {
                         <td>{l.linha}</td>
                         <td>{l.matricula || "—"}</td>
                         <td className="td-nome" title={l.nome}>{l.nome || "—"}</td>
+                        <td>{l.cpf || "—"}</td>
                         <td title={l.cargo}>{l.cargo || "—"}</td>
                         <td title={l.setor}>{l.setor || "—"}</td>
                         <td>{l.matriculaLider || "—"}</td>

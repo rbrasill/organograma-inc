@@ -15,6 +15,7 @@ const CABECALHO = [
   "Cod. Colaborador sistema do Departamento Pessoal",
   "Regional",
   "Nome Colaborador",
+  "CPF",
   "Tipo Contratação",
   "Cargo",
   "Setor",
@@ -39,7 +40,7 @@ export async function GET(req) {
     const filtroAtivo = incluirTodos ? "" : "WHERE c.ativo = 1";
 
     const [rows] = await pool.query(
-      `SELECT c.codigo_dp, c.nome, c.tipo_contratacao,
+      `SELECT c.codigo_dp, c.nome, c.cpf, c.tipo_contratacao,
               reg.nome AS regional,
               cg.nome AS cargo, cg.codigo_cargo_dp,
               COALESCE(nhp.ordem, nh.ordem) AS nh_ordem,
@@ -69,6 +70,7 @@ export async function GET(req) {
         r.codigo_dp || "",
         r.regional || "",
         r.nome || "",
+        r.cpf || "",
         r.tipo_contratacao || "",
         r.cargo || "",
         r.setor || "",

@@ -132,10 +132,10 @@ CREATE TABLE IF NOT EXISTS colaborador (
   nome              VARCHAR(200)     NOT NULL,
   email             VARCHAR(200)     NULL,
   tipo_contratacao  ENUM('CLT','PJ') NOT NULL DEFAULT 'CLT',
-  -- dados de prestador PJ (usados só quando tipo_contratacao = 'PJ').
-  -- PJ é o TIPO de contratação da pessoa (não uma empresa): guarda-se CPF.
+  -- CPF de QUALQUER colaborador (CLT ou PJ) — opcional; vem da importação
+  -- por Excel ou do cadastro PJ. Na tela de edição é somente visualização.
   cpf               VARCHAR(20)      NULL,
-  telefone          VARCHAR(30)      NULL,
+  telefone          VARCHAR(30)      NULL,   -- contato (hoje usado no cadastro PJ)
   cargo_id          CHAR(36)         NULL,
   nivel_id          CHAR(36)         NULL,   -- variação de nível DA PESSOA (sobrepõe o padrão do cargo; NULL = herda)
   setor_id          CHAR(36)         NULL,
