@@ -18,7 +18,7 @@ const ITENS = [
   { key: "lideres", href: "/lideres", label: "Líderes por área", Icon: UserIcon, title: "Diretores, áreas e troca de líder" },
   { key: "importar", href: "/?abrir=importar", label: "Importar Excel", Icon: UploadIcon, title: "Subir a base oficial por Excel", acao: true },
   { key: "exportar", href: "/api/colaboradores/exportar", label: "Exportar base", Icon: DownloadIcon, title: "Baixar toda a base em Excel", download: true },
-  { key: "areas", href: "/?abrir=areas", label: "Gerenciar áreas", Icon: MergeIcon, title: "Renomear e mesclar áreas", acao: true },
+  { key: "areas", href: "/areas", label: "Gerenciar áreas", Icon: MergeIcon, title: "Renomear e mesclar áreas" },
   { key: "catalogos", href: "/catalogos", label: "Catálogos", Icon: GridIcon, title: "Cargos, níveis, locais, regionais e situações" },
 ];
 

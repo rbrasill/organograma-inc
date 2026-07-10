@@ -10,7 +10,6 @@ import {
 } from "@/components/icons";
 import PersonModal from "@/components/PersonModal";
 import ImportModal from "@/components/ImportModal";
-import AreaModal from "@/components/AreaModal";
 import LiderAreaModal from "@/components/LiderAreaModal";
 
 // nível visual (cor da faixa/legenda): mapeia a ORDEM do banco (1 = topo,
@@ -182,7 +181,6 @@ export default function OrgChart() {
   const [highlightId, setHighlightId] = useState(null);
   const [showSug, setShowSug] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [showAreas, setShowAreas] = useState(false);
   const [liderAreaAlvo, setLiderAreaAlvo] = useState(null); // card do líder externo aberto
   const [baixando, setBaixando] = useState(false);
   const boxRef = useRef(null);
@@ -215,7 +213,6 @@ export default function OrgChart() {
   useEffect(() => {
     const abrir = new URLSearchParams(window.location.search).get("abrir");
     if (abrir === "importar") setShowImport(true);
-    if (abrir === "areas") setShowAreas(true);
     if (abrir) window.history.replaceState(null, "", "/");
   }, []);
 
@@ -480,7 +477,7 @@ export default function OrgChart() {
         titulo="Organograma INC"
         subtitulo="Visualize e gerencie a estrutura organizacional da empresa."
         atual="home"
-        onAcao={(k) => (k === "importar" ? setShowImport(true) : setShowAreas(true))}
+        onAcao={(k) => { if (k === "importar") setShowImport(true); }}
       />
 
       {/* controles do dia a dia: escolher a área e buscar pessoa */}
@@ -625,9 +622,6 @@ export default function OrgChart() {
         <ImportModal onClose={() => { setShowImport(false); carregar(areaId); }} />
       )}
 
-      {showAreas && (
-        <AreaModal onClose={() => setShowAreas(false)} onMudou={() => carregar(areaId)} />
-      )}
 
       {liderAreaAlvo && (
         <LiderAreaModal
