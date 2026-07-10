@@ -132,6 +132,10 @@ CREATE TABLE IF NOT EXISTS colaborador (
   nome              VARCHAR(200)     NOT NULL,
   email             VARCHAR(200)     NULL,
   tipo_contratacao  ENUM('CLT','PJ') NOT NULL DEFAULT 'CLT',
+  -- dados de prestador PJ (usados só quando tipo_contratacao = 'PJ')
+  empresa           VARCHAR(200)     NULL,
+  cnpj              VARCHAR(20)      NULL,
+  telefone          VARCHAR(30)      NULL,
   cargo_id          CHAR(36)         NULL,
   nivel_id          CHAR(36)         NULL,   -- variação de nível DA PESSOA (sobrepõe o padrão do cargo; NULL = herda)
   setor_id          CHAR(36)         NULL,

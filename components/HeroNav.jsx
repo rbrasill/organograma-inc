@@ -9,12 +9,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
-  InboxIcon, PencilIcon, UserIcon, UploadIcon, DownloadIcon, MergeIcon, GridIcon,
+  InboxIcon, PencilIcon, UserIcon, UploadIcon, DownloadIcon, MergeIcon, GridIcon, BriefcaseIcon,
 } from "@/components/icons";
 
 const ITENS = [
   { key: "solicitacoes", href: "/solicitacoes", label: "Solicitações", Icon: InboxIcon, title: "Solicitações de ajuste recebidas pelo RH" },
   { key: "colaboradores", href: "/colaboradores", label: "Editar colaboradores", Icon: PencilIcon, title: "Localizar e editar dados de colaboradores" },
+  { key: "pj", href: "/pj", label: "Colaboradores PJ", Icon: BriefcaseIcon, title: "Gerenciar prestadores PJ: cadastrar, editar, status, excluir" },
   { key: "lideres", href: "/lideres", label: "Líderes por área", Icon: UserIcon, title: "Diretores, áreas e troca de líder" },
   { key: "importar", href: "/?abrir=importar", label: "Importar Excel", Icon: UploadIcon, title: "Subir a base oficial por Excel", acao: true },
   { key: "exportar", href: "/api/colaboradores/exportar", label: "Exportar base", Icon: DownloadIcon, title: "Baixar toda a base em Excel", download: true },
