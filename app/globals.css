@@ -10,7 +10,7 @@
   --line-soft:#eef1f7;
   --brand:#1f3864;
   --accent:#3b5bdb;
-  --inc:#fe5e19;          /* laranja oficial INC (rgb 254,94,25) */
+  --inc:#f16021;          /* laranja oficial INC (#F16021) */
   --inc-soft:#fff2ec;     /* tint claro do laranja — usar em fundos sutis */
   --inc-line:#ffd9c6;     /* borda/realce leve na cor da marca */
   --wire:#ff9a70;
@@ -34,13 +34,7 @@ main{padding:20px 24px 24px}
 /* tela cheia: o organograma usa toda a largura do monitor */
 .shell{max-width:none;margin:0}
 
-.brand{display:flex;align-items:center;gap:14px}
-/* logo oficial INC (SVG) — o texto "INC" do markup fica oculto */
-.logo{width:46px;height:46px;border-radius:13px;overflow:hidden;background:var(--inc) url('/inc-logo.svg') center/100% 100% no-repeat;font-size:0;color:transparent;box-shadow:0 8px 20px -10px rgba(254,94,25,.6)}
-.brand h1{font-size:15px;margin:0;font-weight:700;letter-spacing:-.01em}
-.brand p{margin:2px 0 0;font-size:12px;color:var(--ink-faint);font-weight:500}
-
-/* ===== banner "hero" do topo (menu de funcionalidades) ===== */
+/* ===== banner "hero" do topo (menu global, presente em todas as páginas) ===== */
 .hero{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;
   background:linear-gradient(105deg,#F16021 0%,#e0559a 42%,#9f60b7 68%,#40419f 100%);
   border-radius:22px;padding:20px 26px;margin-bottom:16px;
@@ -55,6 +49,9 @@ main{padding:20px 24px 24px}
   padding:11px 15px 11px 11px;color:#fff;font-size:12.5px;font-weight:700;position:relative;
   transition:background .2s var(--ease),transform .2s var(--ease),border-color .2s}
 .hero-card:hover{background:rgba(255,255,255,.26);border-color:rgba(255,255,255,.4);transform:translateY(-2px)}
+/* card da página atual */
+.hero-card.on{background:rgba(255,255,255,.92);border-color:#fff;color:var(--ink)}
+.hero-card.on .hc-ic{background:var(--inc-soft);color:var(--inc)}
 .hc-ic{width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,.18);display:grid;place-items:center;flex:none}
 .hc-nome{white-space:nowrap;display:inline-flex;align-items:center;gap:7px}
 .hc-badge{font-style:normal;font-size:10px;font-weight:800;background:#fff;color:var(--inc);border-radius:999px;padding:1px 6px;line-height:1.4}
@@ -357,10 +354,6 @@ main{padding:20px 24px 24px}
 
 /* ===== página /solicitacoes ===== */
 .sol-shell{max-width:1600px;margin:0 auto}
-.sol-topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
-.sol-topbar .brand h1{font-size:17px;margin:0;font-weight:800;color:var(--brand);letter-spacing:-.01em}
-.sol-topbar .brand p{margin:2px 0 0;font-size:12px;color:var(--ink-faint);font-weight:500}
-.sol-topbar .btn{text-decoration:none}
 
 .sol-board{display:grid;grid-template-columns:360px 1fr;gap:14px;align-items:start}
 @media (max-width:860px){ .sol-board{grid-template-columns:1fr} }
@@ -369,7 +362,8 @@ main{padding:20px 24px 24px}
 .sol-filtros{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
 .sol-tab{border:1px solid var(--line);background:#fff;color:var(--ink-soft);font:inherit;font-size:12px;font-weight:700;border-radius:999px;padding:6px 12px;cursor:pointer;transition:all .2s}
 .sol-tab:hover{border-color:var(--wire-soft)}
-.sol-tab.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+/* toque sutil das cores do hero: aba ativa com o gradiente da marca */
+.sol-tab.on{background:linear-gradient(105deg,#f16021,#c65b7e 60%,#9f60b7);color:#fff;border-color:transparent}
 .sol-busca{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:11px;padding:8px 11px;margin-bottom:10px;color:var(--ink-faint)}
 .sol-busca input{border:0;outline:0;font:inherit;font-size:13px;width:100%;color:var(--ink);background:transparent}
 

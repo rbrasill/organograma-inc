@@ -7,9 +7,9 @@
 // novo líder da própria área herda o diretor).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import HeroNav from "@/components/HeroNav";
 import {
-  UserIcon, CheckIcon, CloseIcon, AlertIcon, ChevronIcon, SearchIcon,
+  UserIcon, CheckIcon, CloseIcon, AlertIcon, SearchIcon,
 } from "@/components/icons";
 
 // tom leve e discreto por área/diretor (escolhido pelo nome, estável)
@@ -171,16 +171,11 @@ export default function LideresView() {
 
   return (
     <div className="sol-shell">
-      <div className="sol-topbar">
-        <div className="brand">
-          <div className="logo">INC</div>
-          <div>
-            <h1>Líderes por área</h1>
-            <p>Diretores, áreas sob sua gestão e o líder de cada área · a troca aplica na área inteira</p>
-          </div>
-        </div>
-        <Link href="/" className="btn btn-neutral"><ChevronIcon size={13} /> Voltar ao organograma</Link>
-      </div>
+      <HeroNav
+        titulo="Líderes por área"
+        subtitulo="Diretores, áreas sob sua gestão e o líder de cada área · a troca aplica na área inteira"
+        atual="lideres"
+      />
 
       <div className="ct-board">
         {erro && <div className="modal-alert"><AlertIcon size={16} /><div><b>{erro}</b></div></div>}

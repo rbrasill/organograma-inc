@@ -5,9 +5,9 @@
 // direita com o de→para, observação e ações Aprovar / Devolver.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import HeroNav from "@/components/HeroNav";
 import {
-  UserIcon, CheckIcon, CloseIcon, AlertIcon, ChevronIcon, SearchIcon,
+  UserIcon, CheckIcon, CloseIcon, AlertIcon, SearchIcon,
 } from "@/components/icons";
 
 const TIPO_LABEL = {
@@ -83,16 +83,11 @@ export default function SolicitacoesView() {
 
   return (
     <div className="sol-shell">
-      <div className="sol-topbar">
-        <div className="brand">
-          <div className="logo">INC</div>
-          <div>
-            <h1>Solicitações de ajuste</h1>
-            <p>RH / DHO · aprovar ou devolver mudanças estruturais</p>
-          </div>
-        </div>
-        <Link href="/" className="btn btn-neutral"><ChevronIcon size={13} /> Voltar ao organograma</Link>
-      </div>
+      <HeroNav
+        titulo="Solicitações de ajuste"
+        subtitulo="RH / DHO · aprovar ou devolver mudanças estruturais"
+        atual="solicitacoes"
+      />
 
       <div className="sol-board">
         {/* LISTA */}

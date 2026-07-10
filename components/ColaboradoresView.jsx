@@ -6,7 +6,7 @@
 // do produto). Layout mestre-detalhe, no mesmo padrão de /solicitacoes.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import HeroNav from "@/components/HeroNav";
 import {
   UserIcon, CheckIcon, AlertIcon, ChevronIcon, SearchIcon, PencilIcon,
 } from "@/components/icons";
@@ -283,16 +283,11 @@ export default function ColaboradoresView() {
 
   return (
     <div className="sol-shell">
-      <div className="sol-topbar">
-        <div className="brand">
-          <div className="logo">INC</div>
-          <div>
-            <h1>Editar colaboradores</h1>
-            <p>Localize por área e nome · edite os dados direto no banco</p>
-          </div>
-        </div>
-        <Link href="/" className="btn btn-neutral"><ChevronIcon size={13} /> Voltar ao organograma</Link>
-      </div>
+      <HeroNav
+        titulo="Editar colaboradores"
+        subtitulo="Localize por área e nome · edite os dados direto no banco"
+        atual="colaboradores"
+      />
 
       <div className="sol-board">
         {/* LISTA / BUSCA */}

@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import HeroNav from "@/components/HeroNav";
 import { NIVEIS, nivelDe, inconsistenciasDe, construirArvore, normalizar } from "@/data/ti";
 import {
   UserIcon, PinIcon, CheckIcon, CloseIcon, GridIcon,
   SearchIcon, FullscreenIcon, AlertIcon,
-  PlusIcon, MinusIcon, TargetIcon, UploadIcon, DownloadIcon, InboxIcon, PencilIcon, MergeIcon,
+  PlusIcon, MinusIcon, TargetIcon, DownloadIcon,
 } from "@/components/icons";
 import PersonModal from "@/components/PersonModal";
 import ImportModal from "@/components/ImportModal";
@@ -185,7 +185,6 @@ export default function OrgChart() {
   const [showAreas, setShowAreas] = useState(false);
   const [liderAreaAlvo, setLiderAreaAlvo] = useState(null); // card do líder externo aberto
   const [baixando, setBaixando] = useState(false);
-  const [pendentes, setPendentes] = useState(0);
   const boxRef = useRef(null);
   const viewportRef = useRef(null);
   const treeRef = useRef(null);
@@ -212,12 +211,12 @@ export default function OrgChart() {
 
   useEffect(() => { carregar(null); }, [carregar]);
 
-  // contador de solicitações pendentes para o badge do cabeçalho
+  // vindo de outra página com ?abrir=importar|areas → abre o modal direto
   useEffect(() => {
-    fetch("/api/solicitacoes?status=pendente")
-      .then((r) => r.json())
-      .then((j) => { if (j.ok) setPendentes(j.pendentes); })
-      .catch(() => {});
+    const abrir = new URLSearchParams(window.location.search).get("abrir");
+    if (abrir === "importar") setShowImport(true);
+    if (abrir === "areas") setShowAreas(true);
+    if (abrir) window.history.replaceState(null, "", "/");
   }, []);
 
   const nomeArea = setores.find((s) => s.id === areaId)?.nome || "—";
@@ -476,46 +475,13 @@ export default function OrgChart() {
 
   return (
     <div className="shell">
-      {/* banner "hero": logo + título à esquerda; cards das funcionalidades à direita */}
-      <div className="hero">
-        <div className="hero-brand">
-          <img className="hero-logo" src="/inc-oficial.svg" alt="INC Empreendimentos" />
-          <div className="hero-txt">
-            <h1>Organograma INC</h1>
-            <p>Visualize e gerencie a estrutura organizacional da empresa.</p>
-          </div>
-        </div>
-        <div className="hero-cards">
-          <Link href="/solicitacoes" className="hero-card" title="Solicitações de ajuste recebidas pelo RH">
-            <span className="hc-ic"><InboxIcon size={17} /></span>
-            <span className="hc-nome">Solicitações{pendentes > 0 && <i className="hc-badge">{pendentes}</i>}</span>
-          </Link>
-          <Link href="/colaboradores" className="hero-card" title="Localizar e editar dados de colaboradores">
-            <span className="hc-ic"><PencilIcon size={17} /></span>
-            <span className="hc-nome">Editar colaboradores</span>
-          </Link>
-          <Link href="/lideres" className="hero-card" title="Diretores, áreas e troca de líder">
-            <span className="hc-ic"><UserIcon size={17} /></span>
-            <span className="hc-nome">Líderes por área</span>
-          </Link>
-          <button className="hero-card" onClick={() => setShowImport(true)} title="Subir a base oficial por Excel">
-            <span className="hc-ic"><UploadIcon size={17} /></span>
-            <span className="hc-nome">Importar Excel</span>
-          </button>
-          <a className="hero-card" href="/api/colaboradores/exportar" title="Baixar toda a base em Excel">
-            <span className="hc-ic"><DownloadIcon size={17} /></span>
-            <span className="hc-nome">Exportar base</span>
-          </a>
-          <button className="hero-card" onClick={() => setShowAreas(true)} title="Renomear e mesclar áreas">
-            <span className="hc-ic"><MergeIcon size={17} /></span>
-            <span className="hc-nome">Gerenciar áreas</span>
-          </button>
-          <Link href="/catalogos" className="hero-card" title="Cargos, níveis, locais, regionais e situações">
-            <span className="hc-ic"><GridIcon size={17} /></span>
-            <span className="hc-nome">Catálogos</span>
-          </Link>
-        </div>
-      </div>
+      {/* banner "hero" global: logo + título + menu de funcionalidades */}
+      <HeroNav
+        titulo="Organograma INC"
+        subtitulo="Visualize e gerencie a estrutura organizacional da empresa."
+        atual="home"
+        onAcao={(k) => (k === "importar" ? setShowImport(true) : setShowAreas(true))}
+      />
 
       {/* controles do dia a dia: escolher a área e buscar pessoa */}
       <div className="controls-bar">
