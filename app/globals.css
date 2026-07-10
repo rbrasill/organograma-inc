@@ -139,12 +139,13 @@ main{padding:20px 24px 24px}
 
 
 /* colunas verticais de equipe: cards empilhados conectados por fio */
-.leaf-col{display:flex;flex-direction:column;align-items:center}
-.leaf-col .card{width:282px}
-.leaf-item{position:relative;padding-top:16px}
-.leaf-item:first-child{padding-top:0}
-.leaf-item::before{content:"";position:absolute;top:0;left:50%;width:2px;height:16px;background:var(--wire);transform:translateX(-50%)}
-.leaf-item:first-child::before{display:none}
+/* pilha de fileiras de folhas por nível (li.leaf-stack): cada ul.leaf-row é
+   uma fileira de cards do MESMO nível; a primeira cola no drop do grupo
+   (sem stub extra) e as seguintes pendem da fileira de cima pelo stub padrão.
+   O --deg do li da pilha não desce para as fileiras internas. */
+.tree .leaf-stack .leaf-row{--deg:0px}
+.tree .leaf-stack > .leaf-row:first-child{padding-top:0}
+.tree .leaf-stack > .leaf-row:first-child::before{display:none}
 
 /* sem transform no hover: o card não pode se mover sob o cursor,
    senão o navegador descarta o clique nos botões (expandir/recolher) */

@@ -104,14 +104,25 @@ function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
   );
 }
 
-// divide as folhas em colunas verticais (equipes grandes),
-// mantendo todas conectadas por linhas
-function dividirEmColunas(leaves) {
-  const numCols = Math.min(4, Math.ceil(leaves.length / 4));
-  const porCol = Math.ceil(leaves.length / numCols);
-  const cols = [];
-  for (let i = 0; i < leaves.length; i += porCol) cols.push(leaves.slice(i, i + porCol));
-  return cols;
+// agrupa as folhas (quem não tem equipe) em FILEIRAS por nível hierárquico:
+// mesmo nível = mesma fileira (cards lado a lado, alinhados); nível mais
+// baixo = fileira abaixo. Fileiras muito largas quebram em blocos de até 5.
+const MAX_POR_FILEIRA = 5;
+function fileirasDeFolhas(leaves) {
+  const porNivel = new Map();
+  for (const f of leaves) {
+    const o = ordemDe(f);
+    if (!porNivel.has(o)) porNivel.set(o, []);
+    porNivel.get(o).push(f);
+  }
+  const fileiras = [];
+  for (const o of [...porNivel.keys()].sort((a, b) => a - b)) {
+    const grupo = porNivel.get(o);
+    for (let i = 0; i < grupo.length; i += MAX_POR_FILEIRA) {
+      fileiras.push(grupo.slice(i, i + MAX_POR_FILEIRA));
+    }
+  }
+  return fileiras;
 }
 
 function TreeNode({ node, rest, deg = 0 }) {
@@ -127,7 +138,7 @@ function TreeNode({ node, rest, deg = 0 }) {
   const hasKids = kids.length > 0;
   const branches = kids.filter((c) => (c.children || []).length > 0);
   const leaves = kids.filter((c) => (c.children || []).length === 0);
-  const emColunas = leaves.length > 4;
+  const fileiras = fileirasDeFolhas(leaves);
   const degDe = degrausDe(kids);
 
   return (
@@ -145,7 +156,8 @@ function TreeNode({ node, rest, deg = 0 }) {
           {branches.map((c) => (
             <TreeNode key={c.id} node={c} rest={rest} deg={degDe(c)} />
           ))}
-          {!emColunas && leaves.map((c) => (
+          {/* uma única fileira de folhas: cards direto na barra (clássico) */}
+          {fileiras.length === 1 && fileiras[0].map((c) => (
             <li key={c.id} style={{ "--deg": `${degDe(c)}px` }}>
               <Card
                 node={c} byId={rest.byId} collapsed={false}
@@ -154,21 +166,25 @@ function TreeNode({ node, rest, deg = 0 }) {
               />
             </li>
           ))}
-          {emColunas && dividirEmColunas(leaves).map((col, i) => (
-            <li key={`col-${i}`} style={{ "--deg": `${degDe(col[0])}px` }}>
-              <div className="leaf-col">
-                {col.map((c) => (
-                  <div className="leaf-item" key={c.id}>
-                    <Card
-                      node={c} byId={rest.byId} collapsed={false}
-                      onToggle={rest.onToggle} onOpen={rest.onOpen}
-                      highlight={rest.highlightId === c.id}
-                    />
-                  </div>
-                ))}
-              </div>
+          {/* níveis diferentes: pilha de fileiras — mesma fileira = mesmo
+              nível (lado a lado); fileiras seguintes pendem da de cima */}
+          {fileiras.length > 1 && (
+            <li className="leaf-stack" style={{ "--deg": `${degDe(fileiras[0][0])}px` }}>
+              {fileiras.map((row, i) => (
+                <ul className="leaf-row" key={i}>
+                  {row.map((c) => (
+                    <li key={c.id}>
+                      <Card
+                        node={c} byId={rest.byId} collapsed={false}
+                        onToggle={rest.onToggle} onOpen={rest.onOpen}
+                        highlight={rest.highlightId === c.id}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              ))}
             </li>
-          ))}
+          )}
         </ul>
       )}
     </li>
