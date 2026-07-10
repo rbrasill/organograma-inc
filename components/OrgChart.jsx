@@ -5,7 +5,7 @@ import Link from "next/link";
 import { NIVEIS, nivelDe, inconsistenciasDe, construirArvore, normalizar } from "@/data/ti";
 import {
   UserIcon, PinIcon, CheckIcon, CloseIcon, GridIcon,
-  ChevronIcon, SearchIcon, FullscreenIcon, AlertIcon,
+  SearchIcon, FullscreenIcon, AlertIcon,
   PlusIcon, MinusIcon, TargetIcon, UploadIcon, DownloadIcon, InboxIcon, PencilIcon, MergeIcon,
 } from "@/components/icons";
 import PersonModal from "@/components/PersonModal";
@@ -184,17 +184,6 @@ export default function OrgChart() {
   const [showImport, setShowImport] = useState(false);
   const [showAreas, setShowAreas] = useState(false);
   const [liderAreaAlvo, setLiderAreaAlvo] = useState(null); // card do líder externo aberto
-  const [showMenu, setShowMenu] = useState(false); // menu "Gerenciar"
-  const menuRef = useRef(null);
-
-  // fecha o menu "Gerenciar" ao clicar fora ou apertar Esc
-  useEffect(() => {
-    function fora(e) { if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false); }
-    function esc(e) { if (e.key === "Escape") setShowMenu(false); }
-    document.addEventListener("mousedown", fora);
-    document.addEventListener("keydown", esc);
-    return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc); };
-  }, []);
   const [baixando, setBaixando] = useState(false);
   const [pendentes, setPendentes] = useState(0);
   const boxRef = useRef(null);
@@ -487,100 +476,86 @@ export default function OrgChart() {
 
   return (
     <div className="shell">
-      <div className="topbar">
-        <div className="brand">
-          <div className="logo">INC</div>
-          <div>
-            <h1>Portal de Organograma</h1>
-            <p>INC Empreendimentos</p>
+      {/* banner "hero": logo + título à esquerda; cards das funcionalidades à direita */}
+      <div className="hero">
+        <div className="hero-brand">
+          <img className="hero-logo" src="/inc-oficial.svg" alt="INC Empreendimentos" />
+          <div className="hero-txt">
+            <h1>Organograma INC</h1>
+            <p>Visualize e gerencie a estrutura organizacional da empresa.</p>
           </div>
         </div>
-        <div className="controls">
-          {/* controles do dia a dia visíveis; ações administrativas agrupadas no menu "Gerenciar" */}
-          <div className="select">
-            <GridIcon /> Área:
-            <select
-              className="area-select"
-              value={areaId || ""}
-              onChange={(e) => carregar(e.target.value || null)}
-              disabled={carregando || setores.length === 0}
-            >
-              <option value="">Selecione uma área...</option>
-              {setores.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
-            </select>
-          </div>
-          <div className="search" ref={boxRef}>
-            <SearchIcon />
-            <input
-              placeholder="Buscar pessoa em toda a base..."
-              value={query}
-              onChange={(e) => { setQuery(e.target.value); setShowSug(true); }}
-              onFocus={() => setShowSug(true)}
-            />
-            {showSug && query.trim().length >= 2 && (
-              <div className="sug sug-busca">
-                {resultadosBusca.map((p) => (
-                  <button key={p.matricula} className="sug-item" onClick={() => irParaPessoa(p)}>
-                    <span className="si-ava"><UserIcon size={16} /></span>
-                    <span className="si-txt">
-                      <b>{p.nome}</b>
-                      <em>{p.cargo || "Cargo a definir"}{p.setor ? ` · ${p.setor}` : ""}</em>
-                    </span>
-                  </button>
-                ))}
-                {buscando && <div className="sug-vazio">Buscando...</div>}
-                {!buscando && resultadosBusca.length === 0 && (
-                  <div className="sug-vazio">Nenhuma pessoa encontrada.</div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <Link href="/solicitacoes" className="btn btn-import btn-solic" title="Solicitações de ajuste recebidas pelo RH">
-            <span className="ic"><InboxIcon size={13} /></span>Solicitações
-            {pendentes > 0 && <span className="solic-badge">{pendentes}</span>}
+        <div className="hero-cards">
+          <Link href="/solicitacoes" className="hero-card" title="Solicitações de ajuste recebidas pelo RH">
+            <span className="hc-ic"><InboxIcon size={17} /></span>
+            <span className="hc-nome">Solicitações{pendentes > 0 && <i className="hc-badge">{pendentes}</i>}</span>
           </Link>
+          <Link href="/colaboradores" className="hero-card" title="Localizar e editar dados de colaboradores">
+            <span className="hc-ic"><PencilIcon size={17} /></span>
+            <span className="hc-nome">Editar colaboradores</span>
+          </Link>
+          <Link href="/lideres" className="hero-card" title="Diretores, áreas e troca de líder">
+            <span className="hc-ic"><UserIcon size={17} /></span>
+            <span className="hc-nome">Líderes por área</span>
+          </Link>
+          <button className="hero-card" onClick={() => setShowImport(true)} title="Subir a base oficial por Excel">
+            <span className="hc-ic"><UploadIcon size={17} /></span>
+            <span className="hc-nome">Importar Excel</span>
+          </button>
+          <a className="hero-card" href="/api/colaboradores/exportar" title="Baixar toda a base em Excel">
+            <span className="hc-ic"><DownloadIcon size={17} /></span>
+            <span className="hc-nome">Exportar base</span>
+          </a>
+          <button className="hero-card" onClick={() => setShowAreas(true)} title="Renomear e mesclar áreas">
+            <span className="hc-ic"><MergeIcon size={17} /></span>
+            <span className="hc-nome">Gerenciar áreas</span>
+          </button>
+          <Link href="/catalogos" className="hero-card" title="Cargos, níveis, locais, regionais e situações">
+            <span className="hc-ic"><GridIcon size={17} /></span>
+            <span className="hc-nome">Catálogos</span>
+          </Link>
+        </div>
+      </div>
 
-          <div className="menu-wrap" ref={menuRef}>
-            <button
-              className={`btn btn-import menu-btn ${showMenu ? "on" : ""}`}
-              onClick={() => setShowMenu((v) => !v)}
-              aria-expanded={showMenu}
-            >
-              <span className="ic"><GridIcon size={13} /></span>Gerenciar
-              <ChevronIcon size={11} />
-            </button>
-            {showMenu && (
-              <div className="menu-pop">
-                <span className="menu-titulo">Colaboradores</span>
-                <Link href="/colaboradores" className="menu-item" onClick={() => setShowMenu(false)}>
-                  <span className="mi-ic"><PencilIcon size={15} /></span>
-                  <span className="mi-txt"><b>Editar colaboradores</b><em>Localizar e corrigir dados direto no banco</em></span>
-                </Link>
-                <button className="menu-item" onClick={() => { setShowMenu(false); setShowImport(true); }}>
-                  <span className="mi-ic"><UploadIcon size={15} /></span>
-                  <span className="mi-txt"><b>Importar Excel</b><em>Subir a base oficial (upsert por matrícula)</em></span>
+      {/* controles do dia a dia: escolher a área e buscar pessoa */}
+      <div className="controls-bar">
+        <div className="select">
+          <GridIcon /> Área:
+          <select
+            className="area-select"
+            value={areaId || ""}
+            onChange={(e) => carregar(e.target.value || null)}
+            disabled={carregando || setores.length === 0}
+          >
+            <option value="">Selecione uma área...</option>
+            {setores.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+          </select>
+        </div>
+        <div className="search" ref={boxRef}>
+          <SearchIcon />
+          <input
+            placeholder="Buscar pessoa em toda a base..."
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setShowSug(true); }}
+            onFocus={() => setShowSug(true)}
+          />
+          {showSug && query.trim().length >= 2 && (
+            <div className="sug sug-busca">
+              {resultadosBusca.map((p) => (
+                <button key={p.matricula} className="sug-item" onClick={() => irParaPessoa(p)}>
+                  <span className="si-ava"><UserIcon size={16} /></span>
+                  <span className="si-txt">
+                    <b>{p.nome}</b>
+                    <em>{p.cargo || "Cargo a definir"}{p.setor ? ` · ${p.setor}` : ""}</em>
+                  </span>
                 </button>
-                <a className="menu-item" href="/api/colaboradores/exportar" onClick={() => setShowMenu(false)}>
-                  <span className="mi-ic"><DownloadIcon size={15} /></span>
-                  <span className="mi-txt"><b>Exportar base</b><em>Baixar todos em .xlsx (formato de importação)</em></span>
-                </a>
-                <span className="menu-titulo">Estrutura</span>
-                <Link href="/lideres" className="menu-item" onClick={() => setShowMenu(false)}>
-                  <span className="mi-ic"><UserIcon size={15} /></span>
-                  <span className="mi-txt"><b>Líderes por área</b><em>Diretores, áreas e troca de líder em massa</em></span>
-                </Link>
-                <button className="menu-item" onClick={() => { setShowMenu(false); setShowAreas(true); }}>
-                  <span className="mi-ic"><MergeIcon size={15} /></span>
-                  <span className="mi-txt"><b>Gerenciar áreas</b><em>Renomear e mesclar áreas duplicadas</em></span>
-                </button>
-                <Link href="/catalogos" className="menu-item" onClick={() => setShowMenu(false)}>
-                  <span className="mi-ic"><GridIcon size={15} /></span>
-                  <span className="mi-txt"><b>Catálogos da base</b><em>Cargos, níveis, locais, regionais e situações</em></span>
-                </Link>
-              </div>
-            )}
-          </div>
+              ))}
+              {buscando && <div className="sug-vazio">Buscando...</div>}
+              {!buscando && resultadosBusca.length === 0 && (
+                <div className="sug-vazio">Nenhuma pessoa encontrada.</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
