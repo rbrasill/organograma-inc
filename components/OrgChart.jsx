@@ -1,16 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import HeroNav from "@/components/HeroNav";
 import { NIVEIS, nivelDe, inconsistenciasDe, construirArvore, normalizar } from "@/data/ti";
 import {
   UserIcon, PinIcon, CheckIcon, CloseIcon, GridIcon,
-  ChevronIcon, SearchIcon, FullscreenIcon, AlertIcon,
-  PlusIcon, MinusIcon, TargetIcon, UploadIcon, DownloadIcon, InboxIcon, PencilIcon, MergeIcon,
+  SearchIcon, FullscreenIcon, AlertIcon,
+  PlusIcon, MinusIcon, TargetIcon, DownloadIcon,
 } from "@/components/icons";
 import PersonModal from "@/components/PersonModal";
 import ImportModal from "@/components/ImportModal";
-import AreaModal from "@/components/AreaModal";
 import LiderAreaModal from "@/components/LiderAreaModal";
 
 // nível visual (cor da faixa/legenda): mapeia a ORDEM do banco (1 = topo,
@@ -36,13 +35,24 @@ function nivelVisual(node) {
 }
 
 // ordem do nível hierárquico do banco (1 = topo); sem nível vai para o fim.
-// Usada só para ORDENAR os filhos da esquerda (mais sênior) para a direita —
-// todos os irmãos ficam na mesma linha (árvore clássica, sem degraus).
+// Usada para ORDENAR os filhos da esquerda (mais sênior) para a direita e
+// para calcular o DEGRAU vertical entre irmãos de níveis diferentes.
 const ordemDe = (n) => (n.nivelOrdem == null ? 99 : n.nivelOrdem);
 
+// degrau vertical entre irmãos: quem tem nível mais baixo desce em relação
+// ao irmão mais sênior, deixando visível que não são do mesmo nível mesmo
+// respondendo ao mesmo líder. O degrau é por POSIÇÃO entre os níveis
+// distintos do grupo (não pela distância absoluta), para não abrir buracos.
+const DEGRAU_PX = 46;
+function degrausDe(kids) {
+  const ordens = [...new Set(kids.map(ordemDe))].sort((a, b) => a - b);
+  return (n) => Math.min(ordens.indexOf(ordemDe(n)), 4) * DEGRAU_PX;
+}
+
 function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
-  const nivel = nivelVisual(node);
-  const cor = NIVEIS[nivel - 1].cor;
+  // cor oficial da FAMÍLIA (nivel_hierarquico.cor) quando existe; senão cai
+  // no mapa de 6 faixas por ordem/nome do cargo (cargos sem nível vinculado).
+  const cor = node.cor || NIVEIS[nivelVisual(node) - 1].cor;
   const kids = node.children ? node.children.length : 0;
   const alertas = inconsistenciasDe(node, byId);
   // raiz da área cujo líder real existe fora dela (ex.: responde a um
@@ -95,32 +105,45 @@ function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
   );
 }
 
-// divide as folhas em colunas verticais (equipes grandes),
-// mantendo todas conectadas por linhas
-function dividirEmColunas(leaves) {
-  const numCols = Math.min(4, Math.ceil(leaves.length / 4));
-  const porCol = Math.ceil(leaves.length / numCols);
-  const cols = [];
-  for (let i = 0; i < leaves.length; i += porCol) cols.push(leaves.slice(i, i + porCol));
-  return cols;
+// agrupa as folhas (quem não tem equipe) em FILEIRAS por nível hierárquico:
+// mesmo nível = mesma fileira (cards lado a lado, alinhados); nível mais
+// baixo = fileira abaixo. Fileiras muito largas quebram em blocos de até 5.
+const MAX_POR_FILEIRA = 5;
+function fileirasDeFolhas(leaves) {
+  const porNivel = new Map();
+  for (const f of leaves) {
+    const o = ordemDe(f);
+    if (!porNivel.has(o)) porNivel.set(o, []);
+    porNivel.get(o).push(f);
+  }
+  const fileiras = [];
+  for (const o of [...porNivel.keys()].sort((a, b) => a - b)) {
+    const grupo = porNivel.get(o);
+    for (let i = 0; i < grupo.length; i += MAX_POR_FILEIRA) {
+      fileiras.push(grupo.slice(i, i + MAX_POR_FILEIRA));
+    }
+  }
+  return fileiras;
 }
 
-function TreeNode({ node, rest }) {
+function TreeNode({ node, rest, deg = 0 }) {
   const collapsed = rest.collapsedSet.has(node.id);
 
   // filhos ordenados por nível (mais sênior à esquerda), depois por nome.
-  // Ramos (quem tem equipe) primeiro, folhas depois — mas todos na MESMA
-  // linha horizontal, ligados pela mesma barra (árvore clássica).
+  // Ramos (quem tem equipe) primeiro, folhas depois — todos ligados à mesma
+  // barra, mas com DEGRAU vertical quando os níveis diferem (o mais sênior
+  // fica mais alto; ver degrausDe).
   const kids = [...(node.children || [])].sort(
     (a, b) => ordemDe(a) - ordemDe(b) || a.nome.localeCompare(b.nome, "pt-BR")
   );
   const hasKids = kids.length > 0;
   const branches = kids.filter((c) => (c.children || []).length > 0);
   const leaves = kids.filter((c) => (c.children || []).length === 0);
-  const emColunas = leaves.length > 4;
+  const fileiras = fileirasDeFolhas(leaves);
+  const degDe = degrausDe(kids);
 
   return (
-    <li>
+    <li style={{ "--deg": `${deg}px` }}>
       <Card
         node={node}
         byId={rest.byId}
@@ -132,10 +155,11 @@ function TreeNode({ node, rest }) {
       {hasKids && !collapsed && (
         <ul>
           {branches.map((c) => (
-            <TreeNode key={c.id} node={c} rest={rest} />
+            <TreeNode key={c.id} node={c} rest={rest} deg={degDe(c)} />
           ))}
-          {!emColunas && leaves.map((c) => (
-            <li key={c.id}>
+          {/* uma única fileira de folhas: cards direto na barra (clássico) */}
+          {fileiras.length === 1 && fileiras[0].map((c) => (
+            <li key={c.id} style={{ "--deg": `${degDe(c)}px` }}>
               <Card
                 node={c} byId={rest.byId} collapsed={false}
                 onToggle={rest.onToggle} onOpen={rest.onOpen}
@@ -143,21 +167,25 @@ function TreeNode({ node, rest }) {
               />
             </li>
           ))}
-          {emColunas && dividirEmColunas(leaves).map((col, i) => (
-            <li key={`col-${i}`}>
-              <div className="leaf-col">
-                {col.map((c) => (
-                  <div className="leaf-item" key={c.id}>
-                    <Card
-                      node={c} byId={rest.byId} collapsed={false}
-                      onToggle={rest.onToggle} onOpen={rest.onOpen}
-                      highlight={rest.highlightId === c.id}
-                    />
-                  </div>
-                ))}
-              </div>
+          {/* níveis diferentes: pilha de fileiras — mesma fileira = mesmo
+              nível (lado a lado); fileiras seguintes pendem da de cima */}
+          {fileiras.length > 1 && (
+            <li className="leaf-stack" style={{ "--deg": `${degDe(fileiras[0][0])}px` }}>
+              {fileiras.map((row, i) => (
+                <ul className="leaf-row" key={i}>
+                  {row.map((c) => (
+                    <li key={c.id}>
+                      <Card
+                        node={c} byId={rest.byId} collapsed={false}
+                        onToggle={rest.onToggle} onOpen={rest.onOpen}
+                        highlight={rest.highlightId === c.id}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              ))}
             </li>
-          ))}
+          )}
         </ul>
       )}
     </li>
@@ -182,21 +210,9 @@ export default function OrgChart() {
   const [highlightId, setHighlightId] = useState(null);
   const [showSug, setShowSug] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [showAreas, setShowAreas] = useState(false);
   const [liderAreaAlvo, setLiderAreaAlvo] = useState(null); // card do líder externo aberto
-  const [showMenu, setShowMenu] = useState(false); // menu "Gerenciar"
-  const menuRef = useRef(null);
-
-  // fecha o menu "Gerenciar" ao clicar fora ou apertar Esc
-  useEffect(() => {
-    function fora(e) { if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false); }
-    function esc(e) { if (e.key === "Escape") setShowMenu(false); }
-    document.addEventListener("mousedown", fora);
-    document.addEventListener("keydown", esc);
-    return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc); };
-  }, []);
   const [baixando, setBaixando] = useState(false);
-  const [pendentes, setPendentes] = useState(0);
+  const [fullscreen, setFullscreen] = useState(false);
   const boxRef = useRef(null);
   const viewportRef = useRef(null);
   const treeRef = useRef(null);
@@ -223,12 +239,11 @@ export default function OrgChart() {
 
   useEffect(() => { carregar(null); }, [carregar]);
 
-  // contador de solicitações pendentes para o badge do cabeçalho
+  // vindo de outra página com ?abrir=importar|areas → abre o modal direto
   useEffect(() => {
-    fetch("/api/solicitacoes?status=pendente")
-      .then((r) => r.json())
-      .then((j) => { if (j.ok) setPendentes(j.pendentes); })
-      .catch(() => {});
+    const abrir = new URLSearchParams(window.location.search).get("abrir");
+    if (abrir === "importar") setShowImport(true);
+    if (abrir) window.history.replaceState(null, "", "/");
   }, []);
 
   const nomeArea = setores.find((s) => s.id === areaId)?.nome || "—";
@@ -249,6 +264,20 @@ export default function OrgChart() {
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
+
+  // tela cheia: ESC fecha; recentraliza ao entrar/sair (o viewport muda de
+  // tamanho e o ResizeObserver já dispara centerView, mas garantimos aqui)
+  useEffect(() => {
+    if (!fullscreen) return;
+    function onKey(e) { if (e.key === "Escape") setFullscreen(false); }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [fullscreen]);
+  useEffect(() => {
+    const t = setTimeout(() => centerView(), 130);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullscreen]);
 
   function centerView() {
     const vp = viewportRef.current, t = treeRef.current;
@@ -477,8 +506,8 @@ export default function OrgChart() {
     for (const p of pessoas) {
       const fam = (p.familia || "").trim() || "Sem nível definido";
       if (map.has(fam)) continue;
-      const lvl = nivelVisual(p);
-      map.set(fam, { familia: fam, ordem: p.nivelOrdem ?? 999, cor: NIVEIS[lvl - 1].cor });
+      const cor = p.cor || NIVEIS[nivelVisual(p) - 1].cor;
+      map.set(fam, { familia: fam, ordem: p.nivelOrdem ?? 999, cor });
     }
     return [...map.values()].sort(
       (a, b) => a.ordem - b.ordem || a.familia.localeCompare(b.familia, "pt-BR")
@@ -487,100 +516,57 @@ export default function OrgChart() {
 
   return (
     <div className="shell">
-      <div className="topbar">
-        <div className="brand">
-          <div className="logo">INC</div>
-          <div>
-            <h1>Portal de Organograma</h1>
-            <p>INC Empreendimentos</p>
-          </div>
+      {/* banner "hero" global: logo + título + menu de funcionalidades */}
+      <HeroNav
+        titulo="Organograma INC"
+        subtitulo="Visualize e gerencie a estrutura organizacional da empresa."
+        atual="home"
+        onAcao={(k) => { if (k === "importar") setShowImport(true); }}
+      />
+
+      {/* controles do dia a dia: escolher a área e buscar pessoa */}
+      <div className="controls-bar">
+        <div className="select">
+          <GridIcon /> Área:
+          <select
+            className="area-select"
+            value={areaId || ""}
+            onChange={(e) => carregar(e.target.value || null)}
+            disabled={carregando || setores.length === 0}
+          >
+            <option value="">Selecione uma área...</option>
+            {setores.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+          </select>
         </div>
-        <div className="controls">
-          {/* controles do dia a dia visíveis; ações administrativas agrupadas no menu "Gerenciar" */}
-          <div className="select">
-            <GridIcon /> Área:
-            <select
-              className="area-select"
-              value={areaId || ""}
-              onChange={(e) => carregar(e.target.value || null)}
-              disabled={carregando || setores.length === 0}
-            >
-              <option value="">Selecione uma área...</option>
-              {setores.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
-            </select>
-          </div>
-          <div className="search" ref={boxRef}>
-            <SearchIcon />
-            <input
-              placeholder="Buscar pessoa em toda a base..."
-              value={query}
-              onChange={(e) => { setQuery(e.target.value); setShowSug(true); }}
-              onFocus={() => setShowSug(true)}
-            />
-            {showSug && query.trim().length >= 2 && (
-              <div className="sug sug-busca">
-                {resultadosBusca.map((p) => (
-                  <button key={p.matricula} className="sug-item" onClick={() => irParaPessoa(p)}>
-                    <span className="si-ava"><UserIcon size={16} /></span>
-                    <span className="si-txt">
-                      <b>{p.nome}</b>
-                      <em>{p.cargo || "Cargo a definir"}{p.setor ? ` · ${p.setor}` : ""}</em>
-                    </span>
-                  </button>
-                ))}
-                {buscando && <div className="sug-vazio">Buscando...</div>}
-                {!buscando && resultadosBusca.length === 0 && (
-                  <div className="sug-vazio">Nenhuma pessoa encontrada.</div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <Link href="/solicitacoes" className="btn btn-import btn-solic" title="Solicitações de ajuste recebidas pelo RH">
-            <span className="ic"><InboxIcon size={13} /></span>Solicitações
-            {pendentes > 0 && <span className="solic-badge">{pendentes}</span>}
-          </Link>
-
-          <div className="menu-wrap" ref={menuRef}>
-            <button
-              className={`btn btn-import menu-btn ${showMenu ? "on" : ""}`}
-              onClick={() => setShowMenu((v) => !v)}
-              aria-expanded={showMenu}
-            >
-              <span className="ic"><GridIcon size={13} /></span>Gerenciar
-              <ChevronIcon size={11} />
-            </button>
-            {showMenu && (
-              <div className="menu-pop">
-                <span className="menu-titulo">Colaboradores</span>
-                <Link href="/colaboradores" className="menu-item" onClick={() => setShowMenu(false)}>
-                  <span className="mi-ic"><PencilIcon size={15} /></span>
-                  <span className="mi-txt"><b>Editar colaboradores</b><em>Localizar e corrigir dados direto no banco</em></span>
-                </Link>
-                <button className="menu-item" onClick={() => { setShowMenu(false); setShowImport(true); }}>
-                  <span className="mi-ic"><UploadIcon size={15} /></span>
-                  <span className="mi-txt"><b>Importar Excel</b><em>Subir a base oficial (upsert por matrícula)</em></span>
+        <div className="search" ref={boxRef}>
+          <SearchIcon />
+          <input
+            placeholder="Buscar pessoa em toda a base..."
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setShowSug(true); }}
+            onFocus={() => setShowSug(true)}
+          />
+          {showSug && query.trim().length >= 2 && (
+            <div className="sug sug-busca">
+              {resultadosBusca.map((p) => (
+                <button key={p.matricula} className="sug-item" onClick={() => irParaPessoa(p)}>
+                  <span className="si-ava"><UserIcon size={16} /></span>
+                  <span className="si-txt">
+                    <b>{p.nome}</b>
+                    <em>{p.cargo || "Cargo a definir"}{p.setor ? ` · ${p.setor}` : ""}</em>
+                  </span>
                 </button>
-                <a className="menu-item" href="/api/colaboradores/exportar" onClick={() => setShowMenu(false)}>
-                  <span className="mi-ic"><DownloadIcon size={15} /></span>
-                  <span className="mi-txt"><b>Exportar base</b><em>Baixar todos em .xlsx (formato de importação)</em></span>
-                </a>
-                <span className="menu-titulo">Estrutura</span>
-                <button className="menu-item" onClick={() => { setShowMenu(false); setShowAreas(true); }}>
-                  <span className="mi-ic"><MergeIcon size={15} /></span>
-                  <span className="mi-txt"><b>Gerenciar áreas</b><em>Renomear e mesclar áreas duplicadas</em></span>
-                </button>
-                <Link href="/catalogos" className="menu-item" onClick={() => setShowMenu(false)}>
-                  <span className="mi-ic"><GridIcon size={15} /></span>
-                  <span className="mi-txt"><b>Catálogos da base</b><em>Cargos, níveis, locais, regionais e situações</em></span>
-                </Link>
-              </div>
-            )}
-          </div>
+              ))}
+              {buscando && <div className="sug-vazio">Buscando...</div>}
+              {!buscando && resultadosBusca.length === 0 && (
+                <div className="sug-vazio">Nenhuma pessoa encontrada.</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="board-shell">
+      <div className={`board-shell ${fullscreen ? "fs" : ""}`}>
         <div className="board">
           <div className="board-head">
             <div className="title-wrap">
@@ -607,7 +593,13 @@ export default function OrgChart() {
                 {baixando ? "Gerando imagem..." : "Baixar imagem"}
               </button>
               <button className="btn btn-primary"><span className="ic"><CheckIcon /></span>Validar organograma</button>
-              <button className="icon-btn" title="Tela cheia"><FullscreenIcon /></button>
+              <button
+                className={`icon-btn ${fullscreen ? "on" : ""}`}
+                onClick={() => setFullscreen((v) => !v)}
+                title={fullscreen ? "Sair da tela cheia (Esc)" : "Ver em tela cheia"}
+              >
+                {fullscreen ? <CloseIcon /> : <FullscreenIcon />}
+              </button>
             </div>
           </div>
 
@@ -653,7 +645,7 @@ export default function OrgChart() {
               {roots.length > 0 && (
                 <ul>
                   {rootsOrdenadas.map((r) => (
-                    <TreeNode key={r.id} node={r} rest={rest} />
+                    <TreeNode key={r.id} node={r} rest={rest} deg={degrausDe(rootsOrdenadas)(r)} />
                   ))}
                 </ul>
               )}
@@ -680,9 +672,6 @@ export default function OrgChart() {
         <ImportModal onClose={() => { setShowImport(false); carregar(areaId); }} />
       )}
 
-      {showAreas && (
-        <AreaModal onClose={() => setShowAreas(false)} onMudou={() => carregar(areaId)} />
-      )}
 
       {liderAreaAlvo && (
         <LiderAreaModal

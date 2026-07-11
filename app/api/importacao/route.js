@@ -126,7 +126,7 @@ export async function POST(req) {
 
       const matriculas = linhas.map((l) => l.matricula);
       const [ex] = await conn.query(
-        "SELECT id, codigo_dp, nome, cargo_id, setor_id, local_id, regional_id, situacao_id, tipo_contratacao, ativo FROM colaborador WHERE codigo_dp IN (?)",
+        "SELECT id, codigo_dp, nome, cpf, cargo_id, setor_id, local_id, regional_id, situacao_id, tipo_contratacao, ativo FROM colaborador WHERE codigo_dp IN (?)",
         [matriculas]
       );
       const exMap = new Map(ex.map((c) => [c.codigo_dp, c]));
@@ -146,16 +146,21 @@ export async function POST(req) {
           ? (normalizar(l.tipo).includes("pj") ? "PJ" : "CLT")
           : (String(l.matricula).toUpperCase().startsWith("PJ") ? "PJ" : "CLT");
 
+        // CPF é OPCIONAL no arquivo: quando vem, grava/atualiza; quando não
+        // vem, PRESERVA o que já está no banco (COALESCE) — nunca apaga.
+        const cpfNovo = (l.cpf || "").trim() || null;
+
         const cur = exMap.get(l.matricula);
         if (cur) {
           const mudou =
             cur.nome !== l.nome || cur.cargo_id !== cargoId || cur.setor_id !== setorId ||
             cur.local_id !== localId || cur.regional_id !== regId || cur.situacao_id !== sitId ||
-            cur.tipo_contratacao !== tipo || cur.ativo !== 1;
+            cur.tipo_contratacao !== tipo || cur.ativo !== 1 ||
+            (cpfNovo !== null && cpfNovo !== cur.cpf);
           if (mudou) {
             await conn.query(
-              "UPDATE colaborador SET nome=?, tipo_contratacao=?, cargo_id=?, setor_id=?, local_id=?, regional_id=?, situacao_id=?, ativo=1 WHERE id=?",
-              [l.nome, tipo, cargoId, setorId, localId, regId, sitId, cur.id]
+              "UPDATE colaborador SET nome=?, cpf=COALESCE(?, cpf), tipo_contratacao=?, cargo_id=?, setor_id=?, local_id=?, regional_id=?, situacao_id=?, ativo=1 WHERE id=?",
+              [l.nome, cpfNovo, tipo, cargoId, setorId, localId, regId, sitId, cur.id]
             );
             await conn.query(
               "UPDATE colaborador_historico SET data_fim = NOW() WHERE colaborador_id = ? AND data_fim IS NULL",
@@ -166,7 +171,7 @@ export async function POST(req) {
           }
         } else {
           const nid = randomUUID();
-          novos.push([nid, l.matricula, l.nome, tipo, cargoId, setorId, localId, regId, sitId, 1]);
+          novos.push([nid, l.matricula, l.nome, cpfNovo, tipo, cargoId, setorId, localId, regId, sitId, 1]);
           hist.push([randomUUID(), nid, cargoId, setorId, localId, sitId, "importacao"]);
           inseridos++;
         }
@@ -177,7 +182,7 @@ export async function POST(req) {
       }
 
       if (novos.length) await bulkInsert(conn,
-        "INSERT INTO colaborador (id, codigo_dp, nome, tipo_contratacao, cargo_id, setor_id, local_id, regional_id, situacao_id, ativo) VALUES ?", novos);
+        "INSERT INTO colaborador (id, codigo_dp, nome, cpf, tipo_contratacao, cargo_id, setor_id, local_id, regional_id, situacao_id, ativo) VALUES ?", novos);
       if (hist.length) await bulkInsert(conn,
         "INSERT INTO colaborador_historico (id, colaborador_id, cargo_id, setor_id, local_id, situacao_id, motivo) VALUES ?", hist);
       if (itens.length) await bulkInsert(conn,

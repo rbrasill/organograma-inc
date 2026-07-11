@@ -1,0 +1,296 @@
+// Líderes por área — visão agrupada por DIRETOR.
+//   Regras do domínio (CLAUDE.md): o LÍDER de uma área é o colaborador que,
+//   dentro dela, não responde a ninguém da própria área (topo do subtree
+//   local). O DIRETOR é a quem esse líder responde — tipicamente alguém de
+//   outra área que gerencia várias áreas (ex.: Rodrigo Faria → DP com
+//   Rodrigo Agreli, Controladoria com Rubens).
+//
+//   GET → { diretores: [ { diretor, areas: [...] } ], semDiretor: [areas] }
+//   POST { acao:"trocar", areaId, deMatricula, paraMatricula }
+//     → troca o líder da área INTEIRA, numa transação:
+//       1. novo líder (se for da área) herda o diretor do antigo;
+//       2. todos da área que respondiam ao antigo passam ao novo;
+//       3. o antigo (membro da área) passa a responder ao novo.
+
+import { getPool } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+
+function erroResposta(e) {
+  const msg = e?.codigo === "SEM_CONFIG" ? e.message : `Falha ao acessar o banco: ${e.message}`;
+  return Response.json({ ok: false, erro: msg }, { status: 500 });
+}
+
+export async function GET(req) {
+  try {
+    const pool = getPool();
+    const perfilMat = new URL(req.url).searchParams.get("perfil");
+    const [rows] = await pool.query(
+      `SELECT c.id, c.codigo_dp AS matricula, c.nome, c.setor_id AS setorId,
+              c.lider_id AS liderId, cg.nome AS cargo,
+              COALESCE(nhp.ordem, nh.ordem) AS ordem,
+              COALESCE(nhp.familia, nh.familia) AS familia,
+              s.nome AS setorNome
+         FROM colaborador c
+         LEFT JOIN cargo cg              ON cg.id = c.cargo_id
+         LEFT JOIN nivel_hierarquico nh  ON nh.id = cg.nivel_id
+         LEFT JOIN nivel_hierarquico nhp ON nhp.id = c.nivel_id
+         LEFT JOIN setor s               ON s.id = c.setor_id
+        WHERE c.ativo = 1`
+    );
+
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const diretos = new Map(); // id -> nº de subordinados diretos ativos
+    rows.forEach((r) => {
+      if (r.liderId) diretos.set(r.liderId, (diretos.get(r.liderId) || 0) + 1);
+    });
+
+    // agrupa por setor e acha as raízes locais de cada área
+    const porSetor = new Map();
+    rows.forEach((r) => {
+      if (!r.setorId) return;
+      if (!porSetor.has(r.setorId)) porSetor.set(r.setorId, []);
+      porSetor.get(r.setorId).push(r);
+    });
+
+    const ord = (r) => (r.ordem == null ? 99 : r.ordem);
+
+    // Regra de negócio: toda área é ligada a um DIRETOR (níveis 2–5: CFO,
+    // Diretor, Vice-Diretor); quando não há diretor na cadeia, é ligada ao
+    // Presidente/Conselheiro (nível 1 — os únicos nesse nível).
+    const ehDiretoria = (p) => p && p.ordem != null && p.ordem >= 2 && p.ordem <= 5;
+    const ehPresidencia = (p) => p && p.ordem === 1;
+
+    // sobe a cadeia A PARTIR DO PRÓPRIO líder da área: o primeiro com nível
+    // de diretoria é o diretor responsável (se o líder já é diretor, é ele
+    // mesmo); chegando ao nível 1 sem diretor, o grupo é a presidência.
+    function responsavelDe(liderRow) {
+      const vistos = new Set();
+      let cur = liderRow;
+      while (cur && !vistos.has(cur.id)) {
+        vistos.add(cur.id);
+        if (ehDiretoria(cur)) return { pessoa: cur, tipo: "diretor" };
+        if (ehPresidencia(cur)) return { pessoa: cur, tipo: "presidencia" };
+        cur = cur.liderId ? byId.get(cur.liderId) : null;
+      }
+      return { pessoa: null, tipo: "topo" };
+    }
+
+    const grupos = new Map(); // chave: pessoa responsável (diretor/presidência) ou "topo"
+
+    for (const [setorId, membros] of porSetor) {
+      const raizes = membros.filter((m) => {
+        if (!m.liderId) return true;
+        const l = byId.get(m.liderId);
+        return !l || l.setorId !== setorId; // líder de fora (ou inativo) = raiz local
+      });
+      if (raizes.length === 0) continue; // ciclo interno — some da lista até corrigir
+
+      raizes.sort((a, b) =>
+        ord(a) - ord(b) || (diretos.get(b.id) || 0) - (diretos.get(a.id) || 0) ||
+        a.nome.localeCompare(b.nome, "pt-BR")
+      );
+
+      // UMA raiz interna → ela é o líder da área (ex.: DP → Rodrigo Agreli).
+      // VÁRIAS raízes → ninguém lidera internamente: o líder da área é a
+      // pessoa EXTERNA a quem o topo responde.
+      let lider, liderExterno = false, diretosNaArea;
+      if (raizes.length === 1) {
+        lider = raizes[0];
+        diretosNaArea = diretos.get(lider.id) || 0;
+      } else {
+        const cont = new Map();
+        raizes.forEach((r) => { if (r.liderId) cont.set(r.liderId, (cont.get(r.liderId) || 0) + 1); });
+        let extId = null, max = 0;
+        for (const [eid, n] of cont) if (n > max) { max = n; extId = eid; }
+        const ext = extId ? byId.get(extId) : null;
+        if (ext) {
+          lider = ext;
+          liderExterno = true;
+          diretosNaArea = max; // diretos DENTRO da área (não os globais dele)
+        } else {
+          lider = raizes[0]; // todas as raízes sem líder algum (topo absoluto)
+          diretosNaArea = diretos.get(lider.id) || 0;
+        }
+      }
+
+      // diretor responsável: sobe a cadeia a partir do líder (inclui ele próprio)
+      const resp = responsavelDe(lider);
+      const ehOResponsavel = !!(resp.pessoa && resp.pessoa.id === lider.id);
+
+      const area = {
+        id: setorId,
+        nome: membros[0].setorNome || "—",
+        pessoas: membros.length,
+        outrosTopo: raizes.length - 1,
+        lider: {
+          matricula: lider.matricula || "",
+          nome: lider.nome,
+          cargo: lider.cargo || "",
+          diretos: diretosNaArea,
+          externo: liderExterno,
+          // selo no card quando o líder É o responsável (Diretor/CFO/Presidente…)
+          tag: ehOResponsavel ? (lider.familia || "Diretor") : "",
+        },
+      };
+
+      const chave = resp.pessoa ? resp.pessoa.id : "topo";
+      if (!grupos.has(chave)) {
+        const p = resp.pessoa;
+        grupos.set(chave, {
+          tipo: resp.tipo,
+          diretor: p ? {
+            matricula: p.matricula || "",
+            nome: p.nome,
+            cargo: p.cargo || "",
+            setor: p.setorNome || "",
+            respondeA: p.liderId ? (byId.get(p.liderId)?.nome || "") : "",
+          } : null,
+          areas: [],
+        });
+      }
+      grupos.get(chave).areas.push(area);
+    }
+
+    const todos = [...grupos.values()];
+    todos.forEach((g) => g.areas.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")));
+    // presidência primeiro (nível 1), depois os diretores
+    const pesoTipo = { presidencia: 0, diretor: 1 };
+    const diretores = todos.filter((g) => g.diretor)
+      .sort((a, b) =>
+        (pesoTipo[a.tipo] ?? 9) - (pesoTipo[b.tipo] ?? 9) ||
+        b.areas.length - a.areas.length ||
+        a.diretor.nome.localeCompare(b.diretor.nome, "pt-BR"));
+    const semDiretor = todos.find((g) => !g.diretor)?.areas || [];
+
+    // ===== perfil de um líder: visão completa dele no organograma =====
+    if (perfilMat) {
+      const pessoa = rows.find((r) => r.matricula === perfilMat);
+      if (!pessoa) return Response.json({ ok: false, erro: "Colaborador não encontrado." }, { status: 404 });
+
+      // dados ricos do card (cor/variação/tipo/situação) — consulta pontual
+      const [[det]] = await pool.query(
+        `SELECT c.tipo_contratacao, sit.nome AS situacao,
+                COALESCE(nhp.cor, nh.cor) AS cor, COALESCE(nhp.cod_var, nh.cod_var) AS cod_var
+           FROM colaborador c
+           LEFT JOIN cargo cg ON cg.id = c.cargo_id
+           LEFT JOIN nivel_hierarquico nh ON nh.id = cg.nivel_id
+           LEFT JOIN nivel_hierarquico nhp ON nhp.id = c.nivel_id
+           LEFT JOIN situacao sit ON sit.id = c.situacao_id
+          WHERE c.id = ? LIMIT 1`,
+        [pessoa.id]
+      );
+
+      // cadeia de comando: da pessoa até o topo (com proteção contra ciclo)
+      const cadeia = [];
+      const vistos = new Set([pessoa.id]);
+      let cur = pessoa.liderId ? byId.get(pessoa.liderId) : null;
+      while (cur && !vistos.has(cur.id)) {
+        vistos.add(cur.id);
+        cadeia.push({ nome: cur.nome, cargo: cur.cargo || "", familia: cur.familia || "" });
+        cur = cur.liderId ? byId.get(cur.liderId) : null;
+      }
+
+      const todasAreas = todos.flatMap((g) => g.areas);
+      const lideraAreas = todasAreas
+        .filter((a) => a.lider.matricula === perfilMat)
+        .map((a) => ({ nome: a.nome, pessoas: a.pessoas }));
+      const areasGeridas = (grupos.get(pessoa.id)?.areas || [])
+        .map((a) => ({ nome: a.nome, liderNome: a.lider.nome }));
+
+      const diretosArr = rows
+        .filter((r) => r.liderId === pessoa.id)
+        .sort((a, b) => ord(a) - ord(b) || a.nome.localeCompare(b.nome, "pt-BR"));
+
+      return Response.json({
+        ok: true,
+        perfil: {
+          matricula: pessoa.matricula || "",
+          nome: pessoa.nome,
+          cargo: pessoa.cargo || "",
+          familia: pessoa.familia || "",
+          cod_var: det?.cod_var || "",
+          cor: det?.cor || "",
+          setor: pessoa.setorNome || "",
+          situacao: det?.situacao || "",
+          pj: det?.tipo_contratacao === "PJ",
+          cadeia,
+          lideraAreas,
+          areasGeridas,
+          totalDiretos: diretosArr.length,
+          diretos: diretosArr.slice(0, 12).map((r) => ({
+            matricula: r.matricula || "", nome: r.nome, cargo: r.cargo || "", setor: r.setorNome || "",
+          })),
+        },
+      });
+    }
+
+    return Response.json({ ok: true, diretores, semDiretor });
+  } catch (e) {
+    return erroResposta(e);
+  }
+}
+
+export async function POST(req) {
+  let conn;
+  try {
+    const pool = getPool();
+    const body = await req.json();
+    if (body.acao !== "trocar") return Response.json({ ok: false, erro: "Ação desconhecida." }, { status: 400 });
+
+    const { areaId, deMatricula, paraMatricula } = body;
+    if (!areaId || !deMatricula || !paraMatricula) {
+      return Response.json({ ok: false, erro: "Dados incompletos." }, { status: 400 });
+    }
+    if (deMatricula === paraMatricula) {
+      return Response.json({ ok: false, erro: "Escolha uma pessoa diferente do líder atual." }, { status: 400 });
+    }
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    const [[antigo]] = await conn.query(
+      "SELECT id, nome, setor_id, lider_id FROM colaborador WHERE codigo_dp = ? FOR UPDATE", [deMatricula]
+    );
+    const [[novo]] = await conn.query(
+      "SELECT id, nome, setor_id FROM colaborador WHERE codigo_dp = ? AND ativo = 1 FOR UPDATE", [paraMatricula]
+    );
+    if (!antigo) { await conn.rollback(); return Response.json({ ok: false, erro: "Líder atual não encontrado." }, { status: 404 }); }
+    if (!novo) { await conn.rollback(); return Response.json({ ok: false, erro: "Novo líder não encontrado (ou inativo)." }, { status: 404 }); }
+
+    // 1. novo líder da própria área assume o posto do antigo:
+    //    - antigo era MEMBRO da área → novo herda o diretor dele;
+    //    - antigo era EXTERNO (diretor liderando direto) → novo passa a
+    //      responder ao próprio antigo (o diretor continua diretor).
+    //    Quem é de fora mantém o próprio líder (vira âncora externa).
+    if (novo.setor_id === areaId) {
+      let novoChefe = antigo.setor_id === areaId ? (antigo.lider_id || null) : antigo.id;
+      if (novoChefe === novo.id) novoChefe = null; // nunca auto-liderança
+      await conn.query("UPDATE colaborador SET lider_id = ? WHERE id = ?", [novoChefe, novo.id]);
+    }
+    // 2. todos da área que respondiam ao antigo passam ao novo
+    const [r] = await conn.query(
+      "UPDATE colaborador SET lider_id = ? WHERE setor_id = ? AND ativo = 1 AND lider_id = ? AND id <> ?",
+      [novo.id, areaId, antigo.id, novo.id]
+    );
+    // 3. o antigo (se for membro da área) passa a responder ao novo
+    let antigoReaponta = false;
+    if (antigo.setor_id === areaId) {
+      await conn.query("UPDATE colaborador SET lider_id = ? WHERE id = ?", [novo.id, antigo.id]);
+      antigoReaponta = true;
+    }
+
+    await conn.commit();
+    return Response.json({
+      ok: true,
+      reapontados: r.affectedRows || 0,
+      antigoReaponta,
+      liderExterno: novo.setor_id !== areaId,
+    });
+  } catch (e) {
+    if (conn) { try { await conn.rollback(); } catch {} }
+    return erroResposta(e);
+  } finally {
+    if (conn) conn.release();
+  }
+}

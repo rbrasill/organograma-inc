@@ -10,7 +10,7 @@
   --line-soft:#eef1f7;
   --brand:#1f3864;
   --accent:#3b5bdb;
-  --inc:#fe5e19;          /* laranja oficial INC (rgb 254,94,25) */
+  --inc:#f16021;          /* laranja oficial INC (#F16021) */
   --inc-soft:#fff2ec;     /* tint claro do laranja — usar em fundos sutis */
   --inc-line:#ffd9c6;     /* borda/realce leve na cor da marca */
   --wire:#ff9a70;
@@ -34,13 +34,34 @@ main{padding:20px 24px 24px}
 /* tela cheia: o organograma usa toda a largura do monitor */
 .shell{max-width:none;margin:0}
 
-.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
-.brand{display:flex;align-items:center;gap:14px}
-/* logo oficial INC (SVG) — o texto "INC" do markup fica oculto */
-.logo{width:46px;height:46px;border-radius:13px;overflow:hidden;background:var(--inc) url('/inc-logo.svg') center/100% 100% no-repeat;font-size:0;color:transparent;box-shadow:0 8px 20px -10px rgba(254,94,25,.6)}
-.brand h1{font-size:15px;margin:0;font-weight:700;letter-spacing:-.01em}
-.brand p{margin:2px 0 0;font-size:12px;color:var(--ink-faint);font-weight:500}
-.controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+/* ===== banner "hero" do topo (menu global, presente em todas as páginas) ===== */
+/* uma única linha: marca à esquerda (encolhe), cards à direita (não quebram;
+   rolam na horizontal só se a tela for estreita demais) */
+/* hero em duas linhas: marca no topo, menu de cards na linha de baixo */
+.hero{display:flex;flex-direction:column;align-items:stretch;gap:15px;
+  background:linear-gradient(105deg,#F16021 0%,#e0559a 42%,#9f60b7 68%,#40419f 100%);
+  border-radius:22px;padding:18px 22px;margin-bottom:16px;
+  box-shadow:0 18px 44px -22px rgba(64,65,159,.55)}
+.hero-brand{display:flex;align-items:center;gap:16px;min-width:0}
+.hero-logo{height:42px;width:auto;display:block;flex:none}
+.hero-txt{min-width:0}
+.hero-txt h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-.02em;color:#fff;line-height:1.1}
+.hero-txt p{margin:4px 0 0;font-size:12.5px;font-weight:500;color:rgba(255,255,255,.88)}
+.hero-cards{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-start;flex:none}
+.hero-card{display:flex;align-items:center;gap:9px;text-decoration:none;cursor:pointer;font:inherit;flex:none;
+  background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);border-radius:13px;
+  padding:9px 13px 9px 9px;color:#fff;font-size:12px;font-weight:700;position:relative;
+  transition:background .2s var(--ease),transform .2s var(--ease),border-color .2s}
+.hero-card:hover{background:rgba(255,255,255,.26);border-color:rgba(255,255,255,.4);transform:translateY(-2px)}
+/* card da página atual */
+.hero-card.on{background:rgba(255,255,255,.92);border-color:#fff;color:var(--ink)}
+.hero-card.on .hc-ic{background:var(--inc-soft);color:var(--inc)}
+.hc-ic{width:29px;height:29px;border-radius:9px;background:rgba(255,255,255,.18);display:grid;place-items:center;flex:none}
+.hc-nome{white-space:nowrap;display:inline-flex;align-items:center;gap:7px}
+.hc-badge{font-style:normal;font-size:10px;font-weight:800;background:#fff;color:var(--inc);border-radius:999px;padding:1px 6px;line-height:1.4}
+@media (max-width:820px){ .hero-txt h1{font-size:20px} }
+
+.controls-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 .select,.search{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--line);padding:9px 13px;border-radius:12px;box-shadow:var(--shadow-soft);font-size:13px;color:var(--ink-soft);font-weight:500;position:relative}
 .search input{border:0;outline:0;font:inherit;color:var(--ink);background:transparent;width:210px}
 .select svg,.search svg{color:var(--ink-faint)}
@@ -48,19 +69,6 @@ main{padding:20px 24px 24px}
 
 .sug{position:absolute;top:calc(100% + 8px);left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 44px -18px rgba(16,24,40,.4);padding:6px;z-index:40;overflow:hidden}
 
-/* menu "Gerenciar": agrupa as ações administrativas em um dropdown */
-.menu-wrap{position:relative}
-.menu-btn svg:last-child{transition:transform .3s var(--ease)}
-.menu-btn.on svg:last-child{transform:rotate(180deg)}
-.menu-pop{position:absolute;top:calc(100% + 8px);right:0;width:308px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 60px -20px rgba(16,24,40,.45);padding:8px;z-index:60;animation:pop .3s var(--ease)}
-.menu-titulo{display:block;font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);padding:9px 10px 4px}
-.menu-item{display:flex;align-items:center;gap:11px;width:100%;text-align:left;border:0;background:transparent;padding:9px 10px;border-radius:11px;cursor:pointer;text-decoration:none;font:inherit;transition:background .2s var(--ease)}
-.menu-item:hover{background:#f5f7fc}
-.mi-ic{width:34px;height:34px;border-radius:10px;background:#f1f5fb;color:#5b6c8c;display:grid;place-items:center;flex:none;transition:background .2s,color .2s}
-.menu-item:hover .mi-ic{background:#fff1eb;color:var(--inc)}
-.mi-txt{display:flex;flex-direction:column;min-width:0}
-.mi-txt b{font-size:13px;font-weight:700;color:var(--ink)}
-.mi-txt em{font-size:11px;color:var(--ink-faint);font-style:normal;font-weight:500}
 .sug-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;padding:9px 10px;border-radius:10px;cursor:pointer;transition:background .2s var(--ease)}
 .sug-item:hover{background:#f5f7fc}
 .si-ava{width:30px;height:30px;border-radius:9px;background:#f1f5fb;color:#8ea0bd;display:grid;place-items:center;flex:none}
@@ -72,6 +80,13 @@ main{padding:20px 24px 24px}
 
 .board-shell{background:rgba(255,255,255,.6);border:1px solid var(--line);border-radius:26px;padding:8px;box-shadow:var(--shadow-card)}
 .board{background:var(--panel);border-radius:20px;border:1px solid var(--line-soft);padding:26px 26px 30px;position:relative}
+/* tela cheia: overlay fixo cobrindo a janela; o board vira coluna flex e o
+   viewport ocupa todo o espaço restante entre o cabeçalho e a legenda */
+.board-shell.fs{position:fixed;inset:0;z-index:200;border-radius:0;padding:14px;background:#eef1f7;box-shadow:none;overflow:hidden}
+.board-shell.fs .board{height:calc(100dvh - 28px);display:flex;flex-direction:column;overflow:hidden;border-radius:16px;padding:20px 22px 16px}
+.board-shell.fs .tree-viewport{flex:1 1 auto;height:auto;min-height:0}
+.icon-btn.on{background:var(--inc);border-color:var(--inc);color:#fff}
+.icon-btn.on:hover{color:#fff;filter:brightness(1.05)}
 .board-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:6px}
 .title-wrap .eyebrow{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--inc);background:var(--inc-soft);border:1px solid var(--inc-line);padding:5px 10px;border-radius:999px;margin-bottom:10px}
 .title-wrap h2{margin:0;font-size:27px;font-weight:800;letter-spacing:-.02em;color:var(--brand)}
@@ -107,9 +122,11 @@ main{padding:20px 24px 24px}
 /* padding zerado nas laterais: o padrão do navegador (40px à esquerda)
    deslocava todos os filhos ~20px do centro do pai */
 .tree ul{display:flex;justify-content:center;padding:26px 0 0;position:relative;margin:0;list-style:none}
-.tree li{list-style:none;position:relative;padding:26px 12px 0;display:flex;flex-direction:column;align-items:center}
+/* --deg = degrau vertical extra do card (níveis mais baixos descem);
+   a linha de conexão (::before/::after) se estende junto até o card */
+.tree li{list-style:none;position:relative;padding:calc(26px + var(--deg,0px)) 12px 0;display:flex;flex-direction:column;align-items:center}
 .tree ul::before{content:"";position:absolute;top:0;left:50%;width:2px;height:26px;background:var(--wire);transform:translateX(-50%)}
-.tree li::before,.tree li::after{content:"";position:absolute;top:0;height:26px;width:50%;border-top:2px solid var(--wire)}
+.tree li::before,.tree li::after{content:"";position:absolute;top:0;height:calc(26px + var(--deg,0px));width:50%;border-top:2px solid var(--wire)}
 .tree li::before{right:50%}
 .tree li::after{left:50%}
 .tree li::after{border-left:2px solid var(--wire)}
@@ -123,18 +140,19 @@ main{padding:20px 24px 24px}
 .tree li:only-child::after{width:0;border-top:0;border-top-left-radius:0;border-top-right-radius:0}
 .tree > ul{padding:0}
 .tree > ul::before{display:none}
-.tree > ul > li{padding-top:0}
+.tree > ul > li{padding-top:var(--deg,0px)}
 .tree > ul > li::before,.tree > ul > li::after{display:none}
 .tree > ul > li:only-child::before,.tree > ul > li:only-child::after{display:none}
 
 
 /* colunas verticais de equipe: cards empilhados conectados por fio */
-.leaf-col{display:flex;flex-direction:column;align-items:center}
-.leaf-col .card{width:282px}
-.leaf-item{position:relative;padding-top:16px}
-.leaf-item:first-child{padding-top:0}
-.leaf-item::before{content:"";position:absolute;top:0;left:50%;width:2px;height:16px;background:var(--wire);transform:translateX(-50%)}
-.leaf-item:first-child::before{display:none}
+/* pilha de fileiras de folhas por nível (li.leaf-stack): cada ul.leaf-row é
+   uma fileira de cards do MESMO nível; a primeira cola no drop do grupo
+   (sem stub extra) e as seguintes pendem da fileira de cima pelo stub padrão.
+   O --deg do li da pilha não desce para as fileiras internas. */
+.tree .leaf-stack .leaf-row{--deg:0px}
+.tree .leaf-stack > .leaf-row:first-child{padding-top:0}
+.tree .leaf-stack > .leaf-row:first-child::before{display:none}
 
 /* sem transform no hover: o card não pode se mover sob o cursor,
    senão o navegador descarta o clique nos botões (expandir/recolher) */
@@ -186,7 +204,7 @@ main{padding:20px 24px 24px}
 .modal{width:100%;max-width:520px;max-height:calc(100dvh - 40px);display:flex;flex-direction:column;overflow:hidden;background:#fff;border-radius:22px;box-shadow:0 30px 80px -20px rgba(16,24,40,.5);position:relative;animation:pop .35s var(--ease)}
 /* cabeçalho e rodapé fixos; só o miolo rola — Salvar/Cancelar e o X
    ficam sempre visíveis, sem cortar em telas baixas */
-.modal-head{padding:22px 22px 14px}
+.modal-head{padding:22px 44px 14px 22px} /* folga à direita p/ o botão fechar */
 .modal-body{flex:1;overflow-y:auto;padding:0 22px}
 .modal-foot{padding:14px 22px 18px;border-top:1px solid var(--line-soft)}
 @keyframes fade{from{opacity:0}to{opacity:1}}
@@ -206,6 +224,8 @@ main{padding:20px 24px 24px}
 .fld span{font-size:12px;font-weight:600;color:var(--ink-soft)}
 .fld input{border:1px solid var(--line);border-radius:11px;padding:9px 12px;font:inherit;font-size:13.5px;color:var(--ink);outline:none;transition:border-color .2s,box-shadow .2s}
 .fld input:focus{border-color:var(--inc);box-shadow:0 0 0 3px rgba(255,83,15,.12)}
+/* somente visualização (ex.: CPF) e campos dentro de fieldset desabilitado */
+.fld input:disabled,.fld select:disabled{background:#f2f5fa;color:var(--ink-soft);cursor:not-allowed}
 .ro-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .ro{background:#f7f9fd;border:1px solid var(--line-soft);border-radius:11px;padding:9px 12px}
 .ro span{display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint)}
@@ -350,11 +370,7 @@ main{padding:20px 24px 24px}
 .modal-note.sol-ok{background:#eefaf0;border-color:#c7ebd0;color:#177245}
 
 /* ===== página /solicitacoes ===== */
-.sol-shell{max-width:1600px;margin:0 auto}
-.sol-topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
-.sol-topbar .brand h1{font-size:17px;margin:0;font-weight:800;color:var(--brand);letter-spacing:-.01em}
-.sol-topbar .brand p{margin:2px 0 0;font-size:12px;color:var(--ink-faint);font-weight:500}
-.sol-topbar .btn{text-decoration:none}
+.sol-shell{max-width:none;margin:0}
 
 .sol-board{display:grid;grid-template-columns:360px 1fr;gap:14px;align-items:start}
 @media (max-width:860px){ .sol-board{grid-template-columns:1fr} }
@@ -363,7 +379,8 @@ main{padding:20px 24px 24px}
 .sol-filtros{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
 .sol-tab{border:1px solid var(--line);background:#fff;color:var(--ink-soft);font:inherit;font-size:12px;font-weight:700;border-radius:999px;padding:6px 12px;cursor:pointer;transition:all .2s}
 .sol-tab:hover{border-color:var(--wire-soft)}
-.sol-tab.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+/* toque sutil das cores do hero: aba ativa com o gradiente da marca */
+.sol-tab.on{background:linear-gradient(105deg,#f16021,#c65b7e 60%,#9f60b7);color:#fff;border-color:transparent}
 .sol-busca{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:11px;padding:8px 11px;margin-bottom:10px;color:var(--ink-faint)}
 .sol-busca input{border:0;outline:0;font:inherit;font-size:13px;width:100%;color:var(--ink);background:transparent}
 
@@ -420,7 +437,10 @@ main{padding:20px 24px 24px}
 .col-fld select{border:1px solid var(--line);border-radius:11px;padding:9px 11px;font:inherit;font-size:13px;background:#fff;color:var(--ink);cursor:pointer;outline:none}
 .col-fld select:focus{border-color:var(--inc);box-shadow:0 0 0 3px rgba(255,83,15,.12)}
 .col-edit-tag{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--inc);background:#fff1eb;border:1px solid #ffd7c4;border-radius:999px;padding:5px 11px;white-space:nowrap}
-.col-form{display:flex;flex-direction:column;gap:12px}
+.col-form{display:flex;flex-direction:column;gap:12px;border:0;padding:0;margin:0;min-width:0}
+/* colaborador desativado: formulário em somente visualização */
+.col-form[disabled]{opacity:.65}
+.col-form[disabled] .la-btn{visibility:hidden}
 .col-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media (max-width:560px){ .col-grid2{grid-template-columns:1fr} }
 .col-foot{display:flex;align-items:center;gap:9px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line-soft)}
@@ -459,6 +479,74 @@ main{padding:20px 24px 24px}
 .ct-del-confirma{margin-top:10px;display:flex;flex-direction:column;gap:9px}
 .ct-editando{border-color:var(--inc);box-shadow:0 0 0 3px rgba(255,83,15,.08)}
 .ct-form-titulo{font-size:13.5px;font-weight:800;color:var(--brand)}
+
+/* ===== líderes por área (agrupado por diretor) ===== */
+/* paleta de tons leves e discretos (atribuídos pelo nome da área/diretor) */
+.tone-0{--tone-soft:#eff4ff;--tone-line:#d8e4fc;--tone-text:#3457c4}
+.tone-1{--tone-soft:#eefaf2;--tone-line:#cdeada;--tone-text:#1d7a4b}
+.tone-2{--tone-soft:#f6f3ff;--tone-line:#e4dcfa;--tone-text:#6b45c8}
+.tone-3{--tone-soft:#fff8ea;--tone-line:#f3e2b6;--tone-text:#a16207}
+.tone-4{--tone-soft:#fff1f5;--tone-line:#fad5e0;--tone-text:#b1447a}
+.tone-5{--tone-soft:#eefafa;--tone-line:#c9ebe8;--tone-text:#0f766e}
+.tone-6{--tone-soft:#f0f2ff;--tone-line:#dde2fc;--tone-text:#4f46b5}
+.tone-7{--tone-soft:#fff4ec;--tone-line:#fbdcc8;--tone-text:#c05621}
+
+.ld-grupo{margin-bottom:26px}
+.ld-dir{display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:2px solid var(--tone-line,var(--inc-line));margin-bottom:13px}
+.ld-dir.topo{border-bottom-color:var(--line)}
+.ld-dir-ava{width:42px;height:42px;border-radius:12px;background:var(--tone-soft,var(--inc-soft));border:1px solid var(--tone-line,var(--inc-line));color:var(--tone-text,var(--inc));display:grid;place-items:center;flex:none}
+.ld-dir.topo .ld-dir-ava{background:#f1f5fb;border-color:var(--line);color:#8ea0bd}
+.ld-dir-txt{display:flex;flex-direction:column;min-width:0;flex:1}
+.ld-dir-txt b{font-size:15px;font-weight:800;color:var(--tone-text,var(--brand))}
+.ld-dir.topo .ld-dir-txt b{color:var(--brand)}
+.ld-dir-txt em{font-size:12px;color:var(--ink-faint);font-style:normal;font-weight:500}
+.ld-dir-chip{font-size:11px;font-weight:700;color:var(--ink-soft);background:#f1f5fb;border-radius:999px;padding:5px 11px;white-space:nowrap}
+/* 3 cards por linha (2 em telas médias, 1 no mobile) */
+.ld-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
+@media (max-width:1100px){ .ld-grid{grid-template-columns:repeat(2,1fr)} }
+@media (max-width:700px){ .ld-grid{grid-template-columns:1fr} }
+/* card da área: neutro (a cor fica só no cabeçalho do diretor).
+   min-width:0 deixa o card encolher dentro da coluna — sem isso os textos
+   nowrap ditam a largura mínima e a grade estoura a tela (scroll lateral) */
+.ld-card{min-width:0;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;transition:border-color .2s,box-shadow .2s}
+.ld-area b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* selo da família (Diretor/Presidente…) no card do líder */
+.ld-tag-dir{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--inc);background:var(--inc-soft);border:1px solid var(--inc-line);border-radius:6px;padding:1px 6px;white-space:nowrap;flex:none}
+/* nome do líder vira botão (abre o perfil completo) */
+.la-nome-btn{border:0;background:transparent;padding:0;font:inherit;font-size:14px;font-weight:700;color:var(--ink);text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.la-nome-btn:hover{color:var(--inc);text-decoration:underline}
+/* linha discreta abaixo do nome: tag da família + quantos lidera.
+   min-height reservado → cards com e sem tag têm a MESMA altura */
+.la-meta{display:flex;align-items:center;gap:6px;min-height:17px;margin:2px 0 1px;min-width:0}
+
+/* ===== modal de perfil do líder ===== */
+.lp-modal{max-width:600px}
+.lp-ava{width:52px;height:52px;border-radius:14px;background:#f1f5fb;border:2px solid var(--tone-line);color:var(--tone-text);display:grid;place-items:center;flex:none}
+.lp-cadeia{display:flex;flex-wrap:wrap;align-items:center;gap:7px}
+.lp-chip{display:inline-flex;flex-direction:column;background:#f7f9fd;border:1px solid var(--line-soft);border-radius:10px;padding:6px 11px;font-size:12.5px;font-weight:700;color:var(--ink)}
+.lp-chip em{font-size:10.5px;font-weight:500;font-style:normal;color:var(--ink-faint)}
+.lp-cadeia .lp-seta{color:var(--ink-faint);font-weight:700;font-size:12px}
+.lp-tags{display:flex;flex-wrap:wrap;gap:8px}
+.lp-area-tag{font-size:12px;font-weight:700;color:var(--ink-soft);background:#f1f5fb;border-radius:8px;padding:5px 11px}
+.lp-area-tag em{font-style:normal;font-weight:600;color:var(--ink-faint);margin-left:4px}
+.lp-geridas{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (max-width:560px){ .lp-geridas{grid-template-columns:1fr} }
+.lp-gerida{background:var(--inc-soft);border:1px solid var(--inc-line);border-radius:10px;padding:8px 11px;display:flex;flex-direction:column;min-width:0}
+.lp-gerida b{font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lp-gerida em{font-size:11px;font-style:normal;color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lp-equipe{display:flex;flex-direction:column;gap:7px;max-height:230px;overflow-y:auto}
+.lp-membro{display:flex;align-items:center;gap:10px}
+.lp-membro-ava{width:30px;height:30px;border-radius:9px;background:#f1f5fb;color:#8ea0bd;display:grid;place-items:center;flex:none}
+.lp-membro-txt{display:flex;flex-direction:column;min-width:0}
+.lp-membro-txt b{font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lp-membro-txt em{font-size:11px;font-style:normal;color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lp-mais{font-size:11.5px;color:var(--ink-faint);margin:8px 0 0}
+.ld-card:hover{border-color:#d8dfeb;box-shadow:var(--shadow-soft)}
+.ld-area{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:9px}
+.ld-area b{font-size:13.5px;font-weight:800;color:var(--ink)}
+/* modal de alterar líder */
+.ld-modal-ava{width:52px;height:52px;border-radius:14px;background:var(--tone-soft,#f1f5fb);border:1px solid var(--tone-line,var(--line));color:var(--tone-text,#8ea0bd);display:grid;place-items:center;flex:none}
+.ld-modal-lista{max-height:240px;overflow-y:auto}
 
 /* ===== painel de gestão de áreas ===== */
 .area-modal{max-width:620px}

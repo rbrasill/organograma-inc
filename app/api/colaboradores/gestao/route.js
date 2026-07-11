@@ -31,6 +31,7 @@ async function contarSubordinados(conn, id) {
 async function carregarColaborador(pool, id) {
   const [rows] = await pool.query(
     `SELECT c.id, c.codigo_dp, c.nome, c.email, c.tipo_contratacao, c.ativo,
+            c.cpf, c.telefone,
             c.cargo_id, c.setor_id, c.local_id, c.regional_id, c.situacao_id, c.lider_id,
             c.nivel_id AS nivel_pessoal_id, cg.nivel_id AS cargo_nivel_id,
             cg.nome AS cargo, s.nome AS setor, lt.nome AS local,
@@ -49,6 +50,52 @@ async function carregarColaborador(pool, id) {
   return rows[0] || null;
 }
 
+// resolve líder (por matrícula) e variação de nível (dentro do nível do cargo),
+// compartilhado por salvar e criar. Retorna { liderId, nivelPessoal } ou { erro }.
+async function resolverEstruturais(pool, campos, idAtual, nivelAtual) {
+  let liderId = null;
+  if (campos.liderMatricula) {
+    const [[l]] = await pool.query("SELECT id FROM colaborador WHERE codigo_dp = ?", [campos.liderMatricula]);
+    if (!l) return { erro: `Líder de matrícula "${campos.liderMatricula}" não encontrado.` };
+    if (idAtual && l.id === idAtual) return { erro: "O colaborador não pode ser o próprio líder." };
+    liderId = l.id;
+  }
+  let nivelPessoal = nivelAtual || null; // ausente = preserva
+  if (Object.prototype.hasOwnProperty.call(campos, "nivelId")) {
+    const nivelId = campos.nivelId || null;
+    let padraoCargo = null;
+    if (campos.cargoId) {
+      const [[cg]] = await pool.query(
+        `SELECT cg.nivel_id, nh.ordem FROM cargo cg
+           LEFT JOIN nivel_hierarquico nh ON nh.id = cg.nivel_id WHERE cg.id = ?`, [campos.cargoId]
+      );
+      padraoCargo = cg || null;
+    }
+    if (nivelId) {
+      const [[n]] = await pool.query("SELECT id, ordem, cod_var FROM nivel_hierarquico WHERE id = ?", [nivelId]);
+      if (!n) return { erro: "Nível hierárquico selecionado não existe." };
+      if (padraoCargo?.ordem != null && n.ordem !== padraoCargo.ordem) {
+        return { erro: `A variação ${n.cod_var || ""} é do nível ${n.ordem}, mas o cargo é do nível ${padraoCargo.ordem}. Escolha uma variação do mesmo nível — o número do nível se edita no catálogo de cargos.` };
+      }
+    }
+    nivelPessoal = nivelId && nivelId !== (padraoCargo?.nivel_id || null) ? nivelId : null;
+  }
+  return { liderId, nivelPessoal };
+}
+
+// próxima matrícula PJ disponível (PJ#### incremental)
+async function proximaMatriculaPJ(pool) {
+  const [rows] = await pool.query(
+    "SELECT codigo_dp FROM colaborador WHERE codigo_dp REGEXP '^PJ[0-9]+$'"
+  );
+  let max = 1000;
+  for (const r of rows) {
+    const n = parseInt(String(r.codigo_dp).slice(2), 10);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return `PJ${max + 1}`;
+}
+
 export async function GET(req) {
   try {
     const pool = getPool();
@@ -56,6 +103,7 @@ export async function GET(req) {
     const id = url.searchParams.get("id");
     const setor = url.searchParams.get("setor");
     const q = (url.searchParams.get("q") || "").trim();
+    const tipo = url.searchParams.get("tipo"); // 'PJ' → tela dedicada de PJ
 
     // detalhe de um colaborador
     if (id) {
@@ -65,27 +113,29 @@ export async function GET(req) {
       return Response.json({ ok: true, colaborador: c });
     }
 
-    // busca (área e/ou nome). Sem filtro nenhum não lista tudo (base grande):
-    // exige área OU um termo de busca. Por padrão só ativos; incluirInativos=1
-    // traz também os arquivados (para reativar).
-    if (setor || q) {
+    // busca. Sem filtro nenhum não lista tudo (base grande): exige área, termo
+    // OU tipo (a tela de PJ lista todos os PJ direto). Por padrão só ativos;
+    // incluirInativos=1 traz também os arquivados (para reativar).
+    if (setor || q || tipo) {
       const incluirInativos = url.searchParams.get("incluirInativos") === "1";
       const cond = [];
       const args = [];
       if (!incluirInativos) cond.push("c.ativo = 1");
+      if (tipo) { cond.push("c.tipo_contratacao = ?"); args.push(tipo); }
       if (setor) { cond.push("c.setor_id = ?"); args.push(setor); }
       if (q) {
         cond.push("c.nome LIKE ? COLLATE utf8mb4_unicode_ci");
         args.push(`%${q}%`);
       }
       const [rows] = await pool.query(
-        `SELECT c.id, c.codigo_dp AS matricula, c.nome, c.ativo, cg.nome AS cargo, s.nome AS setor
+        `SELECT c.id, c.codigo_dp AS matricula, c.nome, c.ativo,
+                cg.nome AS cargo, s.nome AS setor
            FROM colaborador c
            LEFT JOIN cargo cg ON cg.id = c.cargo_id
            LEFT JOIN setor s  ON s.id = c.setor_id
           WHERE ${cond.join(" AND ")}
           ORDER BY c.ativo DESC, c.nome
-          LIMIT 200`,
+          LIMIT 500`,
         args
       );
       return Response.json({ ok: true, colaboradores: rows });
@@ -124,7 +174,73 @@ export async function POST(req) {
     const pool = getPool();
     const body = await req.json();
     const { id, acao } = body;
+
+    // ---- criar: novo colaborador (usado pela tela de PJ). Matrícula PJ é
+    // gerada automaticamente; tipo forçado conforme campos.tipo (default PJ).
+    if (acao === "criar") {
+      const campos = body.campos || {};
+      const nome = (campos.nome || "").trim();
+      if (!nome) return erro400("Informe o nome do colaborador.");
+      const tipo = normalizar(campos.tipo || "PJ").includes("clt") ? "CLT" : "PJ";
+
+      const vinc = await resolverEstruturais(pool, campos, null, null);
+      if (vinc.erro) return erro400(vinc.erro);
+
+      let codigo = (campos.codigo || "").trim();
+      if (!codigo) codigo = tipo === "PJ" ? await proximaMatriculaPJ(pool) : null;
+      if (codigo) {
+        const [[dup]] = await pool.query("SELECT id FROM colaborador WHERE codigo_dp = ?", [codigo]);
+        if (dup) return erro400(`A matrícula ${codigo} já existe.`);
+      }
+
+      const novoId = randomUUID();
+      const fk = (v) => (v ? v : null);
+      await pool.query(
+        `INSERT INTO colaborador
+           (id, codigo_dp, nome, email, tipo_contratacao, cpf, telefone,
+            cargo_id, nivel_id, setor_id, local_id, regional_id, situacao_id, lider_id, ativo)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
+        [
+          novoId, codigo, nome, (campos.email || "").trim() || null, tipo,
+          (campos.cpf || "").trim() || null, (campos.telefone || "").trim() || null,
+          fk(campos.cargoId), vinc.nivelPessoal, fk(campos.setorId), fk(campos.localId),
+          fk(campos.regionalId), fk(campos.situacaoId), vinc.liderId,
+        ]
+      );
+      await pool.query(
+        "INSERT INTO colaborador_historico (id, colaborador_id, cargo_id, setor_id, local_id, situacao_id, lider_id, motivo) VALUES (?,?,?,?,?,?,?,'cadastro_manual')",
+        [randomUUID(), novoId, fk(campos.cargoId), fk(campos.setorId), fk(campos.localId), fk(campos.situacaoId), vinc.liderId]
+      );
+      const criado = await carregarColaborador(pool, novoId);
+      return Response.json({ ok: true, colaborador: criado });
+    }
+
     if (!id) return Response.json({ ok: false, erro: "Colaborador não informado." }, { status: 400 });
+
+    // ---- excluir: remoção PERMANENTE com integridade (subordinados sobem
+    // para o líder do excluído; registros ligados a ele são limpos). Irreversível.
+    if (acao === "excluir") {
+      conn = await pool.getConnection();
+      await conn.beginTransaction();
+      const [[c]] = await conn.query("SELECT id, lider_id FROM colaborador WHERE id = ? FOR UPDATE", [id]);
+      if (!c) { await conn.rollback(); return Response.json({ ok: false, erro: "Colaborador não encontrado." }, { status: 404 }); }
+
+      // subordinados (ativos ou não) passam ao líder de cima do excluído
+      const [sub] = await conn.query("UPDATE colaborador SET lider_id = ? WHERE lider_id = ?", [c.lider_id || null, id]);
+      // desfaz referências que apontam para ele antes de apagar
+      await conn.query("DELETE FROM colaborador_historico WHERE colaborador_id = ?", [id]);
+      await conn.query("UPDATE colaborador_historico SET lider_id = NULL WHERE lider_id = ?", [id]);
+      await conn.query("DELETE FROM solicitacao_ajuste WHERE colaborador_alvo_id = ?", [id]);
+      await conn.query("UPDATE solicitacao_ajuste SET solicitante_id = NULL WHERE solicitante_id = ?", [id]);
+      await conn.query("UPDATE solicitacao_ajuste SET aprovador_id = NULL WHERE aprovador_id = ?", [id]);
+      await conn.query("DELETE FROM log_auditoria WHERE entidade = 'colaborador' AND registro_id = ?", [id]);
+      await conn.query("UPDATE log_auditoria SET autor_id = NULL WHERE autor_id = ?", [id]);
+      await conn.query("DELETE FROM usuario_perfil WHERE colaborador_id = ?", [id]);
+      await conn.query("UPDATE setor SET lider_colaborador_id = NULL WHERE lider_colaborador_id = ?", [id]);
+      await conn.query("DELETE FROM colaborador WHERE id = ?", [id]);
+      await conn.commit();
+      return Response.json({ ok: true, reapontados: sub.affectedRows || 0 });
+    }
 
     // ---- desativar: arquiva (ativo=0) e reaponta os subordinados diretos
     // para o líder do desativado (mantém a árvore conectada). Nada é apagado.
@@ -171,69 +287,46 @@ export async function POST(req) {
     const { campos } = body;
     if (!campos) return Response.json({ ok: false, erro: "Dados incompletos." }, { status: 400 });
 
-    const [[alvo]] = await pool.query("SELECT id, nivel_id FROM colaborador WHERE id = ?", [id]);
+    const [[alvo]] = await pool.query("SELECT id, nivel_id, ativo FROM colaborador WHERE id = ?", [id]);
     if (!alvo) return Response.json({ ok: false, erro: "Colaborador não encontrado." }, { status: 404 });
+    if (!alvo.ativo) {
+      return Response.json({
+        ok: false,
+        erro: "Colaborador desativado é somente visualização — reative-o para poder editar.",
+      }, { status: 409 });
+    }
 
     const nome = (campos.nome || "").trim();
     if (!nome) return Response.json({ ok: false, erro: "O nome não pode ficar em branco." }, { status: 400 });
 
     const tipo = normalizar(campos.tipo || "").includes("pj") ? "PJ" : "CLT";
-
-    // resolve o líder pela matrícula (pode ser de qualquer área). Impede
-    // auto-liderança (colaborador não pode ser o próprio líder).
-    let liderId = null;
-    if (campos.liderMatricula) {
-      const [[l]] = await pool.query("SELECT id FROM colaborador WHERE codigo_dp = ?", [campos.liderMatricula]);
-      if (!l) return Response.json({ ok: false, erro: `Líder de matrícula "${campos.liderMatricula}" não encontrado.` }, { status: 400 });
-      if (l.id === id) return Response.json({ ok: false, erro: "O colaborador não pode ser o próprio líder." }, { status: 400 });
-      liderId = l.id;
-    }
-
-    // FKs por id (os selects já mandam o id; string vazia = NULL)
     const fk = (v) => (v ? v : null);
 
-    // nível hierárquico (cascata código → variação/família): grava NA PESSOA
-    // (colaborador.nivel_id), sem tocar no cargo — cada colaborador pode ter
-    // sua variação (14.A, 14.B...). Igual ao padrão do cargo = NULL (herda),
-    // assim mudar o padrão do cargo no catálogo continua valendo p/ quem herda.
-    // variação da família: só pode variar DENTRO do nível do cargo (o número
-    // do nível é do cargo e se edita no catálogo). Igual ao padrão = NULL (herda).
-    let nivelPessoal = alvo.nivel_id || null; // não enviado = preserva o atual
-    if (Object.prototype.hasOwnProperty.call(campos, "nivelId")) {
-      const nivelId = campos.nivelId || null;
-      let padraoCargo = null;
-      if (campos.cargoId) {
-        const [[cg]] = await pool.query(
-          `SELECT cg.nivel_id, nh.ordem FROM cargo cg
-             LEFT JOIN nivel_hierarquico nh ON nh.id = cg.nivel_id
-            WHERE cg.id = ?`,
-          [campos.cargoId]
-        );
-        padraoCargo = cg || null;
-      }
-      if (nivelId) {
-        const [[n]] = await pool.query("SELECT id, ordem, cod_var FROM nivel_hierarquico WHERE id = ?", [nivelId]);
-        if (!n) return Response.json({ ok: false, erro: "Nível hierárquico selecionado não existe." }, { status: 400 });
-        if (padraoCargo?.ordem != null && n.ordem !== padraoCargo.ordem) {
-          return Response.json({
-            ok: false,
-            erro: `A variação ${n.cod_var || ""} é do nível ${n.ordem}, mas o cargo escolhido é do nível ${padraoCargo.ordem}. Escolha uma variação do mesmo nível — o número do nível se edita no catálogo de cargos.`,
-          }, { status: 400 });
-        }
-      }
-      nivelPessoal = nivelId && nivelId !== (padraoCargo?.nivel_id || null) ? nivelId : null;
-    }
+    // líder + variação de nível (compartilhado com criar)
+    const vinc = await resolverEstruturais(pool, campos, id, alvo.nivel_id);
+    if (vinc.erro) return erro400(vinc.erro);
+
+    // cpf/telefone: só entram no UPDATE quando o payload traz o campo.
+    // A tela geral de edição não os envia (CPF lá é somente visualização) —
+    // sem isso, salvar por ela apagaria o CPF/telefone já gravados.
+    const tem = (c) => Object.prototype.hasOwnProperty.call(campos, c);
+    const extraSet = [];
+    const extraVal = [];
+    if (tem("cpf")) { extraSet.push("cpf = ?"); extraVal.push((campos.cpf || "").trim() || null); }
+    if (tem("telefone")) { extraSet.push("telefone = ?"); extraVal.push((campos.telefone || "").trim() || null); }
 
     await pool.query(
       `UPDATE colaborador
           SET nome = ?, email = ?, tipo_contratacao = ?,
+              ${extraSet.length ? `${extraSet.join(", ")},` : ""}
               cargo_id = ?, nivel_id = ?, setor_id = ?, local_id = ?, regional_id = ?, situacao_id = ?,
               lider_id = ?
         WHERE id = ?`,
       [
         nome, (campos.email || "").trim() || null, tipo,
-        fk(campos.cargoId), nivelPessoal, fk(campos.setorId), fk(campos.localId),
-        fk(campos.regionalId), fk(campos.situacaoId), liderId, id,
+        ...extraVal,
+        fk(campos.cargoId), vinc.nivelPessoal, fk(campos.setorId), fk(campos.localId),
+        fk(campos.regionalId), fk(campos.situacaoId), vinc.liderId, id,
       ]
     );
 

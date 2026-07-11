@@ -6,7 +6,7 @@
 // do produto). Layout mestre-detalhe, no mesmo padrão de /solicitacoes.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import HeroNav from "@/components/HeroNav";
 import {
   UserIcon, CheckIcon, AlertIcon, ChevronIcon, SearchIcon, PencilIcon,
 } from "@/components/icons";
@@ -150,6 +150,7 @@ export default function ColaboradoresView() {
         matricula: c.codigo_dp || "",
         nome: c.nome || "",
         email: c.email || "",
+        cpf: c.cpf || "", // exibição apenas — não é enviado no salvar
         tipo: c.tipo_contratacao || "CLT",
         cargoId: c.cargo_id || "",
         setorId: c.setor_id || "",
@@ -222,9 +223,12 @@ export default function ColaboradoresView() {
   async function salvar() {
     setSalvando(true); setErro("");
     try {
+      // CPF é somente visualização nesta tela: sai do payload para a API
+      // preservar o valor gravado (ela só atualiza cpf quando o campo vem).
+      const { cpf: _cpf, ...campos } = form;
       const r = await fetch("/api/colaboradores/gestao", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: selId, campos: form }),
+        body: JSON.stringify({ id: selId, campos }),
       });
       const txt = await r.text();
       let j; try { j = JSON.parse(txt); } catch { j = { ok: false, erro: `Servidor respondeu ${r.status}.` }; }
@@ -283,16 +287,11 @@ export default function ColaboradoresView() {
 
   return (
     <div className="sol-shell">
-      <div className="sol-topbar">
-        <div className="brand">
-          <div className="logo">INC</div>
-          <div>
-            <h1>Editar colaboradores</h1>
-            <p>Localize por área e nome · edite os dados direto no banco</p>
-          </div>
-        </div>
-        <Link href="/" className="btn btn-neutral"><ChevronIcon size={13} /> Voltar ao organograma</Link>
-      </div>
+      <HeroNav
+        titulo="Editar colaboradores"
+        subtitulo="Localize por área e nome · edite os dados direto no banco"
+        atual="colaboradores"
+      />
 
       <div className="sol-board">
         {/* LISTA / BUSCA */}
@@ -357,8 +356,9 @@ export default function ColaboradoresView() {
 
               {form.ativo === 0 && (
                 <div className="modal-note col-arquivado">
-                  <b>Este colaborador está desativado (arquivado).</b> Não aparece no organograma, nas contagens
-                  nem na busca padrão. O registro e o histórico foram preservados — use <b>Reativar</b> para trazê-lo de volta.
+                  <b>Este colaborador está desativado (arquivado) — os dados abaixo são somente visualização.</b>{" "}
+                  Ele não aparece no organograma, nas contagens nem na busca padrão. O registro e o histórico
+                  foram preservados — use <b>Reativar</b> para trazê-lo de volta e poder editar.
                 </div>
               )}
 
@@ -366,15 +366,28 @@ export default function ColaboradoresView() {
               {salvo && <div className="modal-note sol-ok"><b>Alterações salvas no banco.</b></div>}
               {msgAtivo && <div className="modal-note sol-ok"><b>{msgAtivo}</b></div>}
 
-              <div className="col-form">
+              {/* desativado = somente visualização: o fieldset desabilita
+                  todos os campos e botões internos (inclusive trocar líder) */}
+              <fieldset className="col-form" disabled={form.ativo === 0}>
                 <label className="fld">
                   <span>Nome</span>
                   <input value={form.nome} onChange={(e) => set("nome", e.target.value)} />
                 </label>
-                <label className="fld">
-                  <span>E-mail corporativo</span>
-                  <input value={form.email} placeholder="nome@meuinc.com.br" onChange={(e) => set("email", e.target.value)} />
-                </label>
+                <div className="col-grid2">
+                  <label className="fld">
+                    <span>E-mail corporativo</span>
+                    <input value={form.email} placeholder="nome@meuinc.com.br" onChange={(e) => set("email", e.target.value)} />
+                  </label>
+                  <label className="fld">
+                    <span>CPF <em className="ct-ex">· somente visualização</em></span>
+                    <input
+                      value={form.cpf}
+                      placeholder="Não informado"
+                      disabled
+                      title="O CPF vem da importação por Excel (ou do cadastro PJ) e não é editável aqui."
+                    />
+                  </label>
+                </div>
                 <div className="col-grid2">
                   <label className="fld">
                     <span>Tipo de contratação</span>
@@ -501,7 +514,7 @@ export default function ColaboradoresView() {
                     </div>
                   )}
                 </div>
-              </div>
+              </fieldset>
 
               {confirmando && (
                 <div className="sol-confirma">
@@ -568,6 +581,7 @@ export default function ColaboradoresView() {
                 </div>
               )}
 
+              {form.ativo !== 0 && (
               <div className="col-foot">
                 {confirmando ? (
                   <>
@@ -591,6 +605,7 @@ export default function ColaboradoresView() {
                   </>
                 )}
               </div>
+              )}
             </>
           )}
         </section>

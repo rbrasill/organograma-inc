@@ -10,10 +10,10 @@
 //    mostra ANTES quantas pessoas/cargos serão desvinculados.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import HeroNav from "@/components/HeroNav";
 import { normalizar } from "@/data/ti";
 import {
-  ChevronIcon, SearchIcon, AlertIcon, CheckIcon, PlusIcon, PencilIcon, CloseIcon,
+  SearchIcon, AlertIcon, CheckIcon, PlusIcon, PencilIcon, CloseIcon,
 } from "@/components/icons";
 
 const RX = {
@@ -208,16 +208,11 @@ export default function CatalogosView() {
 
   return (
     <div className="sol-shell">
-      <div className="sol-topbar">
-        <div className="brand">
-          <div className="logo">INC</div>
-          <div>
-            <h1>Catálogos da base</h1>
-            <p>Áreas, cargos, níveis, locais, regionais e situações · edição com validação de formato</p>
-          </div>
-        </div>
-        <Link href="/" className="btn btn-neutral"><ChevronIcon size={13} /> Voltar ao organograma</Link>
-      </div>
+      <HeroNav
+        titulo="Catálogos da base"
+        subtitulo="Áreas, cargos, níveis, locais, regionais e situações · edição com validação de formato"
+        atual="catalogos"
+      />
 
       <div className="ct-board">
         <div className="sol-filtros">
