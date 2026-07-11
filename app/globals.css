@@ -370,7 +370,7 @@ main{padding:20px 24px 24px}
 .modal-note.sol-ok{background:#eefaf0;border-color:#c7ebd0;color:#177245}
 
 /* ===== página /solicitacoes ===== */
-.sol-shell{max-width:1600px;margin:0 auto}
+.sol-shell{max-width:none;margin:0}
 
 .sol-board{display:grid;grid-template-columns:360px 1fr;gap:14px;align-items:start}
 @media (max-width:860px){ .sol-board{grid-template-columns:1fr} }
