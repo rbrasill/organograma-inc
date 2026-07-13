@@ -142,3 +142,21 @@ export function AlertIcon({ size = 14 }) {
     </svg>
   );
 }
+export function MailIcon({ size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 7l9 6 9-6" />
+    </svg>
+  );
+}
+export function KeyIcon({ size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="8" cy="15" r="4" />
+      <path d="M10.8 12.2L20 3" />
+      <path d="M16 7l3 3" />
+      <path d="M13.5 9.5l2.5 2.5" />
+    </svg>
+  );
+}
