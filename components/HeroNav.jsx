@@ -9,7 +9,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
-  InboxIcon, PencilIcon, UserIcon, UploadIcon, DownloadIcon, GridIcon, BriefcaseIcon,
+  InboxIcon, PencilIcon, UserIcon, UploadIcon, DownloadIcon, GridIcon, BriefcaseIcon, LogoutIcon,
 } from "@/components/icons";
 
 const ITENS = [
@@ -24,12 +24,22 @@ const ITENS = [
 
 export default function HeroNav({ titulo, subtitulo, atual, onAcao }) {
   const [pendentes, setPendentes] = useState(0);
+  const [sessao, setSessao] = useState(null); // { autenticado, nome } quando a auth está ligada
   useEffect(() => {
     fetch("/api/solicitacoes?status=pendente")
       .then((r) => r.json())
       .then((j) => { if (j.ok) setPendentes(j.pendentes); })
       .catch(() => {});
+    fetch("/api/auth/sessao")
+      .then((r) => r.json())
+      .then((j) => { if (j.ok && j.ativa && j.autenticado) setSessao(j); })
+      .catch(() => {});
   }, []);
+
+  async function sair() {
+    try { await fetch("/api/auth/sair", { method: "POST" }); } catch {}
+    window.location.href = "/login";
+  }
 
   return (
     <div className="hero">
@@ -41,6 +51,14 @@ export default function HeroNav({ titulo, subtitulo, atual, onAcao }) {
           <h1>{titulo}</h1>
           {subtitulo && <p>{subtitulo}</p>}
         </div>
+        {sessao && (
+          <div className="hero-user">
+            <span className="hu-nome" title={sessao.nome}>Olá, {(sessao.nome || "").split(" ")[0]}</span>
+            <button className="hu-sair" onClick={sair} title="Encerrar a sessão">
+              <LogoutIcon size={14} /> Sair
+            </button>
+          </div>
+        )}
       </div>
       <div className="hero-cards">
         {ITENS.map((it) => {
