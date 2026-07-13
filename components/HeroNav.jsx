@@ -2,14 +2,14 @@
 
 // Cabeçalho global do portal ("hero"): gradiente da marca + logo oficial INC
 // + menu de funcionalidades em cards — o MESMO em todas as páginas.
-// O card da página atual fica destacado. Na home, Importar/Gerenciar áreas
-// abrem os modais direto (via onAcao); nas demais páginas esses cards
-// navegam para a home com ?abrir=<acao>, que abre o modal ao chegar.
+// O card da página atual fica destacado. Na home, Importar abre o modal
+// direto (via onAcao); nas demais páginas esse card navega para a home com
+// ?abrir=importar, que abre o modal ao chegar.
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
-  InboxIcon, PencilIcon, UserIcon, UploadIcon, DownloadIcon, MergeIcon, GridIcon, BriefcaseIcon,
+  InboxIcon, PencilIcon, UserIcon, UploadIcon, DownloadIcon, GridIcon, BriefcaseIcon,
 } from "@/components/icons";
 
 const ITENS = [
@@ -19,7 +19,6 @@ const ITENS = [
   { key: "lideres", href: "/lideres", label: "Líderes por área", Icon: UserIcon, title: "Diretores, áreas e troca de líder" },
   { key: "importar", href: "/?abrir=importar", label: "Importar Excel", Icon: UploadIcon, title: "Subir a base oficial por Excel", acao: true },
   { key: "exportar", href: "/api/colaboradores/exportar", label: "Exportar base", Icon: DownloadIcon, title: "Baixar toda a base em Excel", download: true },
-  { key: "areas", href: "/areas", label: "Gerenciar áreas", Icon: MergeIcon, title: "Renomear e mesclar áreas" },
   { key: "catalogos", href: "/catalogos", label: "Catálogos", Icon: GridIcon, title: "Cargos, níveis, locais, regionais e situações" },
 ];
 

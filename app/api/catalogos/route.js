@@ -66,7 +66,6 @@ const DEFS = {
     desvincular: [
       "UPDATE colaborador SET setor_id = NULL WHERE setor_id = ?",
       "UPDATE colaborador_historico SET setor_id = NULL WHERE setor_id = ?",
-      "UPDATE setor SET setor_pai_id = NULL WHERE setor_pai_id = ?",
     ],
   },
   cargo: {
@@ -160,8 +159,7 @@ async function validar(pool, tipo, campos, idAtual) {
       [norm, idAtual || ""]
     );
     if (dup.length) {
-      const dica = tipo === "setor" ? ' Para unir duas áreas, use "Gerenciar áreas → Mesclar".' : "";
-      return { erro: `Já existe "${dup[0].nome}" com esse nome.${dica}` };
+      return { erro: `Já existe "${dup[0].nome}" com esse nome.` };
     }
     v.nome = nome; v.norm = norm;
   }

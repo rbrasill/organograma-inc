@@ -27,7 +27,7 @@ const ABAS = [
     ],
     avisoExcluir: (it) =>
       `${it.usos} colaborador(es) ficarão sem área (saem do organograma até serem realocados). ` +
-      `Se esta área é uma duplicata, prefira mesclar em "Gerenciar áreas" — a mescla move as pessoas em vez de desvincular.`,
+      `Se esta área é uma duplicata, primeiro mova as pessoas para a área correta (Editar colaboradores ou reimportação) e exclua depois.`,
   },
   {
     key: "cargos", tipo: "cargo", label: "Cargos", singular: "cargo",
