@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="2048" viewBox="0 0 1024 1024" role="img" aria-label="Logo de hierarquia em gradiente laranja">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0eef2"/>
+      <stop offset="100%" stop-color="#ebe8ec"/>
+    </linearGradient>
+    <linearGradient id="grad" x1="0" y1="170" x2="0" y2="760" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffb100"/>
+      <stop offset="50%" stop-color="#ff8b00"/>
+      <stop offset="100%" stop-color="#ff5a00"/>
+    </linearGradient>
+    <style>
+      .g{stroke:url(#grad);fill:none;stroke-linecap:round;stroke-linejoin:round}
+      .c{stroke-width:32}
+      .l{stroke-width:28}
+    </style>
+  </defs>
+
+  <rect x="10" y="10" width="1004" height="1004" rx="110" fill="url(#bg)"/>
+
+  <!-- connectors, trimmed to circle edges for a cleaner logo look -->
+  <line class="g l" x1="484.36" y1="251.39" x2="433.86" y2="336.15"/>
+  <line class="g l" x1="539.64" y1="251.39" x2="590.14" y2="336.15"/>
+
+  <line class="g l" x1="349.09" y1="451.74" x2="255.91" y2="556.26"/>
+  <line class="g l" x1="431.33" y1="461.29" x2="477.67" y2="546.71"/>
+  <line class="g l" x1="592.67" y1="461.29" x2="546.33" y2="546.71"/>
+  <line class="g l" x1="674.91" y1="451.74" x2="768.09" y2="556.26"/>
+
+  <!-- bottom supports -->
+  <line class="g l" x1="157.09" y1="660.91" x2="111.84" y2="706.16"/>
+  <line class="g l" x1="258.91" y1="660.91" x2="304.16" y2="706.16"/>
+
+  <line class="g l" x1="461.09" y1="660.91" x2="415.84" y2="706.16"/>
+  <line class="g l" x1="562.91" y1="660.91" x2="608.16" y2="706.16"/>
+
+  <line class="g l" x1="765.09" y1="660.91" x2="719.84" y2="706.16"/>
+  <line class="g l" x1="866.91" y1="660.91" x2="912.16" y2="706.16"/>
+
+  <!-- node rings -->
+  <circle class="g c" cx="512" cy="205" r="54"/>
+  <circle class="g c" cx="397" cy="398" r="72"/>
+  <circle class="g c" cx="627" cy="398" r="72"/>
+  <circle class="g c" cx="208" cy="610" r="72"/>
+  <circle class="g c" cx="512" cy="610" r="72"/>
+  <circle class="g c" cx="816" cy="610" r="72"/>
+</svg>
