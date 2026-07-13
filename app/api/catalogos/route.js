@@ -4,9 +4,10 @@
 // Integridade (regras desta rota):
 //  * nome sempre re-normalizado (nome_normalizado) — mantém a importação
 //    casando os registros e impede duplicatas por grafia;
-//  * códigos validados no MESMO formato oficial já usado no banco
-//    (SET…, LOCTRA…, NH…, letra única, cargo numérico ou PJUR…) e checados
-//    contra duplicidade onde o schema exige unicidade;
+//  * códigos NÃO são editáveis pelo usuário: ao criar, o sistema gera o
+//    PRÓXIMO da sequência oficial já usada no banco (SET…, LOCTRA…, NH…,
+//    número de cargo, próxima letra livre de situação); ao salvar, o código
+//    existente é preservado;
 //  * excluir NUNCA deixa vínculo órfão: dentro de uma transação, todas as
 //    referências (colaborador, histórico, cargos, sub-áreas) são desfeitas
 //    (viram NULL) antes do DELETE — o colaborador permanece, só perde o
@@ -29,14 +30,34 @@ function erroResposta(e) {
 }
 const erro400 = (m) => Response.json({ ok: false, erro: m }, { status: 400 });
 
-// formatos oficiais dos códigos (espelham os dados reais do banco)
-const FORMATOS = {
-  setor:    { rx: /^SET\d+$/,           ex: "SET300" },
-  local:    { rx: /^LOCTRA\d+$/,        ex: "LOCTRA204" },
-  nivel:    { rx: /^NH\d+$/,            ex: "NH505" },
-  situacao: { rx: /^[A-Z]$/,            ex: "A" },
-  cargo:    { rx: /^(\d+|PJUR\d+)$/,    ex: "89 ou PJUR101" },
-};
+// gera o PRÓXIMO código da sequência oficial de cada catálogo, lendo o maior
+// já usado no banco. O usuário não digita código — o sistema segue a série.
+//   setor SET300… · local LOCTRA200… · nível NH500… · cargo numérico (1,2,…)
+//   situação: próxima LETRA livre de A a Z (série fechada)
+async function proximoCodigo(pool, tipo) {
+  const seq = {
+    setor: { tabela: "setor", col: "codigo_dp", prefixo: "SET" },
+    local: { tabela: "local_trabalho", col: "codigo_dp", prefixo: "LOCTRA" },
+    nivel: { tabela: "nivel_hierarquico", col: "codigo_nh", prefixo: "NH" },
+    cargo: { tabela: "cargo", col: "codigo_cargo_dp", prefixo: "" },
+  }[tipo];
+
+  if (tipo === "situacao") {
+    const [rows] = await pool.query("SELECT codigo_dp FROM situacao WHERE codigo_dp REGEXP '^[A-Z]$'");
+    const usadas = new Set(rows.map((r) => r.codigo_dp));
+    for (const l of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") if (!usadas.has(l)) return l;
+    return null; // todas as 26 letras em uso
+  }
+  if (!seq) return null; // regional não tem código
+
+  const [[r]] = await pool.query(
+    `SELECT MAX(CAST(SUBSTRING(${seq.col}, ?) AS UNSIGNED)) AS maior
+       FROM ${seq.tabela} WHERE ${seq.col} REGEXP ?`,
+    [seq.prefixo.length + 1, `^${seq.prefixo}[0-9]+$`]
+  );
+  const maior = Number(r.maior) || 0;
+  return `${seq.prefixo}${maior + 1}`;
+}
 
 // definição de cada catálogo: tabela, coluna de código e como desvincular
 const DEFS = {
@@ -145,23 +166,8 @@ async function validar(pool, tipo, campos, idAtual) {
     v.nome = nome; v.norm = norm;
   }
 
-  if (def.colCodigo) {
-    const bruto = (campos.codigo || "").trim().toUpperCase();
-    if (bruto) {
-      const f = FORMATOS[tipo];
-      if (!f.rx.test(bruto)) {
-        return { erro: `Código fora do padrão do banco. Formato esperado: ${f.ex}.` };
-      }
-      if (def.codigoUnico) {
-        const [dup] = await pool.query(
-          `SELECT id FROM ${def.tabela} WHERE ${def.colCodigo} = ? AND id <> ?`,
-          [bruto, idAtual || ""]
-        );
-        if (dup.length) return { erro: `O código ${bruto} já está em uso por outro registro.` };
-      }
-    }
-    v.codigo = bruto || null; // vazio = sem código
-  }
+  // código: NUNCA vem do usuário — gerado pela sequência ao criar e
+  // preservado ao salvar (ver proximoCodigo / POST).
 
   if (tipo === "nivel") {
     const ordem = parseInt(campos.ordem, 10);
@@ -212,7 +218,6 @@ export async function POST(req) {
 
       const sets = [], vals = [];
       if (def.temNome) { sets.push("nome = ?", "nome_normalizado = ?"); vals.push(valores.nome, valores.norm); }
-      if (def.colCodigo) { sets.push(`${def.colCodigo} = ?`); vals.push(valores.codigo); }
       if (tipo === "nivel") {
         sets.push("ordem = ?", "variacao = ?", "cod_var = ?", "familia = ?");
         vals.push(valores.ordem, valores.variacao, valores.codVar, valores.familia);
@@ -224,9 +229,19 @@ export async function POST(req) {
         const novoId = randomUUID();
         const cols = ["id"], marks = ["?"], ins = [novoId];
         sets.forEach((s, i) => { cols.push(s.split(" = ")[0]); marks.push("?"); ins.push(vals[i]); });
+        // código gerado pelo sistema: próximo da sequência oficial do banco
+        let codigo = null;
+        if (def.colCodigo) {
+          codigo = await proximoCodigo(pool, tipo);
+          if (tipo === "situacao" && !codigo) {
+            return erro400("Todas as 26 letras de situação já estão em uso — exclua uma antes de criar outra.");
+          }
+          cols.push(def.colCodigo); marks.push("?"); ins.push(codigo);
+        }
         await pool.query(`INSERT INTO ${def.tabela} (${cols.join(", ")}) VALUES (${marks.join(", ")})`, ins);
-        return Response.json({ ok: true, id: novoId });
+        return Response.json({ ok: true, id: novoId, codigo });
       }
+      // salvar: o código NUNCA entra no UPDATE — permanece o da criação
       await pool.query(`UPDATE ${def.tabela} SET ${sets.join(", ")} WHERE id = ?`, [...vals, id]);
       return Response.json({ ok: true });
     }

@@ -3,8 +3,9 @@
 // Catálogos da base — edição dos dados que NÃO são de colaboradores:
 // áreas, cargos, níveis hierárquicos, locais, regionais e situações.
 // Regras de integridade (a API valida de novo, esta tela orienta):
-//  * códigos seguem o formato oficial já usado no banco (SET…, LOCTRA…,
-//    NH…, letra única, cargo numérico/PJUR…) — validados antes de enviar;
+//  * códigos NÃO são editáveis: ao criar, o sistema gera o próximo da
+//    sequência oficial do banco (SET…, LOCTRA…, NH…, número, letra livre);
+//    ao editar, o código aparece fixo (somente visualização);
 //  * nomes não podem duplicar (a normalização evita "TI" vs "T.I ");
 //  * excluir desfaz os vínculos de forma controlada (nada fica órfão) e
 //    mostra ANTES quantas pessoas/cargos serão desvinculados.
@@ -16,21 +17,13 @@ import {
   SearchIcon, AlertIcon, CheckIcon, PlusIcon, PencilIcon, CloseIcon,
 } from "@/components/icons";
 
-const RX = {
-  setor: /^SET\d+$/,
-  local: /^LOCTRA\d+$/,
-  nivel: /^NH\d+$/,
-  situacao: /^[A-Z]$/,
-  cargo: /^(\d+|PJUR\d+)$/,
-};
-
 const ABAS = [
   {
     key: "setores", tipo: "setor", label: "Áreas", singular: "área",
     usoTxt: (n) => `${n} colab.`,
     campos: [
       { k: "nome", label: "Nome", obrig: true },
-      { k: "codigo", label: "Código DP", rx: RX.setor, ex: "SET300" },
+      { k: "codigo", label: "Código DP", auto: true },
     ],
     avisoExcluir: (it) =>
       `${it.usos} colaborador(es) ficarão sem área (saem do organograma até serem realocados). ` +
@@ -41,7 +34,7 @@ const ABAS = [
     usoTxt: (n) => `${n} colab.`,
     campos: [
       { k: "nome", label: "Nome", obrig: true },
-      { k: "codigo", label: "Cód. Cargo", rx: RX.cargo, ex: "89 ou PJUR101" },
+      { k: "codigo", label: "Cód. Cargo", auto: true },
       { k: "nivelId", label: "Nível hierárquico", tipo: "nivel" },
     ],
     avisoExcluir: (it) => `${it.usos} colaborador(es) ficarão com "cargo a definir".`,
@@ -51,7 +44,7 @@ const ABAS = [
     usoTxt: (n) => `${n} cargo(s)`,
     campos: [
       { k: "familia", label: "Família", ex: "Gerente" },
-      { k: "codigo", label: "Código NH", rx: RX.nivel, ex: "NH505" },
+      { k: "codigo", label: "Código NH", auto: true },
       { k: "ordem", label: "Ordem (1 = topo)", tipo: "int", obrig: true },
       { k: "variacao", label: "Variação", ex: "A" },
       { k: "codVar", label: "Cód. variação", ex: "6.A" },
@@ -64,7 +57,7 @@ const ABAS = [
     usoTxt: (n) => `${n} colab.`,
     campos: [
       { k: "nome", label: "Nome", obrig: true },
-      { k: "codigo", label: "Código DP", rx: RX.local, ex: "LOCTRA204" },
+      { k: "codigo", label: "Código DP", auto: true },
     ],
     avisoExcluir: (it) => `${it.usos} colaborador(es) ficarão sem local de trabalho.`,
   },
@@ -79,7 +72,7 @@ const ABAS = [
     usoTxt: (n) => `${n} colab.`,
     campos: [
       { k: "nome", label: "Nome", obrig: true },
-      { k: "codigo", label: "Código (letra)", rx: RX.situacao, ex: "A" },
+      { k: "codigo", label: "Código (letra)", auto: true },
       { k: "ativoArvore", label: "Aparece na árvore do organograma", tipo: "bool" },
     ],
     avisoExcluir: (it) =>
@@ -326,6 +319,20 @@ function FormCampos({ aba, form, setForm, niveis }) {
   return (
     <div className="ct-form">
       {aba.campos.map((c) => {
+        // código sequencial: o sistema gera na criação e ele fica imutável
+        if (c.auto) {
+          return (
+            <label key={c.k} className="fld">
+              <span>{c.label} <em className="ct-ex">· automático</em></span>
+              <input
+                value={form[c.k] ?? ""}
+                placeholder="gerado pelo sistema ao criar"
+                disabled
+                title="O código segue a sequência oficial do banco e não é editável."
+              />
+            </label>
+          );
+        }
         if (c.tipo === "bool") {
           return (
             <label key={c.k} className="ct-check">
