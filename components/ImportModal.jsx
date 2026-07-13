@@ -267,7 +267,7 @@ export default function ImportModal({ onClose }) {
                 <div className="imp-areas-novas">
                   <b><AlertIcon size={13} /> Áreas novas que serão criadas ({previa.areasNovas.length}):</b>
                   <span>{previa.areasNovas.join(" · ")}</span>
-                  <em>Confira se não é um nome digitado diferente de uma área existente. Se for, cancele, importe, e depois use "Gerenciar áreas" para mesclar — ou corrija o Excel antes.</em>
+                  <em>Confira se não é um nome digitado diferente de uma área existente. Se for, corrija o Excel antes de gravar — o nome oficial das áreas se edita em Catálogos → Áreas.</em>
                 </div>
               )}
 

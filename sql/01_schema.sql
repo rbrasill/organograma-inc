@@ -21,9 +21,7 @@
 --   * Tipo JSON é suportado (5.7.8+) — usado em payloads de importação/solicitação.
 --   * ENUM, FK (InnoDB), DATETIME DEFAULT/ON UPDATE CURRENT_TIMESTAMP: OK no 5.7.
 --
--- Ordem de criação respeita as dependências de FK. A dependência circular
--- setor <-> colaborador é resolvida criando a coluna setor.lider_colaborador_id
--- sem FK e adicionando a FK via ALTER TABLE após criar colaborador.
+-- Ordem de criação respeita as dependências de FK.
 -- ============================================================================
 
 SET NAMES utf8mb4;
@@ -68,21 +66,17 @@ CREATE TABLE IF NOT EXISTS cargo (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 1.3 setor (área)
---   setor_pai_id: preparado para hierarquia de áreas (não usado ainda).
---   lider_colaborador_id: FK adicionada por ALTER após criar colaborador.
+--   (setor_pai_id e lider_colaborador_id foram removidos junto com o menu
+--   "Gerenciar áreas": nunca saíram de NULL — a liderança real da área é
+--   derivada da cadeia colaborador.lider_id.)
 CREATE TABLE IF NOT EXISTS setor (
   id                    CHAR(36)     NOT NULL,
   codigo_dp             VARCHAR(20)  NULL,   -- código oficial do DP (SET…)
   nome                  VARCHAR(160) NOT NULL,
   nome_normalizado      VARCHAR(160) NOT NULL,
-  setor_pai_id          CHAR(36)     NULL,
-  lider_colaborador_id  CHAR(36)     NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_setor_norm (nome_normalizado),
-  UNIQUE KEY uq_setor_dp (codigo_dp),
-  KEY ix_setor_pai (setor_pai_id),
-  KEY ix_setor_lider (lider_colaborador_id),
-  CONSTRAINT fk_setor_pai FOREIGN KEY (setor_pai_id) REFERENCES setor (id)
+  UNIQUE KEY uq_setor_dp (codigo_dp)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 1.4 local_trabalho
@@ -163,11 +157,6 @@ CREATE TABLE IF NOT EXISTS colaborador (
   CONSTRAINT fk_colab_situacao FOREIGN KEY (situacao_id) REFERENCES situacao (id),
   CONSTRAINT fk_colab_lider    FOREIGN KEY (lider_id)    REFERENCES colaborador (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- resolve a dependência circular setor <-> colaborador
-ALTER TABLE setor
-  ADD CONSTRAINT fk_setor_lider
-  FOREIGN KEY (lider_colaborador_id) REFERENCES colaborador (id);
 
 -- ---------------------------------------------------------------------------
 -- BLOCO 3 — Histórico e auditoria
@@ -272,6 +261,24 @@ CREATE TABLE IF NOT EXISTS usuario_perfil (
   PRIMARY KEY (id),
   UNIQUE KEY uq_perfil_colab (colaborador_id, perfil),
   CONSTRAINT fk_perfil_colab FOREIGN KEY (colaborador_id) REFERENCES colaborador (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4.5 auth_codigo — códigos de login por e-mail (passwordless).
+--   Guarda SÓ o hash SHA-256 do código (nunca o código em claro).
+--   Uso único (usado_em), expiração (expira_em) e limite de tentativas —
+--   a validação marca usado_em num UPDATE condicional atômico.
+--   Sem FK com colaborador: o vínculo é pelo e-mail (anti-enumeração:
+--   a API responde igual para e-mail cadastrado ou não).
+CREATE TABLE IF NOT EXISTS auth_codigo (
+  id           CHAR(36)     NOT NULL,
+  email        VARCHAR(200) NOT NULL,
+  codigo_hash  CHAR(64)     NOT NULL,
+  criado_em    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expira_em    DATETIME     NOT NULL,
+  usado_em     DATETIME     NULL,
+  tentativas   TINYINT      NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  KEY ix_auth_email (email, criado_em)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

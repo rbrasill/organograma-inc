@@ -236,7 +236,6 @@ export async function POST(req) {
       await conn.query("DELETE FROM log_auditoria WHERE entidade = 'colaborador' AND registro_id = ?", [id]);
       await conn.query("UPDATE log_auditoria SET autor_id = NULL WHERE autor_id = ?", [id]);
       await conn.query("DELETE FROM usuario_perfil WHERE colaborador_id = ?", [id]);
-      await conn.query("UPDATE setor SET lider_colaborador_id = NULL WHERE lider_colaborador_id = ?", [id]);
       await conn.query("DELETE FROM colaborador WHERE id = ?", [id]);
       await conn.commit();
       return Response.json({ ok: true, reapontados: sub.affectedRows || 0 });
