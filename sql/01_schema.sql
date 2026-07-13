@@ -263,6 +263,24 @@ CREATE TABLE IF NOT EXISTS usuario_perfil (
   CONSTRAINT fk_perfil_colab FOREIGN KEY (colaborador_id) REFERENCES colaborador (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 4.5 auth_codigo — códigos de login por e-mail (passwordless).
+--   Guarda SÓ o hash SHA-256 do código (nunca o código em claro).
+--   Uso único (usado_em), expiração (expira_em) e limite de tentativas —
+--   a validação marca usado_em num UPDATE condicional atômico.
+--   Sem FK com colaborador: o vínculo é pelo e-mail (anti-enumeração:
+--   a API responde igual para e-mail cadastrado ou não).
+CREATE TABLE IF NOT EXISTS auth_codigo (
+  id           CHAR(36)     NOT NULL,
+  email        VARCHAR(200) NOT NULL,
+  codigo_hash  CHAR(64)     NOT NULL,
+  criado_em    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expira_em    DATETIME     NOT NULL,
+  usado_em     DATETIME     NULL,
+  tentativas   TINYINT      NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  KEY ix_auth_email (email, criado_em)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================================================
