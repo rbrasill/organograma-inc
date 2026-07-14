@@ -61,22 +61,10 @@ Só trocar os campos para ler deste novo step:
 
 - **Para**: `{{steps.validar_envio.$return_value.email}}`
 - **Assunto**: `Seu código de acesso ao Portal INC: {{steps.validar_envio.$return_value.codigo}}`
-- **Corpo** (texto sugerido):
-
-```
-Olá, {{steps.validar_envio.$return_value.nome}}!
-
-Seu código de acesso ao Portal de Organograma INC é:
-
-    {{steps.validar_envio.$return_value.codigo}}
-
-Este código é válido por 10 minutos e só pode ser usado uma vez.
-
-Não compartilhe este código com ninguém — a equipe INC nunca vai
-pedi-lo por telefone ou mensagem.
-
-Se você não tentou acessar a plataforma, ignore este e-mail.
-```
+- **Corpo**: cole o HTML de **`email-codigo.html`** (nas cores da INC, código
+  em destaque). Ative a opção de corpo **HTML** na ação de e-mail. As
+  variáveis `{{steps.validar_envio.$return_value.nome|codigo}}` já estão no
+  HTML e o Pipedream as substitui no envio.
 
 ### 4. `return_response` (Node.js)
 Cole o conteúdo de `step-return-response.js`: responde

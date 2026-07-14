@@ -1,0 +1,73 @@
+<!-- E-mail do código de acesso (Portal Organograma INC).
+     Cole este HTML no corpo do step "send_email_code" do Pipedream.
+     As variáveis {{steps...}} são preenchidas pelo Pipedream em tempo de envio:
+       {{steps.validar_envio.$return_value.nome}}   → primeiro nome do colaborador
+       {{steps.validar_envio.$return_value.codigo}} → código de 6 dígitos
+     (se você NÃO renomeou o step, troque "validar_envio" por "generate_code").
+     HTML seguro para e-mail: tabelas + estilos inline, sem SVG/flex. -->
+<html lang="pt" xmlns="http://www.w3.org/1999/xhtml">
+<body width="100%" bgcolor="#F0F2F3" style="margin: 0;">
+<center style="width: 100%; background: #F0F2F3; text-align: left;">
+  <div style="margin: auto; max-width: 600px; padding: 50px 0 30px 0;">
+
+    <!-- Cabeçalho da marca (cor sólida com fallback + gradiente INC) -->
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" width="100%" style="max-width: 600px;">
+      <tr>
+        <td bgcolor="#F16021" style="background: #F16021; background: linear-gradient(105deg,#F16021 0%,#e0559a 45%,#9f60b7 72%,#40419f 100%); border-radius: 6px 6px 0 0; padding: 30px 35px; text-align: center;">
+          <div style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: #ffffff; line-height: 1;">Organograma INC</div>
+          <div style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; color: rgba(255,255,255,0.9); margin-top: 6px;">INC Empreendimentos</div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Corpo -->
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" width="100%" style="border-bottom: 1px solid #D6D6D6; max-width: 600px; table-layout: fixed;">
+      <tr>
+        <td style="background-color: #FFFFFF; color: #334155; font-family: 'Helvetica Neue', Roboto, Arial, sans-serif; font-size: 15px; line-height: 155%; padding: 34px 35px 30px 35px;">
+
+          <div style="font-size: 16px; color: #0f172a;">Olá, {{steps.validar_envio.$return_value.nome}}!</div>
+
+          <p style="margin: 18px 0 0 0;">Use o código abaixo para acessar o Portal de Organograma da INC:</p>
+
+          <!-- Código em destaque -->
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" width="100%" style="margin: 26px 0;">
+            <tr>
+              <td align="center" bgcolor="#FFF2EC" style="background-color: #FFF2EC; border: 1px solid #FFD9C6; border-radius: 14px; padding: 26px 20px;">
+                <div style="font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #F16021;">Seu código de acesso</div>
+                <div style="font-family: 'Courier New', Consolas, monospace; font-size: 44px; font-weight: 700; letter-spacing: 0.20em; color: #40419f; margin-top: 12px; line-height: 1;">{{steps.validar_envio.$return_value.codigo}}</div>
+              </td>
+            </tr>
+          </table>
+
+          <p style="margin: 0 0 0 0; font-size: 14px; color: #475569;">
+            Este código é válido por <b>10 minutos</b> e só pode ser usado uma vez.
+          </p>
+
+          <!-- Avisos de segurança -->
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 22px 0 0 0;">
+            <tr>
+              <td style="border-top: 1px solid #EEF1F7; padding-top: 18px; font-size: 13px; line-height: 150%; color: #64748b;">
+                🔒 <b>Não compartilhe este código com ninguém.</b> A equipe INC nunca vai pedi-lo por telefone, e-mail ou mensagem.<br><br>
+                Se você não tentou acessar o portal, pode ignorar este e-mail com segurança — nenhuma ação é necessária.
+              </td>
+            </tr>
+          </table>
+
+        </td>
+      </tr>
+    </table>
+
+    <!-- Rodapé -->
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" width="100%" style="max-width: 600px;">
+      <tr>
+        <td style="padding: 18px 35px; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 11px; color: #94a3b8;">
+          Portal de Organograma · INC Empreendimentos<br>
+          Mensagem automática — por favor, não responda.
+        </td>
+      </tr>
+    </table>
+
+  </div>
+</center>
+</body>
+</html>
