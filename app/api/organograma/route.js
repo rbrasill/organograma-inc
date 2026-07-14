@@ -47,6 +47,7 @@ export async function GET(req) {
     const [rows] = await pool.query(
       `SELECT c.id, c.codigo_dp, c.nome, c.email, c.tipo_contratacao,
               cg.nome AS cargo, lt.nome AS local, st.nome AS situacao,
+              reg.nome AS regional,
               COALESCE(nhp.ordem, nh.ordem) AS nivel_ordem,
               COALESCE(nhp.familia, nh.familia) AS familia,
               COALESCE(nhp.cor, nh.cor) AS cor,
@@ -57,6 +58,7 @@ export async function GET(req) {
          LEFT JOIN nivel_hierarquico nhp ON nhp.id = c.nivel_id
          LEFT JOIN local_trabalho lt   ON lt.id = c.local_id
          LEFT JOIN situacao st         ON st.id = c.situacao_id
+         LEFT JOIN regional reg        ON reg.id = c.regional_id
          LEFT JOIN colaborador ld      ON ld.id = c.lider_id
         WHERE c.ativo = 1
           AND c.setor_id = ?
@@ -114,6 +116,7 @@ export async function GET(req) {
       lider: r.lider_codigo || r.lider_uuid || null,
       liderNome: r.lider_nome || "",
       pj: r.tipo_contratacao === "PJ",
+      regional: r.regional || "",
       nivelOrdem: r.nivel_ordem || null,
       familia: r.familia || "",
       cor: r.cor || null,

@@ -37,6 +37,8 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
   const [buscando, setBuscando] = useState(false);
   const [pickerAberto, setPickerAberto] = useState(false);
   const [aviso, setAviso] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erroSalvar, setErroSalvar] = useState("");
   const [erroSol, setErroSol] = useState("");
   const [confirmandoSol, setConfirmandoSol] = useState(false); // painel de confirmação da solicitação
   const [obs, setObs] = useState("");
@@ -128,9 +130,24 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
     setLiderBusca("");
   }
 
-  function salvar() {
-    onSalvar({ ...pessoa, nome, local, email });
-    onClose();
+  // Salvar (edição direta): PERSISTE no banco nome, e-mail e local — os
+  // campos estruturais seguem por "Solicitar ajuste".
+  async function salvar() {
+    setSalvando(true); setErroSalvar("");
+    try {
+      const r = await fetch("/api/colaboradores/edicao-direta", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matricula: pessoa.id, nome, email, local }),
+      });
+      const txt = await r.text();
+      let j; try { j = JSON.parse(txt); } catch { j = { ok: false, erro: `Servidor respondeu ${r.status}.` }; }
+      if (!j.ok) { setErroSalvar(j.erro || "Falha ao salvar."); setSalvando(false); return; }
+      onSalvar({ ...pessoa, nome, local, email });
+      onClose();
+    } catch (e) {
+      setErroSalvar(`Falha ao salvar: ${e.message}`);
+      setSalvando(false);
+    }
   }
 
   // diferenças estruturais (cargo, área, líder) vs. o estado atual
@@ -208,7 +225,7 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
           </div>
         )}
 
-        {/* situação: somente leitura, gerenciada pelo RH/DP */}
+        {/* somente leitura (gerenciados pelo RH/DP ou pela importação) */}
         <div className="ro-grid" style={{ marginBottom: 12 }}>
           <div className="ro">
             <span>Situação</span>
@@ -217,6 +234,14 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
           <div className="ro">
             <span>Matrícula</span>
             <b>{pessoa.id}</b>
+          </div>
+          <div className="ro">
+            <span>Regional</span>
+            <b>{pessoa.regional || "—"}</b>
+          </div>
+          <div className="ro">
+            <span>Tipo de contratação</span>
+            <b>{pessoa.pj ? "PJ (prestador)" : "CLT"}</b>
           </div>
         </div>
 
@@ -314,6 +339,7 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
           </div>
         </div>
 
+        {erroSalvar && <div className="modal-alert"><AlertIcon size={16} /><div><b>{erroSalvar}</b></div></div>}
         {erroSol && <div className="modal-alert"><AlertIcon size={16} /><div><b>{erroSol}</b></div></div>}
         {aviso && <div className="modal-note">{aviso}</div>}
 
@@ -360,7 +386,9 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
               </button>
               <div style={{ flex: 1 }} />
               <button className="btn btn-neutral" onClick={onClose}>{solEnviada ? "Fechar" : "Cancelar"}</button>
-              <button className="btn btn-primary" onClick={salvar}>Salvar</button>
+              <button className="btn btn-primary" onClick={salvar} disabled={salvando}>
+                {salvando ? "Salvando..." : "Salvar"}
+              </button>
             </>
           )}
         </div>
