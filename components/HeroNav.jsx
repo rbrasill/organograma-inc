@@ -25,11 +25,33 @@ const ITENS = [
 export default function HeroNav({ titulo, subtitulo, atual, onAcao }) {
   const [pendentes, setPendentes] = useState(0);
   const [sessao, setSessao] = useState(null); // { autenticado, nome } quando a auth está ligada
+
+  // badge de solicitações pendentes com POLLING: consulta a cada 45s para o
+  // número se atualizar "ao vivo" (sem recarregar a página) quando um
+  // colaborador envia um ajuste. Aba em segundo plano não consulta; ao
+  // voltar para a aba, atualiza na hora.
   useEffect(() => {
-    fetch("/api/solicitacoes?status=pendente")
-      .then((r) => r.json())
-      .then((j) => { if (j.ok) setPendentes(j.pendentes); })
-      .catch(() => {});
+    let ativo = true;
+    async function carregarPendentes() {
+      if (document.visibilityState === "hidden") return;
+      try {
+        const r = await fetch("/api/solicitacoes?contagem=1"); // modo leve: só o COUNT
+        const j = await r.json();
+        if (ativo && j.ok) setPendentes(j.pendentes);
+      } catch {}
+    }
+    carregarPendentes();
+    const t = setInterval(carregarPendentes, 45000);
+    const aoVoltar = () => { if (document.visibilityState === "visible") carregarPendentes(); };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => {
+      ativo = false;
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", aoVoltar);
+    };
+  }, []);
+
+  useEffect(() => {
     fetch("/api/auth/sessao")
       .then((r) => r.json())
       .then((j) => { if (j.ok && j.ativa && j.autenticado) setSessao(j); })

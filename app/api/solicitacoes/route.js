@@ -27,7 +27,18 @@ function parsePayload(p) {
 export async function GET(req) {
   try {
     const pool = getPool();
-    const status = new URL(req.url).searchParams.get("status");
+    const url = new URL(req.url);
+
+    // modo leve para o POLLING do badge (HeroNav, a cada 45s por aba):
+    // só o COUNT de pendentes, sem a listagem com JOINs
+    if (url.searchParams.get("contagem") === "1") {
+      const [[cont]] = await pool.query(
+        "SELECT COUNT(*) AS pendentes FROM solicitacao_ajuste WHERE status = 'pendente'"
+      );
+      return Response.json({ ok: true, pendentes: Number(cont.pendentes) });
+    }
+
+    const status = url.searchParams.get("status");
     const cond = status && status !== "todas" ? "WHERE s.status = ?" : "";
     const args = status && status !== "todas" ? [status] : [];
     const [rows] = await pool.query(
