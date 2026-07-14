@@ -658,7 +658,11 @@ export default function OrgChart() {
               <span className="lg-vazio">aparecem conforme a área aberta</span>
             ) : (
               legenda.map((lv) => (
-                <span className="chip" key={lv.familia}><i style={{ background: lv.cor }} />{lv.familia}</span>
+                <span className="chip" key={lv.familia}>
+                  <i style={{ background: lv.cor }} />
+                  {lv.familia}
+                  {lv.ordem < 900 && <b className="lg-nivel">N{lv.ordem}</b>}
+                </span>
               ))
             )}
             <span className="chip" style={{ marginLeft: "auto" }}>
