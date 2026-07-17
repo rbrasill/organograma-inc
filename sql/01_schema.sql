@@ -137,6 +137,8 @@ CREATE TABLE IF NOT EXISTS colaborador (
   -- CPF de QUALQUER colaborador (CLT ou PJ) — opcional; vem da importação
   -- por Excel ou do cadastro PJ. Na tela de edição é somente visualização.
   cpf               VARCHAR(20)      NULL,
+  data_nascimento   DATE             NULL,   -- vem do extrato do DP (mig. 07)
+  data_admissao     DATE             NULL,   -- vem do extrato do DP (mig. 07)
   telefone          VARCHAR(30)      NULL,   -- contato (hoje usado no cadastro PJ)
   cargo_id          CHAR(36)         NULL,
   nivel_id          CHAR(36)         NULL,   -- variação de nível DA PESSOA (sobrepõe o padrão do cargo; NULL = herda)
