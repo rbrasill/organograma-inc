@@ -23,7 +23,12 @@ import {
 const ABAS = [
   {
     key: "setores", tipo: "setor", label: "Áreas", singular: "área",
-    usoTxt: (n) => `${n} colab.`,
+    colunas: [
+      { titulo: "Área", tipo: "nome", k: "nome" },
+      { titulo: "Local", tipo: "local" },
+      { titulo: "Código", tipo: "codigo" },
+      { titulo: "Colaboradores", k: "usos" },
+    ],
     campos: [
       { k: "nome", label: "Nome", obrig: true },
       { k: "codigo", label: "Código DP", auto: true },
@@ -35,7 +40,12 @@ const ABAS = [
   },
   {
     key: "cargos", tipo: "cargo", label: "Cargos", singular: "cargo",
-    usoTxt: (n) => `${n} colab.`,
+    colunas: [
+      { titulo: "Cargo", tipo: "nome", k: "nome" },
+      { titulo: "Nível hierárquico", tipo: "nivel" },
+      { titulo: "Código", tipo: "codigo" },
+      { titulo: "Colaboradores", k: "usos" },
+    ],
     campos: [
       { k: "nome", label: "Nome", obrig: true },
       { k: "codigo", label: "Cód. Cargo", auto: true },
@@ -45,7 +55,13 @@ const ABAS = [
   },
   {
     key: "niveis", tipo: "nivel", label: "Níveis", singular: "nível",
-    usoTxt: (n) => `${n} cargo(s)`,
+    colunas: [
+      { titulo: "Família", tipo: "nome", valor: (i) => i.familia || "—" },
+      { titulo: "Ordem", k: "ordem" },
+      { titulo: "Variação", valor: (i) => i.variacao || "—" },
+      { titulo: "Código", tipo: "codigo" },
+      { titulo: "Cargos", k: "usos" },
+    ],
     campos: [
       { k: "familia", label: "Família", ex: "Gerente" },
       { k: "codigo", label: "Código NH", auto: true },
@@ -58,7 +74,11 @@ const ABAS = [
   },
   {
     key: "locais", tipo: "local", label: "Locais", singular: "local",
-    usoTxt: (n) => `${n} colab.`,
+    colunas: [
+      { titulo: "Local", tipo: "nome", k: "nome" },
+      { titulo: "Código", tipo: "codigo" },
+      { titulo: "Colaboradores", k: "usos" },
+    ],
     campos: [
       { k: "nome", label: "Nome", obrig: true },
       { k: "codigo", label: "Código (nº da obra no DP)", auto: true, dica: "vem do extrato do DP na importação" },
@@ -67,13 +87,21 @@ const ABAS = [
   },
   {
     key: "regionais", tipo: "regional", label: "Regionais", singular: "regional",
-    usoTxt: (n) => `${n} colab.`,
+    colunas: [
+      { titulo: "Regional", tipo: "nome", k: "nome" },
+      { titulo: "Colaboradores", k: "usos" },
+    ],
     campos: [{ k: "nome", label: "Nome", obrig: true }],
     avisoExcluir: (it) => `${it.usos} colaborador(es) ficarão sem regional.`,
   },
   {
     key: "situacoes", tipo: "situacao", label: "Situações", singular: "situação",
-    usoTxt: (n) => `${n} colab.`,
+    colunas: [
+      { titulo: "Situação", tipo: "nome", k: "nome" },
+      { titulo: "Código", tipo: "codigo" },
+      { titulo: "Na árvore", tipo: "arvore" },
+      { titulo: "Colaboradores", k: "usos" },
+    ],
     campos: [
       { k: "nome", label: "Nome", obrig: true },
       { k: "codigo", label: "Código (letra)", auto: true },
@@ -198,6 +226,17 @@ export default function CatalogosView() {
     return n ? `${n.codigo || "?"} · ${n.familia || "—"} (ordem ${n.ordem})` : "";
   }, [dados]);
 
+  // renderiza uma célula da tabela conforme o tipo da coluna
+  const vazio = (t) => <span className="ct-vazio">{t}</span>;
+  function celula(col, item) {
+    if (col.tipo === "codigo") return item.codigo ? <code className="ct-code">{item.codigo}</code> : vazio("—");
+    if (col.tipo === "nivel") { const t = nomeNivel(item.nivelId); return t || vazio("— sem nível —"); }
+    if (col.tipo === "local") return item.localNome || vazio("— sem local —");
+    if (col.tipo === "arvore")
+      return <span className={`ct-pill ${item.ativoArvore ? "on" : "off"}`}>{item.ativoArvore ? "Visível" : "Oculta"}</span>;
+    return col.valor ? col.valor(item) : item[col.k];
+  }
+
   function tituloDe(item) {
     if (abaKey === "niveis") return item.familia || item.codigo || "Sem família";
     return item.nome;
@@ -242,28 +281,28 @@ export default function CatalogosView() {
         {carregando && <div className="ar-vazio">Carregando catálogos...</div>}
         {!carregando && itens.length === 0 && <div className="ar-vazio">Nenhum registro encontrado.</div>}
 
-        {/* Áreas: formato de tabela (local · código · colaboradores · editar) */}
-        {!carregando && itens.length > 0 && abaKey === "setores" && (
+        {/* todos os catálogos em formato de tabela — colunas por aba */}
+        {!carregando && itens.length > 0 && (
           <div className="ct-tabela-wrap">
             <table className="ct-tabela">
               <thead>
                 <tr>
-                  <th>Área</th><th>Local</th><th>Código</th><th>Colaboradores</th><th className="ct-col-acoes">Ações</th>
+                  {aba.colunas.map((c) => <th key={c.titulo}>{c.titulo}</th>)}
+                  <th className="ct-col-acoes">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {itens.map((item) => (
                   <tr key={item.id}>
-                    <td className="td-nome">{item.nome}</td>
-                    <td>{item.localNome || <span className="ct-vazio">— sem local —</span>}</td>
-                    <td>{item.codigo ? <code className="ct-code">{item.codigo}</code> : <span className="ct-vazio">—</span>}</td>
-                    <td>{item.usos}</td>
+                    {aba.colunas.map((c, i) => (
+                      <td key={i} className={c.tipo === "nome" ? "td-nome" : ""}>{celula(c, item)}</td>
+                    ))}
                     <td className="ct-col-acoes">
                       <div className="ct-acoes-cel">
                         <button className="btn btn-primary btn-sm" onClick={() => abrirEdicao(item)}>
                           <span className="ic"><PencilIcon size={12} /></span> Editar
                         </button>
-                        <button className="ar-btn ct-del" title="Excluir área"
+                        <button className="ar-btn ct-del" title={`Excluir ${aba.singular}`}
                           onClick={() => { setConfirmandoDel(item.id); setEditando(null); setMsg(""); }}>
                           <CloseIcon size={12} />
                         </button>
@@ -273,36 +312,6 @@ export default function CatalogosView() {
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-
-        {/* Demais catálogos: lista em cartões */}
-        {!carregando && itens.length > 0 && abaKey !== "setores" && (
-          <div className="ar-lista">
-            {itens.map((item) => (
-              <div key={item.id} className="ar-item">
-                <div className="ar-info">
-                  <span className="ar-nome">
-                    {tituloDe(item)}
-                    {item.codigo && <code className="ct-code">{item.codigo}</code>}
-                    {abaKey === "niveis" && <span className="ct-meta">ordem {item.ordem}{item.variacao ? ` · var. ${item.variacao}` : ""}</span>}
-                    {abaKey === "cargos" && item.nivelId && <span className="ct-meta">{nomeNivel(item.nivelId)}</span>}
-                    {abaKey === "situacoes" && (
-                      <span className={`ct-meta ${item.ativoArvore ? "ok" : "off"}`}>
-                        {item.ativoArvore ? "visível no organograma" : "oculta do organograma"}
-                      </span>
-                    )}
-                  </span>
-                  <span className="ar-count">{aba.usoTxt(item.usos)}</span>
-                </div>
-                <div className="ar-acoes">
-                  <button className="ar-btn" onClick={() => abrirEdicao(item)}><PencilIcon size={12} /> Editar</button>
-                  <button className="ar-btn ct-del" onClick={() => { setConfirmandoDel(item.id); setEditando(null); setMsg(""); }}>
-                    <CloseIcon size={12} /> Excluir
-                  </button>
-                </div>
-              </div>
-            ))}
           </div>
         )}
       </div>
