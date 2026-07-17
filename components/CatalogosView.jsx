@@ -2,9 +2,12 @@
 
 // Catálogos da base — edição dos dados que NÃO são de colaboradores:
 // áreas, cargos, níveis hierárquicos, locais, regionais e situações.
+// Criar/editar acontece num MODAL (popup) — a lista fica só para consulta,
+// busca e ações.
 // Regras de integridade (a API valida de novo, esta tela orienta):
 //  * códigos NÃO são editáveis: ao criar, o sistema gera o próximo da
-//    sequência oficial do banco (SET…, LOCTRA…, NH…, número, letra livre);
+//    sequência oficial do banco (SET…, NH…, número, letra livre); o código
+//    de LOCAL é o número da obra no DP e entra pela importação (mig. 06);
 //    ao editar, o código aparece fixo (somente visualização);
 //  * nomes não podem duplicar (a normalização evita "TI" vs "T.I ");
 //  * excluir desfaz os vínculos de forma controlada (nada fica órfão) e
@@ -58,7 +61,7 @@ const ABAS = [
     usoTxt: (n) => `${n} colab.`,
     campos: [
       { k: "nome", label: "Nome", obrig: true },
-      { k: "codigo", label: "Código DP", auto: true },
+      { k: "codigo", label: "Código (nº da obra no DP)", auto: true, dica: "vem do extrato do DP na importação" },
     ],
     avisoExcluir: (it) => `${it.usos} colaborador(es) ficarão sem local de trabalho.`,
   },
@@ -200,6 +203,10 @@ export default function CatalogosView() {
     return item.nome;
   }
 
+  // item aberto no modal de edição (null quando criando)
+  const itemEditando =
+    editando && editando !== "novo" ? (dados?.[abaKey] || []).find((i) => i.id === editando) : null;
+
   return (
     <div className="sol-shell">
       <HeroNav
@@ -230,27 +237,12 @@ export default function CatalogosView() {
         {erroGeral && <div className="modal-alert"><AlertIcon size={16} /><div><b>{erroGeral}</b></div></div>}
         {msg && <div className="modal-note sol-ok"><b>{msg}</b></div>}
 
-        {/* formulário de NOVO registro */}
-        {editando === "novo" && (
-          <div className="ar-item ct-editando">
-            <b className="ct-form-titulo">Nova {aba.singular}</b>
-            <FormCampos aba={aba} form={form} setForm={setForm} niveis={dados?.niveis || []} locais={dados?.locais || []} />
-            {erroForm && <div className="ct-erro"><AlertIcon size={13} /> {erroForm}</div>}
-            <div className="ar-acoes" style={{ justifyContent: "flex-end" }}>
-              <button className="btn btn-neutral btn-sm" onClick={fecharForm}>Cancelar</button>
-              <button className="btn btn-primary btn-sm" disabled={agindo} onClick={salvar}>
-                <span className="ic"><CheckIcon /></span>{agindo ? "Salvando..." : "Criar"}
-              </button>
-            </div>
-          </div>
-        )}
-
         <div className="ar-lista">
           {carregando && <div className="ar-vazio">Carregando catálogos...</div>}
           {!carregando && itens.length === 0 && <div className="ar-vazio">Nenhum registro encontrado.</div>}
 
           {itens.map((item) => (
-            <div key={item.id} className={`ar-item ${editando === item.id ? "ct-editando" : ""}`}>
+            <div key={item.id} className="ar-item">
               <div className="ar-info">
                 <span className="ar-nome">
                   {tituloDe(item)}
@@ -267,26 +259,13 @@ export default function CatalogosView() {
                 <span className="ar-count">{aba.usoTxt(item.usos)}</span>
               </div>
 
-              {editando !== item.id && confirmandoDel !== item.id && (
+              {confirmandoDel !== item.id && (
                 <div className="ar-acoes">
                   <button className="ar-btn" onClick={() => abrirEdicao(item)}><PencilIcon size={12} /> Editar</button>
                   <button className="ar-btn ct-del" onClick={() => { setConfirmandoDel(item.id); setEditando(null); setMsg(""); }}>
                     <CloseIcon size={12} /> Excluir
                   </button>
                 </div>
-              )}
-
-              {editando === item.id && (
-                <>
-                  <FormCampos aba={aba} form={form} setForm={setForm} niveis={dados?.niveis || []} locais={dados?.locais || []} />
-                  {erroForm && <div className="ct-erro"><AlertIcon size={13} /> {erroForm}</div>}
-                  <div className="ar-acoes" style={{ justifyContent: "flex-end" }}>
-                    <button className="btn btn-neutral btn-sm" onClick={fecharForm}>Cancelar</button>
-                    <button className="btn btn-primary btn-sm" disabled={agindo} onClick={salvar}>
-                      <span className="ic"><CheckIcon /></span>{agindo ? "Salvando..." : "Salvar"}
-                    </button>
-                  </div>
-                </>
               )}
 
               {confirmandoDel === item.id && (
@@ -311,6 +290,33 @@ export default function CatalogosView() {
           ))}
         </div>
       </div>
+
+      {/* modal de criação/edição — a lista fica só para consulta e ações */}
+      {editando && (
+        <div className="modal-overlay" onMouseDown={fecharForm}>
+          <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+            <button className="modal-x" onClick={fecharForm} aria-label="Fechar"><CloseIcon size={16} /></button>
+            <div className="modal-head">
+              <div className="imp-ico">{editando === "novo" ? <PlusIcon size={22} /> : <PencilIcon size={22} />}</div>
+              <div>
+                <h3>{editando === "novo" ? `Nova ${aba.singular}` : `Editar ${aba.singular}`}</h3>
+                <p>{editando === "novo" ? `Catálogos → ${aba.label}` : tituloDe(itemEditando || {})}</p>
+              </div>
+            </div>
+            <div className="modal-body">
+              <FormCampos aba={aba} form={form} setForm={setForm} niveis={dados?.niveis || []} locais={dados?.locais || []} />
+              {erroForm && <div className="ct-erro"><AlertIcon size={13} /> {erroForm}</div>}
+            </div>
+            <div className="modal-foot" style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button className="btn btn-neutral" onClick={fecharForm}>Cancelar</button>
+              <button className="btn btn-primary" disabled={agindo} onClick={salvar}>
+                <span className="ic"><CheckIcon /></span>
+                {agindo ? "Salvando..." : editando === "novo" ? "Criar" : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -328,9 +334,9 @@ function FormCampos({ aba, form, setForm, niveis, locais }) {
               <span>{c.label} <em className="ct-ex">· automático</em></span>
               <input
                 value={form[c.k] ?? ""}
-                placeholder="gerado pelo sistema ao criar"
+                placeholder={c.dica || "gerado pelo sistema ao criar"}
                 disabled
-                title="O código segue a sequência oficial do banco e não é editável."
+                title={c.dica || "O código segue a sequência oficial do banco e não é editável."}
               />
             </label>
           );

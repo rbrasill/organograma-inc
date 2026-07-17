@@ -32,12 +32,15 @@ const erro400 = (m) => Response.json({ ok: false, erro: m }, { status: 400 });
 
 // gera o PRÓXIMO código da sequência oficial de cada catálogo, lendo o maior
 // já usado no banco. O usuário não digita código — o sistema segue a série.
-//   setor SET300… · local LOCTRA200… · nível NH500… · cargo numérico (1,2,…)
+//   setor SET300… · nível NH500… · cargo numérico (1,2,…)
 //   situação: próxima LETRA livre de A a Z (série fechada)
+//   local: SEM geração — o código é o número oficial da obra no DP (mig. 06)
+//   e entra pela importação; local criado à mão fica sem código até a obra
+//   aparecer no extrato (inventar número aqui poderia colidir com o DP).
 async function proximoCodigo(pool, tipo) {
+  if (tipo === "local") return null;
   const seq = {
     setor: { tabela: "setor", col: "codigo_dp", prefixo: "SET" },
-    local: { tabela: "local_trabalho", col: "codigo_dp", prefixo: "LOCTRA" },
     nivel: { tabela: "nivel_hierarquico", col: "codigo_nh", prefixo: "NH" },
     cargo: { tabela: "cargo", col: "codigo_cargo_dp", prefixo: "" },
   }[tipo];
