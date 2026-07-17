@@ -10,6 +10,7 @@
 import { randomUUID } from "crypto";
 import { getPool } from "@/lib/db";
 import { normalizar } from "@/data/ti";
+import { localComCodigo } from "@/lib/importacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Vercel: dá folga p/ os lotes maiores
@@ -90,6 +91,18 @@ export async function POST(req) {
       const regNome = new Map(regRows.map((r) => [r.nome_normalizado, r.id]));
       const nhId = new Map(nhRows.map((r) => [r.codigo_nh, r.id]));
 
+      // local no formato novo do DP ("219 - Emotion III"): deriva o código
+      // LOCTRA do prefixo (219 ↔ LOCTRA219) quando a coluna de código não
+      // veio, e guarda o nome limpo para o caso de o local ser criado aqui.
+      // (o cliente já faz isso na prévia; refazer no servidor protege
+      // chamadas diretas à API)
+      for (const l of linhas) {
+        if (!l.codigoLocal) {
+          const p = localComCodigo(l.local);
+          if (p) { l.codigoLocal = p.codigo; l.localNomeLimpo = p.nome; }
+        }
+      }
+
       // pré-cria lookups ausentes no lote (raro na v2, tudo já semeado).
       // situacao é lista fechada: nunca cria.
       const novoSet = [], novoLoc = [], novoCar = [], novoReg = [];
@@ -102,7 +115,9 @@ export async function POST(req) {
         }
         const loNorm = l.local ? normalizar(l.local) : null;
         if ((l.codigoLocal || loNorm) && !(l.codigoLocal && locCod.has(l.codigoLocal)) && !(loNorm && locNome.has(loNorm))) {
-          const id = randomUUID(); const nome = (l.local || l.codigoLocal).trim(); const norm = loNorm || normalizar(nome);
+          const id = randomUUID();
+          const nome = (l.localNomeLimpo || l.local || l.codigoLocal).trim(); // sem o prefixo numérico
+          const norm = normalizar(nome);
           novoLoc.push([id, l.codigoLocal || null, nome, norm]);
           if (l.codigoLocal) locCod.set(l.codigoLocal, id); locNome.set(norm, id);
         }

@@ -74,9 +74,13 @@ CREATE TABLE IF NOT EXISTS setor (
   codigo_dp             VARCHAR(20)  NULL,   -- código oficial do DP (SET…)
   nome                  VARCHAR(160) NOT NULL,
   nome_normalizado      VARCHAR(160) NOT NULL,
+  -- local (obra/unidade) a que o setor pertence — usado pela importação para
+  -- detectar setor desatualizado quando o colaborador muda de local (mig. 05)
+  local_id              CHAR(36)     NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_setor_norm (nome_normalizado),
-  UNIQUE KEY uq_setor_dp (codigo_dp)
+  UNIQUE KEY uq_setor_dp (codigo_dp),
+  KEY ix_setor_local (local_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 1.4 local_trabalho
@@ -89,6 +93,10 @@ CREATE TABLE IF NOT EXISTS local_trabalho (
   UNIQUE KEY uq_local_norm (nome_normalizado),
   UNIQUE KEY uq_local_dp (codigo_dp)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- FK do vínculo setor→local (declarada aqui porque setor é criado antes)
+ALTER TABLE setor
+  ADD CONSTRAINT fk_setor_local FOREIGN KEY (local_id) REFERENCES local_trabalho (id);
 
 -- 1.5 regional
 CREATE TABLE IF NOT EXISTS regional (

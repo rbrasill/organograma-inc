@@ -24,6 +24,7 @@ const ABAS = [
     campos: [
       { k: "nome", label: "Nome", obrig: true },
       { k: "codigo", label: "Código DP", auto: true },
+      { k: "localId", label: "Local vinculado (obra/unidade)", tipo: "local" },
     ],
     avisoExcluir: (it) =>
       `${it.usos} colaborador(es) ficarão sem área (saem do organograma até serem realocados). ` +
@@ -233,7 +234,7 @@ export default function CatalogosView() {
         {editando === "novo" && (
           <div className="ar-item ct-editando">
             <b className="ct-form-titulo">Nova {aba.singular}</b>
-            <FormCampos aba={aba} form={form} setForm={setForm} niveis={dados?.niveis || []} />
+            <FormCampos aba={aba} form={form} setForm={setForm} niveis={dados?.niveis || []} locais={dados?.locais || []} />
             {erroForm && <div className="ct-erro"><AlertIcon size={13} /> {erroForm}</div>}
             <div className="ar-acoes" style={{ justifyContent: "flex-end" }}>
               <button className="btn btn-neutral btn-sm" onClick={fecharForm}>Cancelar</button>
@@ -256,6 +257,7 @@ export default function CatalogosView() {
                   {item.codigo && <code className="ct-code">{item.codigo}</code>}
                   {abaKey === "niveis" && <span className="ct-meta">ordem {item.ordem}{item.variacao ? ` · var. ${item.variacao}` : ""}</span>}
                   {abaKey === "cargos" && item.nivelId && <span className="ct-meta">{nomeNivel(item.nivelId)}</span>}
+                  {abaKey === "setores" && item.localNome && <span className="ct-meta">local: {item.localNome}</span>}
                   {abaKey === "situacoes" && (
                     <span className={`ct-meta ${item.ativoArvore ? "ok" : "off"}`}>
                       {item.ativoArvore ? "visível no organograma" : "oculta do organograma"}
@@ -276,7 +278,7 @@ export default function CatalogosView() {
 
               {editando === item.id && (
                 <>
-                  <FormCampos aba={aba} form={form} setForm={setForm} niveis={dados?.niveis || []} />
+                  <FormCampos aba={aba} form={form} setForm={setForm} niveis={dados?.niveis || []} locais={dados?.locais || []} />
                   {erroForm && <div className="ct-erro"><AlertIcon size={13} /> {erroForm}</div>}
                   <div className="ar-acoes" style={{ justifyContent: "flex-end" }}>
                     <button className="btn btn-neutral btn-sm" onClick={fecharForm}>Cancelar</button>
@@ -314,7 +316,7 @@ export default function CatalogosView() {
 }
 
 // campos do formulário, montados a partir da configuração da aba
-function FormCampos({ aba, form, setForm, niveis }) {
+function FormCampos({ aba, form, setForm, niveis, locais }) {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   return (
     <div className="ct-form">
@@ -338,6 +340,21 @@ function FormCampos({ aba, form, setForm, niveis }) {
             <label key={c.k} className="ct-check">
               <input type="checkbox" checked={!!form[c.k]} onChange={(e) => set(c.k, e.target.checked ? 1 : 0)} />
               {c.label}
+            </label>
+          );
+        }
+        if (c.tipo === "local") {
+          return (
+            <label key={c.k} className="fld">
+              <span>{c.label}</span>
+              <select value={form[c.k] || ""} onChange={(e) => set(c.k, e.target.value)}>
+                <option value="">— sem local vinculado —</option>
+                {(locais || []).map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.codigo ? `${l.codigo} · ` : ""}{l.nome}
+                  </option>
+                ))}
+              </select>
             </label>
           );
         }

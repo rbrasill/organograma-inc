@@ -84,6 +84,7 @@ const DEFS = {
     desvincular: [
       "UPDATE colaborador SET local_id = NULL WHERE local_id = ?",
       "UPDATE colaborador_historico SET local_id = NULL WHERE local_id = ?",
+      "UPDATE setor SET local_id = NULL WHERE local_id = ?", // vínculo setor→local (mig. 05)
     ],
   },
   regional: {
@@ -103,9 +104,12 @@ export async function GET() {
   try {
     const pool = getPool();
     const [setores] = await pool.query(
-      `SELECT s.id, s.codigo_dp AS codigo, s.nome, COUNT(c.id) AS usos
-         FROM setor s LEFT JOIN colaborador c ON c.setor_id = s.id AND c.ativo = 1
-        GROUP BY s.id, s.codigo_dp, s.nome ORDER BY s.nome`
+      `SELECT s.id, s.codigo_dp AS codigo, s.nome, s.local_id AS localId, l.nome AS localNome,
+              COUNT(c.id) AS usos
+         FROM setor s
+         LEFT JOIN local_trabalho l ON l.id = s.local_id
+         LEFT JOIN colaborador c ON c.setor_id = s.id AND c.ativo = 1
+        GROUP BY s.id, s.codigo_dp, s.nome, s.local_id, l.nome ORDER BY s.nome`
     );
     const [cargos] = await pool.query(
       `SELECT cg.id, cg.codigo_cargo_dp AS codigo, cg.nome, cg.nivel_id AS nivelId, COUNT(c.id) AS usos
@@ -187,6 +191,16 @@ async function validar(pool, tipo, campos, idAtual) {
     v.nivelId = nivelId;
   }
 
+  if (tipo === "setor") {
+    // vínculo setor→local (obra/unidade) — opcional; NULL = sem local fixo
+    let localId = campos.localId || null;
+    if (localId) {
+      const [[l]] = await pool.query("SELECT id FROM local_trabalho WHERE id = ?", [localId]);
+      if (!l) return { erro: "Local de trabalho selecionado não existe." };
+    }
+    v.localId = localId;
+  }
+
   if (tipo === "situacao") {
     v.ativoArvore = campos.ativoArvore ? 1 : 0;
   }
@@ -221,6 +235,7 @@ export async function POST(req) {
         vals.push(valores.ordem, valores.variacao, valores.codVar, valores.familia);
       }
       if (tipo === "cargo") { sets.push("nivel_id = ?"); vals.push(valores.nivelId); }
+      if (tipo === "setor") { sets.push("local_id = ?"); vals.push(valores.localId); }
       if (tipo === "situacao") { sets.push("ativo_na_arvore = ?"); vals.push(valores.ativoArvore); }
 
       if (criando) {
