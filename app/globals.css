@@ -486,8 +486,23 @@ main{padding:20px 24px 24px}
 .ct-erro{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#b42318;background:#fdeaea;border:1px solid #f6cfcb;border-radius:9px;padding:8px 11px;margin-top:10px}
 .ct-del:hover{color:#b42318;background:#fdeaea}
 .ct-del-confirma{margin-top:10px;display:flex;flex-direction:column;gap:9px}
+.ct-del-txt{font-size:13px;line-height:1.55;color:var(--ink-soft)}
 .ct-editando{border-color:var(--inc);box-shadow:0 0 0 3px rgba(255,83,15,.08)}
 .ct-form-titulo{font-size:13.5px;font-weight:800;color:var(--brand)}
+
+/* tabela de Áreas (local · código · colaboradores · editar) */
+.ct-tabela-wrap{border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.ct-tabela{width:100%;border-collapse:collapse;font-size:13px}
+.ct-tabela th{background:#eef1f8;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--brand);font-weight:800;padding:13px 16px;white-space:nowrap}
+.ct-tabela td{padding:11px 16px;color:var(--ink-soft);border-top:1px solid var(--line-soft);vertical-align:middle}
+.ct-tabela tbody tr:nth-child(even){background:#f6f8fc}
+.ct-tabela tbody tr:hover{background:#eef2fb}
+.ct-tabela .td-nome{font-weight:700;color:var(--ink)}
+.ct-tabela .ct-code{margin-left:0}
+.ct-vazio{color:var(--ink-faint);font-size:12px}
+.ct-col-acoes{text-align:right;width:1%}
+.ct-acoes-cel{display:inline-flex;align-items:center;gap:7px}
+.ct-acoes-cel .btn-primary{background:linear-gradient(145deg,#274a86,#1f3864);box-shadow:0 8px 18px -12px rgba(31,56,100,.9)}
 
 /* ===== líderes por área (agrupado por diretor) ===== */
 /* paleta de tons leves e discretos (atribuídos pelo nome da área/diretor) */

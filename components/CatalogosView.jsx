@@ -206,6 +206,8 @@ export default function CatalogosView() {
   // item aberto no modal de edição (null quando criando)
   const itemEditando =
     editando && editando !== "novo" ? (dados?.[abaKey] || []).find((i) => i.id === editando) : null;
+  // item aguardando confirmação de exclusão
+  const itemDel = confirmandoDel ? (dados?.[abaKey] || []).find((i) => i.id === confirmandoDel) : null;
 
   return (
     <div className="sol-shell">
@@ -237,58 +239,72 @@ export default function CatalogosView() {
         {erroGeral && <div className="modal-alert"><AlertIcon size={16} /><div><b>{erroGeral}</b></div></div>}
         {msg && <div className="modal-note sol-ok"><b>{msg}</b></div>}
 
-        <div className="ar-lista">
-          {carregando && <div className="ar-vazio">Carregando catálogos...</div>}
-          {!carregando && itens.length === 0 && <div className="ar-vazio">Nenhum registro encontrado.</div>}
+        {carregando && <div className="ar-vazio">Carregando catálogos...</div>}
+        {!carregando && itens.length === 0 && <div className="ar-vazio">Nenhum registro encontrado.</div>}
 
-          {itens.map((item) => (
-            <div key={item.id} className="ar-item">
-              <div className="ar-info">
-                <span className="ar-nome">
-                  {tituloDe(item)}
-                  {item.codigo && <code className="ct-code">{item.codigo}</code>}
-                  {abaKey === "niveis" && <span className="ct-meta">ordem {item.ordem}{item.variacao ? ` · var. ${item.variacao}` : ""}</span>}
-                  {abaKey === "cargos" && item.nivelId && <span className="ct-meta">{nomeNivel(item.nivelId)}</span>}
-                  {abaKey === "setores" && item.localNome && <span className="ct-meta">local: {item.localNome}</span>}
-                  {abaKey === "situacoes" && (
-                    <span className={`ct-meta ${item.ativoArvore ? "ok" : "off"}`}>
-                      {item.ativoArvore ? "visível no organograma" : "oculta do organograma"}
-                    </span>
-                  )}
-                </span>
-                <span className="ar-count">{aba.usoTxt(item.usos)}</span>
-              </div>
+        {/* Áreas: formato de tabela (local · código · colaboradores · editar) */}
+        {!carregando && itens.length > 0 && abaKey === "setores" && (
+          <div className="ct-tabela-wrap">
+            <table className="ct-tabela">
+              <thead>
+                <tr>
+                  <th>Área</th><th>Local</th><th>Código</th><th>Colaboradores</th><th className="ct-col-acoes">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itens.map((item) => (
+                  <tr key={item.id}>
+                    <td className="td-nome">{item.nome}</td>
+                    <td>{item.localNome || <span className="ct-vazio">— sem local —</span>}</td>
+                    <td>{item.codigo ? <code className="ct-code">{item.codigo}</code> : <span className="ct-vazio">—</span>}</td>
+                    <td>{item.usos}</td>
+                    <td className="ct-col-acoes">
+                      <div className="ct-acoes-cel">
+                        <button className="btn btn-primary btn-sm" onClick={() => abrirEdicao(item)}>
+                          <span className="ic"><PencilIcon size={12} /></span> Editar
+                        </button>
+                        <button className="ar-btn ct-del" title="Excluir área"
+                          onClick={() => { setConfirmandoDel(item.id); setEditando(null); setMsg(""); }}>
+                          <CloseIcon size={12} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-              {confirmandoDel !== item.id && (
+        {/* Demais catálogos: lista em cartões */}
+        {!carregando && itens.length > 0 && abaKey !== "setores" && (
+          <div className="ar-lista">
+            {itens.map((item) => (
+              <div key={item.id} className="ar-item">
+                <div className="ar-info">
+                  <span className="ar-nome">
+                    {tituloDe(item)}
+                    {item.codigo && <code className="ct-code">{item.codigo}</code>}
+                    {abaKey === "niveis" && <span className="ct-meta">ordem {item.ordem}{item.variacao ? ` · var. ${item.variacao}` : ""}</span>}
+                    {abaKey === "cargos" && item.nivelId && <span className="ct-meta">{nomeNivel(item.nivelId)}</span>}
+                    {abaKey === "situacoes" && (
+                      <span className={`ct-meta ${item.ativoArvore ? "ok" : "off"}`}>
+                        {item.ativoArvore ? "visível no organograma" : "oculta do organograma"}
+                      </span>
+                    )}
+                  </span>
+                  <span className="ar-count">{aba.usoTxt(item.usos)}</span>
+                </div>
                 <div className="ar-acoes">
                   <button className="ar-btn" onClick={() => abrirEdicao(item)}><PencilIcon size={12} /> Editar</button>
                   <button className="ar-btn ct-del" onClick={() => { setConfirmandoDel(item.id); setEditando(null); setMsg(""); }}>
                     <CloseIcon size={12} /> Excluir
                   </button>
                 </div>
-              )}
-
-              {confirmandoDel === item.id && (
-                <div className="ct-del-confirma">
-                  <div className="ar-merge-aviso">
-                    <AlertIcon size={14} />
-                    <span>
-                      <b>Excluir &quot;{tituloDe(item)}&quot;?</b>{" "}
-                      {item.usos > 0 ? aba.avisoExcluir(item) : "Nenhum vínculo será afetado."}{" "}
-                      Os colaboradores em si <b>não são apagados</b> — só o vínculo com este registro.
-                    </span>
-                  </div>
-                  <div className="ar-acoes" style={{ justifyContent: "flex-end" }}>
-                    <button className="btn btn-neutral btn-sm" onClick={() => setConfirmandoDel(null)}>Cancelar</button>
-                    <button className="btn btn-ghost btn-sm" disabled={agindo} onClick={() => excluir(item)}>
-                      {agindo ? "Excluindo..." : `Excluir${item.usos > 0 ? ` e desvincular ${item.usos}` : ""}`}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* modal de criação/edição — a lista fica só para consulta e ações */}
@@ -312,6 +328,34 @@ export default function CatalogosView() {
               <button className="btn btn-primary" disabled={agindo} onClick={salvar}>
                 <span className="ic"><CheckIcon /></span>
                 {agindo ? "Salvando..." : editando === "novo" ? "Criar" : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* modal de confirmação de exclusão */}
+      {itemDel && (
+        <div className="modal-overlay" onMouseDown={() => setConfirmandoDel(null)}>
+          <div className="modal" style={{ maxWidth: 460 }} onMouseDown={(e) => e.stopPropagation()}>
+            <button className="modal-x" onClick={() => setConfirmandoDel(null)} aria-label="Fechar"><CloseIcon size={16} /></button>
+            <div className="modal-head">
+              <div className="imp-ico" style={{ background: "#fbdcd9", color: "#b42318" }}><AlertIcon size={20} /></div>
+              <div>
+                <h3>Excluir {aba.singular}?</h3>
+                <p>{tituloDe(itemDel)}</p>
+              </div>
+            </div>
+            <div className="modal-body">
+              <p className="ct-del-txt">
+                {itemDel.usos > 0 ? aba.avisoExcluir(itemDel) : "Nenhum vínculo será afetado."}{" "}
+                Os colaboradores em si <b>não são apagados</b> — só o vínculo com este registro.
+              </p>
+            </div>
+            <div className="modal-foot" style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button className="btn btn-neutral" onClick={() => setConfirmandoDel(null)}>Cancelar</button>
+              <button className="btn btn-ghost" disabled={agindo} onClick={() => excluir(itemDel)}>
+                {agindo ? "Excluindo..." : `Excluir${itemDel.usos > 0 ? ` e desvincular ${itemDel.usos}` : ""}`}
               </button>
             </div>
           </div>
