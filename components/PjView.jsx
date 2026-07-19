@@ -17,6 +17,7 @@ const rotuloNivel = (n) =>
 
 const VAZIO = {
   matricula: "", nome: "", cpf: "", telefone: "", email: "",
+  dataNascimento: "", dataAdmissao: "",
   situacaoId: "", cargoId: "", nivelId: "", setorId: "", regionalId: "", localId: "",
   liderMatricula: "", liderNome: "", ativo: 1,
 };
@@ -97,6 +98,7 @@ export default function PjView() {
       setForm({
         matricula: c.codigo_dp || "", nome: c.nome || "",
         cpf: c.cpf || "", telefone: c.telefone || "", email: c.email || "",
+        dataNascimento: c.data_nascimento || "", dataAdmissao: c.data_admissao || "",
         situacaoId: c.situacao_id || "", cargoId: c.cargo_id || "",
         nivelId: c.nivel_pessoal_id || c.cargo_nivel_id || "",
         setorId: c.setor_id || "", regionalId: c.regional_id || "", localId: c.local_id || "",
@@ -253,6 +255,12 @@ export default function PjView() {
                 </div>
                 <label className="fld"><span>E-mail</span>
                   <input value={form.email} placeholder="nome@meuinc.com.br" onChange={(e) => set("email", e.target.value)} /></label>
+                <div className="col-grid2">
+                  <label className="fld"><span>Data de nascimento</span>
+                    <input type="date" value={form.dataNascimento} onChange={(e) => set("dataNascimento", e.target.value)} /></label>
+                  <label className="fld"><span>Data de admissão <em className="ct-ex">· quando foi contratado</em></span>
+                    <input type="date" value={form.dataAdmissao} onChange={(e) => set("dataAdmissao", e.target.value)} /></label>
+                </div>
                 <div className="col-grid2">
                   <label className="fld"><span>Situação</span>
                     <select value={form.situacaoId} onChange={(e) => set("situacaoId", e.target.value)}>
