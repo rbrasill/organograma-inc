@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { nivelDe, NIVEIS, inconsistenciasDe, CARGOS, AREAS, LOCAIS, normalizar } from "@/data/ti";
 import { NIVEL as PERFIL } from "@/lib/perfis";
-import { UserIcon, CloseIcon, AlertIcon, SearchIcon, ChevronIcon, CheckIcon } from "@/components/icons";
+import { dataBR, idade, tempoDeEmpresa } from "@/lib/datas";
+import { UserIcon, CloseIcon, AlertIcon, SearchIcon, ChevronIcon, CheckIcon, CakeIcon } from "@/components/icons";
 
 // Edição direta (aplica na hora, só ADMIN): nome, e-mail, local.
 // Estruturais (exigem "Solicitar ajuste", perfil COLABORADOR+): cargo, área, líder.
@@ -246,6 +247,24 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
             <span>Tipo de contratação</span>
             <b>{pessoa.pj ? "PJ (prestador)" : "CLT"}</b>
           </div>
+          {pessoa.nascimento && (
+            <div className="ro">
+              <span>Aniversário</span>
+              <b className="ro-cake">
+                <CakeIcon size={16} /> {dataBR(pessoa.nascimento)}
+                {idade(pessoa.nascimento) != null && <em className="ro-sub"> · {idade(pessoa.nascimento)} anos</em>}
+              </b>
+            </div>
+          )}
+          {pessoa.admissao && (
+            <div className="ro">
+              <span>Admissão</span>
+              <b>
+                {dataBR(pessoa.admissao)}
+                {tempoDeEmpresa(pessoa.admissao) && <em className="ro-sub"> · {tempoDeEmpresa(pessoa.admissao)} de empresa</em>}
+              </b>
+            </div>
+          )}
         </div>
 
         <div className="modal-section">

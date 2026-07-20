@@ -46,6 +46,8 @@ export async function GET(req) {
 
     const [rows] = await pool.query(
       `SELECT c.id, c.codigo_dp, c.nome, c.email, c.tipo_contratacao,
+              DATE_FORMAT(c.data_nascimento, '%Y-%m-%d') AS data_nascimento,
+              DATE_FORMAT(c.data_admissao, '%Y-%m-%d') AS data_admissao,
               cg.nome AS cargo, lt.nome AS local, st.nome AS situacao,
               reg.nome AS regional,
               COALESCE(nhp.ordem, nh.ordem) AS nivel_ordem,
@@ -117,6 +119,8 @@ export async function GET(req) {
       liderNome: r.lider_nome || "",
       pj: r.tipo_contratacao === "PJ",
       regional: r.regional || "",
+      nascimento: r.data_nascimento || "",
+      admissao: r.data_admissao || "",
       nivelOrdem: r.nivel_ordem || null,
       familia: r.familia || "",
       cor: r.cor || null,

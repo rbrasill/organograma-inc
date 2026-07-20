@@ -243,6 +243,8 @@ main{padding:20px 24px 24px}
 .ro{background:#f7f9fd;border:1px solid var(--line-soft);border-radius:11px;padding:9px 12px}
 .ro span{display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint)}
 .ro b{font-size:13px;color:var(--ink);font-weight:600}
+.ro-cake{display:inline-flex;align-items:center;gap:6px}
+.ro-sub{font-style:normal;font-weight:600;color:var(--ink-soft)}
 .modal-note{background:#eefaf0;border:1px solid #c7ebd0;color:#177245;border-radius:11px;padding:10px 13px;font-size:12.5px;font-weight:600;margin-bottom:14px}
 .modal-foot{display:flex;align-items:center;gap:9px}
 
