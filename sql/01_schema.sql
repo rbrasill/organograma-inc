@@ -263,13 +263,16 @@ CREATE TABLE IF NOT EXISTS solicitacao_ajuste (
   CONSTRAINT fk_sol_aprov FOREIGN KEY (aprovador_id)        REFERENCES colaborador (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 4.4 usuario_perfil — perfis de acesso (sem colaboradores em geral)
+-- 4.4 usuario_perfil — perfis de acesso (mig. 09).
+--   Sem linha = perfil PADRÃO (só visualiza o organograma; não aparece na
+--   tela /acessos). Um perfil por colaborador. A mudança vale a partir do
+--   PRÓXIMO login (o perfil é claim da sessão).
 CREATE TABLE IF NOT EXISTS usuario_perfil (
   id             CHAR(36) NOT NULL,
   colaborador_id CHAR(36) NOT NULL,
-  perfil         ENUM('LIDER','RH','DIRETORIA') NOT NULL,
+  perfil         ENUM('COLABORADOR','GESTOR','ADMIN') NOT NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_perfil_colab (colaborador_id, perfil),
+  UNIQUE KEY uq_perfil_colab (colaborador_id),
   CONSTRAINT fk_perfil_colab FOREIGN KEY (colaborador_id) REFERENCES colaborador (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

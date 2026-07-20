@@ -11,6 +11,8 @@ import { randomUUID } from "crypto";
 import { getPool } from "@/lib/db";
 import { normalizar } from "@/data/ti";
 import { localComCodigo, normalizarCodigoLocal, cargoNormalizado } from "@/lib/importacao";
+import { exigirNivel } from "@/lib/permissoes";
+import { NIVEL } from "@/lib/perfis";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Vercel: dá folga p/ os lotes maiores
@@ -21,6 +23,8 @@ function erroResposta(e) {
 }
 
 export async function GET() {
+  const bloqueio = exigirNivel(NIVEL.ADMIN);
+  if (bloqueio) return bloqueio;
   try {
     const pool = getPool();
     // só CLT: PJ nunca entra na comparação nem na lista de arquivamento
@@ -48,6 +52,8 @@ async function bulkInsert(conn, sql, linhas, tamanho = 500) {
 }
 
 export async function POST(req) {
+  const bloqueio = exigirNivel(NIVEL.ADMIN);
+  if (bloqueio) return bloqueio;
   let conn;
   try {
     const body = await req.json();

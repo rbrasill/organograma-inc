@@ -7,11 +7,15 @@
 
 import { getPool } from "@/lib/db";
 import { normalizar } from "@/data/ti";
+import { exigirNivel } from "@/lib/permissoes";
+import { NIVEL } from "@/lib/perfis";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(req) {
+  const bloqueio = exigirNivel(NIVEL.ADMIN);
+  if (bloqueio) return bloqueio;
   try {
     const pool = getPool();
     const body = await req.json().catch(() => ({}));

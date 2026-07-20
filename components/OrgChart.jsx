@@ -11,6 +11,8 @@ import {
 import PersonModal from "@/components/PersonModal";
 import ImportModal from "@/components/ImportModal";
 import LiderAreaModal from "@/components/LiderAreaModal";
+import useSessao from "@/components/useSessao";
+import { NIVEL } from "@/lib/perfis";
 
 // nível visual (cor da faixa/legenda): mapeia a ORDEM do banco (1 = topo,
 // 18 = base, base v2) para as 6 faixas de cor, num gradiente por hierarquia.
@@ -193,6 +195,7 @@ function TreeNode({ node, rest, deg = 0 }) {
 }
 
 export default function OrgChart() {
+  const sessao = useSessao(); // perfil da sessão: esconde ações acima do nível
   // dados vindos do banco (API) — o mock data/ti.js não é mais a fonte
   const [pessoas, setPessoas] = useState([]);
   const [setores, setSetores] = useState([]);
@@ -482,7 +485,8 @@ export default function OrgChart() {
   // os demais abrem o modal normal do colaborador
   const rest = {
     byId, collapsedSet, onToggle, highlightId,
-    onOpen: (n) => (n.externo ? setLiderAreaAlvo(n) : setOpenId(n.id)),
+    // nó externo (líder de outra área) abre a TROCA de líder — só ADMIN
+    onOpen: (n) => (n.externo ? (sessao.nivel >= NIVEL.ADMIN && setLiderAreaAlvo(n)) : setOpenId(n.id)),
   };
   const aberta = openId ? byId[openId] : null;
 
@@ -583,16 +587,20 @@ export default function OrgChart() {
               )}
             </div>
             <div className="actions">
-              <button
-                className="btn btn-ghost btn-baixar"
-                onClick={baixarImagem}
-                disabled={baixando || roots.length === 0}
-                title="Baixar o organograma completo da área em imagem de alta resolução"
-              >
-                <span className="ic"><DownloadIcon /></span>
-                {baixando ? "Gerando imagem..." : "Baixar imagem"}
-              </button>
-              <button className="btn btn-primary"><span className="ic"><CheckIcon /></span>Validar organograma</button>
+              {sessao.nivel >= NIVEL.COLABORADOR && (
+                <button
+                  className="btn btn-ghost btn-baixar"
+                  onClick={baixarImagem}
+                  disabled={baixando || roots.length === 0}
+                  title="Baixar o organograma completo da área em imagem de alta resolução"
+                >
+                  <span className="ic"><DownloadIcon /></span>
+                  {baixando ? "Gerando imagem..." : "Baixar imagem"}
+                </button>
+              )}
+              {sessao.nivel >= NIVEL.ADMIN && (
+                <button className="btn btn-primary"><span className="ic"><CheckIcon /></span>Validar organograma</button>
+              )}
               <button
                 className={`icon-btn ${fullscreen ? "on" : ""}`}
                 onClick={() => setFullscreen((v) => !v)}
@@ -695,6 +703,7 @@ export default function OrgChart() {
           byId={byId}
           listas={listas}
           areaAtual={nomeArea}
+          nivelAcesso={sessao.nivel}
           onClose={() => setOpenId(null)}
           onSalvar={(atual) => setPessoas((prev) => prev.map((p) => (p.id === atual.id ? { ...p, ...atual } : p)))}
         />

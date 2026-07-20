@@ -80,13 +80,16 @@ export async function POST(req) {
       return Response.json({ ok: false, erro: ERRO_GENERICO }, { status: 401 });
     }
 
-    // perfil (fase 2 dos níveis de acesso): RH > DIRETORIA > LIDER > COLABORADOR
-    const [perfis] = await pool.query(
-      "SELECT perfil FROM usuario_perfil WHERE colaborador_id = ?",
+    // perfil: um por colaborador em usuario_perfil; sem linha = PADRÃO (só
+    // visualização). Rede de segurança anti-lock-out: CPFs listados na env
+    // ACESSO_ADMIN_CPFS entram como ADMIN mesmo sem linha na tabela.
+    const [[linhaPerfil]] = await pool.query(
+      "SELECT perfil FROM usuario_perfil WHERE colaborador_id = ? LIMIT 1",
       [colab.id]
     );
-    const ordem = ["RH", "DIRETORIA", "LIDER"];
-    const perfil = ordem.find((p) => perfis.some((r) => r.perfil === p)) || "COLABORADOR";
+    const adminsEnv = (process.env.ACESSO_ADMIN_CPFS || "")
+      .split(",").map((s) => s.replace(/\D/g, "")).filter(Boolean);
+    const perfil = adminsEnv.includes(cpf) ? "ADMIN" : (linhaPerfil?.perfil || "PADRAO");
 
     const token = assinarSessao({
       colaboradorId: colab.id,

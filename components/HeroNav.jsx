@@ -2,35 +2,43 @@
 
 // Cabeçalho global do portal ("hero"): gradiente da marca + logo oficial INC
 // + menu de funcionalidades em cards — o MESMO em todas as páginas.
+// Os cards aparecem conforme o PERFIL da sessão (nivelMin de cada item):
+//   PADRÃO vê só o organograma (nenhum card) · COLABORADOR ganha Líderes ·
+//   GESTOR ganha Exportar · ADMIN vê tudo (+ Acessos).
 // O card da página atual fica destacado. Na home, Importar abre o modal
 // direto (via onAcao); nas demais páginas esse card navega para a home com
 // ?abrir=importar, que abre o modal ao chegar.
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import useSessao from "@/components/useSessao";
+import { NIVEL } from "@/lib/perfis";
 import {
-  InboxIcon, PencilIcon, UserIcon, UploadIcon, DownloadIcon, GridIcon, BriefcaseIcon, LogoutIcon,
+  InboxIcon, PencilIcon, UserIcon, UploadIcon, DownloadIcon, GridIcon, BriefcaseIcon, LogoutIcon, KeyIcon,
 } from "@/components/icons";
 
 const ITENS = [
-  { key: "solicitacoes", href: "/solicitacoes", label: "Solicitações", Icon: InboxIcon, title: "Solicitações de ajuste recebidas pelo RH" },
-  { key: "colaboradores", href: "/colaboradores", label: "Editar colaboradores", Icon: PencilIcon, title: "Localizar e editar dados de colaboradores" },
-  { key: "pj", href: "/pj", label: "Colaboradores PJ", Icon: BriefcaseIcon, title: "Gerenciar prestadores PJ: cadastrar, editar, status, excluir" },
-  { key: "lideres", href: "/lideres", label: "Líderes por área", Icon: UserIcon, title: "Diretores, áreas e troca de líder" },
-  { key: "importar", href: "/?abrir=importar", label: "Importar Excel", Icon: UploadIcon, title: "Subir a base oficial por Excel", acao: true },
-  { key: "exportar", href: "/api/colaboradores/exportar", label: "Exportar base", Icon: DownloadIcon, title: "Baixar toda a base em Excel", download: true },
-  { key: "catalogos", href: "/catalogos", label: "Catálogos", Icon: GridIcon, title: "Cargos, níveis, locais, regionais e situações" },
+  { key: "solicitacoes", href: "/solicitacoes", label: "Solicitações", Icon: InboxIcon, title: "Solicitações de ajuste recebidas pelo RH", nivelMin: NIVEL.ADMIN },
+  { key: "colaboradores", href: "/colaboradores", label: "Editar colaboradores", Icon: PencilIcon, title: "Localizar e editar dados de colaboradores", nivelMin: NIVEL.ADMIN },
+  { key: "pj", href: "/pj", label: "Colaboradores PJ", Icon: BriefcaseIcon, title: "Gerenciar prestadores PJ: cadastrar, editar, status, excluir", nivelMin: NIVEL.ADMIN },
+  { key: "lideres", href: "/lideres", label: "Líderes por área", Icon: UserIcon, title: "Diretores, áreas e líderes por área", nivelMin: NIVEL.COLABORADOR },
+  { key: "importar", href: "/?abrir=importar", label: "Importar Excel", Icon: UploadIcon, title: "Subir a base oficial por Excel", acao: true, nivelMin: NIVEL.ADMIN },
+  { key: "exportar", href: "/api/colaboradores/exportar", label: "Exportar base", Icon: DownloadIcon, title: "Baixar toda a base em Excel", download: true, nivelMin: NIVEL.GESTOR },
+  { key: "catalogos", href: "/catalogos", label: "Catálogos", Icon: GridIcon, title: "Cargos, níveis, locais, regionais e situações", nivelMin: NIVEL.ADMIN },
+  { key: "acessos", href: "/acessos", label: "Acessos", Icon: KeyIcon, title: "Gerenciar usuários e perfis de acesso", nivelMin: NIVEL.ADMIN },
 ];
 
 export default function HeroNav({ titulo, subtitulo, atual, onAcao }) {
   const [pendentes, setPendentes] = useState(0);
-  const [sessao, setSessao] = useState(null); // { autenticado, nome } quando a auth está ligada
+  const sessao = useSessao();
+  const nivel = sessao.pronto ? sessao.nivel : null; // null = ainda carregando
 
-  // badge de solicitações pendentes com POLLING: consulta a cada 45s para o
-  // número se atualizar "ao vivo" (sem recarregar a página) quando um
-  // colaborador envia um ajuste. Aba em segundo plano não consulta; ao
-  // voltar para a aba, atualiza na hora.
+  // badge de solicitações pendentes com POLLING (só para ADMIN): consulta a
+  // cada 45s para o número se atualizar "ao vivo" (sem recarregar a página)
+  // quando um colaborador envia um ajuste. Aba em segundo plano não consulta;
+  // ao voltar para a aba, atualiza na hora.
   useEffect(() => {
+    if (nivel === null || nivel < NIVEL.ADMIN) return;
     let ativo = true;
     async function carregarPendentes() {
       if (document.visibilityState === "hidden") return;
@@ -49,19 +57,14 @@ export default function HeroNav({ titulo, subtitulo, atual, onAcao }) {
       clearInterval(t);
       document.removeEventListener("visibilitychange", aoVoltar);
     };
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/auth/sessao")
-      .then((r) => r.json())
-      .then((j) => { if (j.ok && j.ativa && j.autenticado) setSessao(j); })
-      .catch(() => {});
-  }, []);
+  }, [nivel]);
 
   async function sair() {
     try { await fetch("/api/auth/sair", { method: "POST" }); } catch {}
     window.location.href = "/login";
   }
+
+  const itensVisiveis = nivel === null ? [] : ITENS.filter((it) => nivel >= it.nivelMin);
 
   return (
     <div className="hero">
@@ -73,7 +76,7 @@ export default function HeroNav({ titulo, subtitulo, atual, onAcao }) {
           <h1>{titulo}</h1>
           {subtitulo && <p>{subtitulo}</p>}
         </div>
-        {sessao && (
+        {sessao.ativa && sessao.autenticado && (
           <div className="hero-user">
             <span className="hu-nome" title={sessao.nome}>Olá, {(sessao.nome || "").split(" ")[0]}</span>
             <button className="hu-sair" onClick={sair} title="Encerrar a sessão">
@@ -83,7 +86,7 @@ export default function HeroNav({ titulo, subtitulo, atual, onAcao }) {
         )}
       </div>
       <div className="hero-cards">
-        {ITENS.map((it) => {
+        {itensVisiveis.map((it) => {
           const cls = `hero-card ${atual === it.key ? "on" : ""}`;
           const conteudo = (
             <>

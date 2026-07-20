@@ -22,6 +22,6 @@ export async function GET() {
     autenticado: !!sessao,
     nome: sessao?.nome || "",
     matricula: sessao?.matricula || "",
-    perfil: sessao?.perfil || "COLABORADOR", // fase 2: HeroNav esconde cards por perfil
+    perfil: sessao?.perfil || "PADRAO", // HeroNav/telas escondem ações por perfil
   });
 }

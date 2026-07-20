@@ -503,7 +503,8 @@ main{padding:20px 24px 24px}
 .ct-col-acoes{text-align:right;width:1%}
 .ct-acoes-cel{display:inline-flex;align-items:center;gap:7px}
 .ct-acoes-cel .btn-primary{background:linear-gradient(145deg,#274a86,#1f3864);box-shadow:0 8px 18px -12px rgba(31,56,100,.9)}
-.ct-pill{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:3px 10px}
+.ct-pill{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:3px 10px;margin-left:8px}
+.ac-ava{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#eef2ff;color:#3b5bdb;vertical-align:middle;margin-right:2px}
 .ct-pill.on{background:#e8f7ee;color:#177245}
 .ct-pill.off{background:#fff1d6;color:#b45309}
 

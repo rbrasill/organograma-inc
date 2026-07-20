@@ -2,13 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { nivelDe, NIVEIS, inconsistenciasDe, CARGOS, AREAS, LOCAIS, normalizar } from "@/data/ti";
+import { NIVEL as PERFIL } from "@/lib/perfis";
 import { UserIcon, CloseIcon, AlertIcon, SearchIcon, ChevronIcon, CheckIcon } from "@/components/icons";
 
-// Edição direta (líder, aplica na hora): nome, e-mail, local.
-// Estruturais (exigem "Solicitar ajuste"): cargo, área, líder.
+// Edição direta (aplica na hora, só ADMIN): nome, e-mail, local.
+// Estruturais (exigem "Solicitar ajuste", perfil COLABORADOR+): cargo, área, líder.
 // Situação: somente leitura — gerenciada pelo RH/DP, não editável aqui.
+// nivelAcesso: nível do perfil da sessão (lib/perfis) — esconde os botões
+// acima do nível; as APIs revalidam no servidor.
 // listas: dropdowns vindos do banco (via API); mock só como fallback.
-export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, onClose, onSalvar }) {
+export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, nivelAcesso = 0, onClose, onSalvar }) {
   const CARGOS_OPCOES = listas?.cargos?.length ? listas.cargos : CARGOS;
   const AREAS_OPCOES = listas?.areas?.length ? listas.areas : AREAS;
   const LOCAIS_OPCOES = listas?.locais?.length ? listas.locais : LOCAIS;
@@ -381,14 +384,18 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
             </>
           ) : (
             <>
-              <button className="btn btn-ghost" onClick={abrirConfirmacao} disabled={solEnviada}>
-                Solicitar ajuste{mudancas.length ? ` (${mudancas.length})` : ""}
-              </button>
+              {nivelAcesso >= PERFIL.COLABORADOR && (
+                <button className="btn btn-ghost" onClick={abrirConfirmacao} disabled={solEnviada}>
+                  Solicitar ajuste{mudancas.length ? ` (${mudancas.length})` : ""}
+                </button>
+              )}
               <div style={{ flex: 1 }} />
               <button className="btn btn-neutral" onClick={onClose}>{solEnviada ? "Fechar" : "Cancelar"}</button>
-              <button className="btn btn-primary" onClick={salvar} disabled={salvando}>
-                {salvando ? "Salvando..." : "Salvar"}
-              </button>
+              {nivelAcesso >= PERFIL.ADMIN && (
+                <button className="btn btn-primary" onClick={salvar} disabled={salvando}>
+                  {salvando ? "Salvando..." : "Salvar"}
+                </button>
+              )}
             </>
           )}
         </div>

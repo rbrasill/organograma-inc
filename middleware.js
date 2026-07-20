@@ -9,15 +9,30 @@
 //   * página sem sessão válida  → redireciona para /login;
 //   * API sem sessão válida     → 401 JSON (exceto /api/auth/*, que são
 //     justamente as rotas de obter a sessão);
-//   * /login com sessão válida  → redireciona para a home.
+//   * /login com sessão válida  → redireciona para a home;
+//   * PÁGINA acima do perfil    → redireciona para a home (o claim `perfil`
+//     vem da sessão; as APIs sensíveis revalidam com exigirNivel — defesa em
+//     profundidade).
 //
 // O middleware roda no runtime Edge (sem o módulo "crypto" do Node), então a
 // verificação do token usa Web Crypto — mesma assinatura HMAC-SHA256 do
 // lib/auth.js (que continua sendo usado pelas rotas /api em Node).
 
 import { NextResponse } from "next/server";
+import { NIVEL, nivelDe } from "@/lib/perfis";
 
 const COOKIE_SESSAO = "inc_sessao";
+
+// nível mínimo por página (prefixo). O que não está aqui é liberado para
+// qualquer sessão válida (organograma "/" etc.).
+const PAGINA_MINIMO = [
+  ["/acessos", NIVEL.ADMIN],
+  ["/solicitacoes", NIVEL.ADMIN],
+  ["/colaboradores", NIVEL.ADMIN],
+  ["/pj", NIVEL.ADMIN],
+  ["/catalogos", NIVEL.ADMIN],
+  ["/lideres", NIVEL.COLABORADOR],
+];
 
 function b64urlParaStr(s) {
   let b = s.replace(/-/g, "+").replace(/_/g, "/");
@@ -70,6 +85,15 @@ export async function middleware(req) {
       );
     }
     return NextResponse.redirect(new URL("/login", req.url));
+  }
+
+  // gate de PÁGINA por perfil (sessões antigas sem claim contam como PADRÃO)
+  if (!pathname.startsWith("/api/")) {
+    const nivel = nivelDe(sessao.perfil);
+    const regra = PAGINA_MINIMO.find(([p]) => pathname === p || pathname.startsWith(`${p}/`));
+    if (regra && nivel < regra[1]) {
+      return NextResponse.redirect(new URL("/", req.url));
+    }
   }
 
   return NextResponse.next();

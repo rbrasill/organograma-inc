@@ -21,6 +21,8 @@
 import { randomUUID } from "crypto";
 import { getPool } from "@/lib/db";
 import { normalizar } from "@/data/ti";
+import { exigirNivel } from "@/lib/permissoes";
+import { NIVEL } from "@/lib/perfis";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +106,8 @@ const DEFS = {
 };
 
 export async function GET() {
+  const bloqueio = exigirNivel(NIVEL.ADMIN);
+  if (bloqueio) return bloqueio;
   try {
     const pool = getPool();
     const [setores] = await pool.query(
@@ -212,6 +216,8 @@ async function validar(pool, tipo, campos, idAtual) {
 }
 
 export async function POST(req) {
+  const bloqueio = exigirNivel(NIVEL.ADMIN);
+  if (bloqueio) return bloqueio;
   let conn;
   try {
     const body = await req.json();

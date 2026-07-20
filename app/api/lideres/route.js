@@ -13,6 +13,8 @@
 //       3. o antigo (membro da área) passa a responder ao novo.
 
 import { getPool } from "@/lib/db";
+import { exigirNivel } from "@/lib/permissoes";
+import { NIVEL } from "@/lib/perfis";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,9 @@ function erroResposta(e) {
 }
 
 export async function GET(req) {
+  // ver Líderes por Área: perfil COLABORADOR para cima (somente leitura)
+  const bloqueio = exigirNivel(NIVEL.COLABORADOR);
+  if (bloqueio) return bloqueio;
   try {
     const pool = getPool();
     const perfilMat = new URL(req.url).searchParams.get("perfil");
@@ -232,6 +237,9 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
+  // trocar líder é edição estrutural: só ADMIN
+  const bloqueio = exigirNivel(NIVEL.ADMIN);
+  if (bloqueio) return bloqueio;
   let conn;
   try {
     const pool = getPool();

@@ -11,6 +11,8 @@
 import { randomUUID } from "crypto";
 import { getPool } from "@/lib/db";
 import { normalizar } from "@/data/ti";
+import { exigirNivel } from "@/lib/permissoes";
+import { NIVEL } from "@/lib/perfis";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +104,8 @@ async function proximaMatriculaPJ(pool) {
 }
 
 export async function GET(req) {
+  const bloqueio = exigirNivel(NIVEL.ADMIN);
+  if (bloqueio) return bloqueio;
   try {
     const pool = getPool();
     const url = new URL(req.url);
@@ -174,6 +178,8 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
+  const bloqueio = exigirNivel(NIVEL.ADMIN);
+  if (bloqueio) return bloqueio;
   let conn;
   try {
     const pool = getPool();

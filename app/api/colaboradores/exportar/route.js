@@ -6,6 +6,8 @@
 
 import * as XLSX from "xlsx";
 import { getPool } from "@/lib/db";
+import { exigirNivel } from "@/lib/permissoes";
+import { NIVEL } from "@/lib/perfis";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +36,9 @@ const CABECALHO = [
 ];
 
 export async function GET(req) {
+  // exportar a base (com CPFs) é ação de GESTOR para cima
+  const bloqueio = exigirNivel(NIVEL.GESTOR);
+  if (bloqueio) return bloqueio;
   try {
     const pool = getPool();
     const incluirTodos = new URL(req.url).searchParams.get("todos") === "1";
