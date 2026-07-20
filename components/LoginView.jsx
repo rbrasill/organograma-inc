@@ -8,16 +8,8 @@
 // fase 2 dos perfis de acesso) — esta tela não o usa mais.
 
 import { useState } from "react";
+import { formatarCpf, soDigitos } from "@/lib/cpf";
 import { UserIcon, KeyIcon, AlertIcon } from "@/components/icons";
-
-// máscara visual 000.000.000-00 (o envio é só dígitos)
-function formatarCpf(v) {
-  const d = String(v || "").replace(/\D/g, "").slice(0, 11);
-  return d
-    .replace(/(\d{3})(\d)/, "$1.$2")
-    .replace(/(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
-    .replace(/(\d{3})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3-$4");
-}
 
 export default function LoginView() {
   const [cpf, setCpf] = useState("");
@@ -28,7 +20,7 @@ export default function LoginView() {
   async function entrar(e) {
     e?.preventDefault();
     setErro("");
-    const dig = cpf.replace(/\D/g, "");
+    const dig = soDigitos(cpf);
     if (dig.length !== 11) { setErro("Digite o CPF completo (11 dígitos)."); return; }
     if (!nascimento) { setErro("Informe sua data de nascimento."); return; }
     setEnviando(true);

@@ -214,7 +214,7 @@ export async function POST(req) {
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
         [
           novoId, codigo, nome, (campos.email || "").trim() || null, tipo,
-          (campos.cpf || "").trim() || null, (campos.telefone || "").trim() || null,
+          String(campos.cpf || "").replace(/\D/g, "") || null, (campos.telefone || "").trim() || null,
           dataOuNull(campos.dataNascimento), dataOuNull(campos.dataAdmissao),
           fk(campos.cargoId), vinc.nivelPessoal, fk(campos.setorId), fk(campos.localId),
           fk(campos.regionalId), fk(campos.situacaoId), vinc.liderId,
@@ -324,7 +324,7 @@ export async function POST(req) {
     const tem = (c) => Object.prototype.hasOwnProperty.call(campos, c);
     const extraSet = [];
     const extraVal = [];
-    if (tem("cpf")) { extraSet.push("cpf = ?"); extraVal.push((campos.cpf || "").trim() || null); }
+    if (tem("cpf")) { extraSet.push("cpf = ?"); extraVal.push(String(campos.cpf || "").replace(/\D/g, "") || null); }
     if (tem("telefone")) { extraSet.push("telefone = ?"); extraVal.push((campos.telefone || "").trim() || null); }
     if (tem("dataNascimento")) { extraSet.push("data_nascimento = ?"); extraVal.push(dataOuNull(campos.dataNascimento)); }
     if (tem("dataAdmissao")) { extraSet.push("data_admissao = ?"); extraVal.push(dataOuNull(campos.dataAdmissao)); }
