@@ -14,10 +14,11 @@ import { useEffect, useState } from "react";
 import useSessao from "@/components/useSessao";
 import { NIVEL } from "@/lib/perfis";
 import {
-  InboxIcon, PencilIcon, UserIcon, UploadIcon, DownloadIcon, GridIcon, BriefcaseIcon, LogoutIcon, KeyIcon,
+  InboxIcon, PencilIcon, UserIcon, UploadIcon, DownloadIcon, GridIcon, BriefcaseIcon, LogoutIcon, KeyIcon, OrgIcon,
 } from "@/components/icons";
 
 const ITENS = [
+  { key: "home", href: "/", label: "Organograma", Icon: OrgIcon, title: "Ver o organograma da empresa", nivelMin: NIVEL.PADRAO },
   { key: "solicitacoes", href: "/solicitacoes", label: "Solicitações", Icon: InboxIcon, title: "Solicitações de ajuste recebidas pelo RH", nivelMin: NIVEL.ADMIN },
   { key: "colaboradores", href: "/colaboradores", label: "Editar colaboradores", Icon: PencilIcon, title: "Localizar e editar dados de colaboradores", nivelMin: NIVEL.ADMIN },
   { key: "pj", href: "/pj", label: "Colaboradores PJ", Icon: BriefcaseIcon, title: "Gerenciar prestadores PJ: cadastrar, editar, status, excluir", nivelMin: NIVEL.ADMIN },

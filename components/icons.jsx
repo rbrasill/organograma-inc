@@ -47,6 +47,18 @@ export function GridIcon({ size = 15 }) {
     </svg>
   );
 }
+
+// organograma: um nó no topo ligado a dois abaixo (hierarquia)
+export function OrgIcon({ size = 15 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <rect x="9" y="2.5" width="6" height="5" rx="1.3" />
+      <rect x="2.5" y="16.5" width="6" height="5" rx="1.3" />
+      <rect x="15.5" y="16.5" width="6" height="5" rx="1.3" />
+      <path d="M12 7.5v4M5.5 16.5v-2.5h13v2.5" />
+    </svg>
+  );
+}
 export function ChevronIcon({ size = 14 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
