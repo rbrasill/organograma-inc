@@ -21,5 +21,7 @@ export async function GET() {
     ativa: true,
     autenticado: !!sessao,
     nome: sessao?.nome || "",
+    matricula: sessao?.matricula || "",
+    perfil: sessao?.perfil || "COLABORADOR", // fase 2: HeroNav esconde cards por perfil
   });
 }

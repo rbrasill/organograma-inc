@@ -291,6 +291,20 @@ CREATE TABLE IF NOT EXISTS auth_codigo (
   KEY ix_auth_email (email, criado_em)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 4.6 auth_login_tentativa — rate-limit do login por CPF + nascimento (mig. 08).
+--   Janelas de contagem: >=5 falhas do CPF em 15 min, >=30 do IP em 1 h → 429.
+--   Linhas com mais de 1 dia são removidas oportunisticamente pelo endpoint.
+CREATE TABLE IF NOT EXISTS auth_login_tentativa (
+  id        CHAR(36)    NOT NULL,
+  cpf       VARCHAR(11) NOT NULL,
+  ip        VARCHAR(64) NULL,
+  sucesso   TINYINT(1)  NOT NULL DEFAULT 0,
+  criado_em DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY ix_alt_cpf (cpf, criado_em),
+  KEY ix_alt_ip (ip, criado_em)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================================================

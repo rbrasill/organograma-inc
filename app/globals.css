@@ -619,6 +619,7 @@ main{padding:20px 24px 24px}
 .login-form{width:100%;max-width:400px}
 .login-form h2{margin:0;font-size:30px;font-weight:800;letter-spacing:-.02em;color:var(--ink)}
 .login-sub{margin:8px 0 26px;font-size:14px;color:var(--ink-soft);font-weight:500;line-height:1.5}
+.login-nota{margin:14px 0 0;font-size:12.5px;color:var(--ink-faint);line-height:1.5}
 
 .login-campo{display:flex;align-items:center;gap:11px;background:#f4f6fb;border:1.5px solid transparent;border-radius:14px;padding:14px 16px;margin-bottom:14px;transition:border-color .2s,background .2s}
 .login-campo:focus-within{background:#fff;border-color:var(--inc);box-shadow:0 0 0 3px rgba(241,96,33,.12)}
