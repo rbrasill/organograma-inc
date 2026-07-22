@@ -49,11 +49,17 @@ export async function GET(req) {
     const [[tot]] = await pool.query(
       `SELECT
          (SELECT COUNT(*) FROM colaborador WHERE ativo = 1) AS geral,
+         (SELECT COUNT(*) FROM colaborador WHERE ativo = 1 AND tipo_contratacao = 'PJ') AS pj,
          (SELECT COUNT(*) FROM colaborador c
             JOIN local_trabalho l ON l.id = c.local_id
            WHERE c.ativo = 1 AND l.codigo_dp = '37') AS sede`
     );
-    const totais = { geral: Number(tot.geral), sede: Number(tot.sede), campo: Number(tot.geral) - Number(tot.sede) };
+    const totais = {
+      geral: Number(tot.geral),
+      sede: Number(tot.sede),
+      campo: Number(tot.geral) - Number(tot.sede),
+      pj: Number(tot.pj),
+    };
 
     // ESCOPO do organograma: por ÁREA (setor) OU por LOCAL — um de cada vez
     // (área tem precedência se ambos vierem). Sem escopo NÃO carrega ninguém

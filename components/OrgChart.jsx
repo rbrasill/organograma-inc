@@ -6,7 +6,7 @@ import { NIVEIS, nivelDe, inconsistenciasDe, construirArvore, normalizar } from 
 import {
   UserIcon, PinIcon, CheckIcon, CloseIcon, GridIcon,
   SearchIcon, FullscreenIcon, AlertIcon,
-  PlusIcon, MinusIcon, TargetIcon, DownloadIcon, BuildingIcon, UsersIcon,
+  PlusIcon, MinusIcon, TargetIcon, DownloadIcon, BuildingIcon, UsersIcon, BriefcaseIcon,
 } from "@/components/icons";
 import PersonModal from "@/components/PersonModal";
 import ImportModal from "@/components/ImportModal";
@@ -646,6 +646,10 @@ export default function OrgChart() {
                 <div className="org-stat">
                   <span className="os-ic"><UsersIcon size={17} /></span>
                   <span className="os-txt"><b>{totais.campo}</b><em>Demais locais</em></span>
+                </div>
+                <div className="org-stat">
+                  <span className="os-ic"><BriefcaseIcon size={16} /></span>
+                  <span className="os-txt"><b>{totais.pj}</b><em>Colaboradores PJ</em></span>
                 </div>
                 <div className="org-stat total">
                   <span className="os-ic"><UsersIcon size={17} /></span>
