@@ -753,7 +753,12 @@ export default function OrgChart() {
           areaAtual={nomeArea}
           nivelAcesso={sessao.nivel}
           onClose={() => setOpenId(null)}
-          onSalvar={(atual) => setPessoas((prev) => prev.map((p) => (p.id === atual.id ? { ...p, ...atual } : p)))}
+          onSalvar={(atual, extra) => {
+            // mudança estrutural (cargo/área/líder, salvar direto do admin)
+            // redesenha a árvore — o patch local não cobre troca de líder/área
+            if (extra?.recarregar) { carregar(areaId, localId); return; }
+            setPessoas((prev) => prev.map((p) => (p.id === atual.id ? { ...p, ...atual } : p)));
+          }}
         />
       )}
     </div>
