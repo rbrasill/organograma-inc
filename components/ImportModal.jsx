@@ -59,6 +59,7 @@ export default function ImportModal({ onClose }) {
       let situacoesCodigos = null;
       let setoresNome = null, setoresCod = null;
       let cargosBanco = null; // [{ codigo, nome, normalizado }]
+      let locaisBanco = null; // idem
       let avisoBanco = "";
       try {
         const r = await fetch("/api/importacao");
@@ -72,6 +73,7 @@ export default function ImportModal({ onClose }) {
           setoresNome = new Set((j.setores || []).map((s) => s.normalizado));
           setoresCod = new Set((j.setores || []).map((s) => s.codigo).filter(Boolean));
           cargosBanco = j.cargos || [];
+          locaisBanco = j.locais || [];
         } else {
           avisoBanco = j.erro || "Banco indisponível — prévia sem comparação com a base atual.";
         }
@@ -128,9 +130,25 @@ export default function ImportModal({ onClose }) {
         });
       }
 
+      // LOCAIS (obras) novos: código do prefixo não existe no catálogo —
+      // acontece quando uma obra nova começa no DP; serão criados na gravação
+      let locaisNovos = [];
+      if (locaisBanco) {
+        const codsBanco = new Set(locaisBanco.map((x) => String(x.codigo || "").trim()).filter(Boolean));
+        const vistos = new Set();
+        anotadas.forEach((l) => {
+          if (l.status === "erro") return;
+          const cod = (l.codigoLocal || "").trim();
+          if (!cod || codsBanco.has(cod) || vistos.has(cod)) return;
+          vistos.add(cod);
+          const nome = String(l.local || "").replace(/^\d+\s*-\s*/, "").trim() || cod;
+          locaisNovos.push(`${cod} · ${nome}`);
+        });
+      }
+
       // o extrato v3 NÃO tem coluna de líder: nesse caso a importação não
       // mexe nos líderes existentes (a árvore é gerida dentro do portal)
-      setPrevia({ anotadas, resumo, arquivar, avisoBanco, areasNovas, cargosNovos, cargosRenomeados, temLider: colunas.matriculaLider !== undefined });
+      setPrevia({ anotadas, resumo, arquivar, avisoBanco, areasNovas, cargosNovos, cargosRenomeados, locaisNovos, temLider: colunas.matriculaLider !== undefined });
       setEtapa("previa");
     } catch (e) {
       setErroGeral(`Não consegui ler o arquivo: ${e.message}`);
@@ -311,6 +329,14 @@ export default function ImportModal({ onClose }) {
                   <b><AlertIcon size={13} /> Áreas novas que serão criadas ({previa.areasNovas.length}):</b>
                   <span>{previa.areasNovas.join(" · ")}</span>
                   <em>Confira se não é um nome digitado diferente de uma área existente. Se for, corrija o Excel antes de gravar — o nome oficial das áreas se edita em Catálogos → Áreas.</em>
+                </div>
+              )}
+
+              {previa.locaisNovos?.length > 0 && (
+                <div className="imp-areas-novas">
+                  <b><AlertIcon size={13} /> Locais novos que serão criados ({previa.locaisNovos.length}):</b>
+                  <span>{previa.locaisNovos.join(" · ")}</span>
+                  <em>Obra nova no DP entra automaticamente com o código do prefixo. Depois, vincule as áreas dela em Catálogos → Áreas (local vinculado).</em>
                 </div>
               )}
 

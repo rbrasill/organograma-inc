@@ -36,6 +36,7 @@ export async function GET() {
     const [sits] = await pool.query("SELECT nome, nome_normalizado, codigo_dp FROM situacao");
     const [setores] = await pool.query("SELECT nome_normalizado, codigo_dp FROM setor");
     const [cargos] = await pool.query("SELECT codigo_cargo_dp, nome, nome_normalizado FROM cargo");
+    const [locais] = await pool.query("SELECT codigo_dp, nome, nome_normalizado FROM local_trabalho");
     return Response.json({
       ok: true,
       clt: colabs.map((c) => ({ cpf: c.cpf || "", matricula: c.codigo_dp || "" })),
@@ -43,6 +44,7 @@ export async function GET() {
       situacoes: sits.map((s) => ({ nome: s.nome, normalizado: s.nome_normalizado, codigo: s.codigo_dp })),
       setores: setores.map((s) => ({ normalizado: s.nome_normalizado, codigo: s.codigo_dp })),
       cargos: cargos.map((c) => ({ codigo: c.codigo_cargo_dp, nome: c.nome, normalizado: c.nome_normalizado })),
+      locais: locais.map((l) => ({ codigo: l.codigo_dp, nome: l.nome, normalizado: l.nome_normalizado })),
     });
   } catch (e) {
     return erroResposta(e);
