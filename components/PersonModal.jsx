@@ -2,13 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { nivelDe, NIVEIS, inconsistenciasDe, CARGOS, AREAS, LOCAIS, normalizar } from "@/data/ti";
-import { UserIcon, CloseIcon, AlertIcon, SearchIcon, ChevronIcon, CheckIcon } from "@/components/icons";
+import { NIVEL as PERFIL } from "@/lib/perfis";
+import { dataBR, idade, tempoDeEmpresa } from "@/lib/datas";
+import { UserIcon, CloseIcon, AlertIcon, SearchIcon, ChevronIcon, CheckIcon, CakeIcon } from "@/components/icons";
 
-// Edição direta (líder, aplica na hora): nome, e-mail, local.
-// Estruturais (exigem "Solicitar ajuste"): cargo, área, líder.
+// Edição direta (aplica na hora, só ADMIN): nome, e-mail, local.
+// Estruturais (exigem "Solicitar ajuste", perfil COLABORADOR+): cargo, área, líder.
 // Situação: somente leitura — gerenciada pelo RH/DP, não editável aqui.
+// nivelAcesso: nível do perfil da sessão (lib/perfis) — esconde os botões
+// acima do nível; as APIs revalidam no servidor.
 // listas: dropdowns vindos do banco (via API); mock só como fallback.
-export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, onClose, onSalvar }) {
+export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, nivelAcesso = 0, onClose, onSalvar }) {
   const CARGOS_OPCOES = listas?.cargos?.length ? listas.cargos : CARGOS;
   const AREAS_OPCOES = listas?.areas?.length ? listas.areas : AREAS;
   const LOCAIS_OPCOES = listas?.locais?.length ? listas.locais : LOCAIS;
@@ -37,6 +41,8 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
   const [buscando, setBuscando] = useState(false);
   const [pickerAberto, setPickerAberto] = useState(false);
   const [aviso, setAviso] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erroSalvar, setErroSalvar] = useState("");
   const [erroSol, setErroSol] = useState("");
   const [confirmandoSol, setConfirmandoSol] = useState(false); // painel de confirmação da solicitação
   const [obs, setObs] = useState("");
@@ -128,9 +134,24 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
     setLiderBusca("");
   }
 
-  function salvar() {
-    onSalvar({ ...pessoa, nome, local, email });
-    onClose();
+  // Salvar (edição direta): PERSISTE no banco nome, e-mail e local — os
+  // campos estruturais seguem por "Solicitar ajuste".
+  async function salvar() {
+    setSalvando(true); setErroSalvar("");
+    try {
+      const r = await fetch("/api/colaboradores/edicao-direta", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matricula: pessoa.id, nome, email, local }),
+      });
+      const txt = await r.text();
+      let j; try { j = JSON.parse(txt); } catch { j = { ok: false, erro: `Servidor respondeu ${r.status}.` }; }
+      if (!j.ok) { setErroSalvar(j.erro || "Falha ao salvar."); setSalvando(false); return; }
+      onSalvar({ ...pessoa, nome, local, email });
+      onClose();
+    } catch (e) {
+      setErroSalvar(`Falha ao salvar: ${e.message}`);
+      setSalvando(false);
+    }
   }
 
   // diferenças estruturais (cargo, área, líder) vs. o estado atual
@@ -208,7 +229,7 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
           </div>
         )}
 
-        {/* situação: somente leitura, gerenciada pelo RH/DP */}
+        {/* somente leitura (gerenciados pelo RH/DP ou pela importação) */}
         <div className="ro-grid" style={{ marginBottom: 12 }}>
           <div className="ro">
             <span>Situação</span>
@@ -218,6 +239,32 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
             <span>Matrícula</span>
             <b>{pessoa.id}</b>
           </div>
+          <div className="ro">
+            <span>Regional</span>
+            <b>{pessoa.regional || "—"}</b>
+          </div>
+          <div className="ro">
+            <span>Tipo de contratação</span>
+            <b>{pessoa.pj ? "PJ (prestador)" : "CLT"}</b>
+          </div>
+          {pessoa.nascimento && (
+            <div className="ro">
+              <span>Aniversário</span>
+              <b className="ro-cake">
+                <CakeIcon size={16} /> {dataBR(pessoa.nascimento)}
+                {idade(pessoa.nascimento) != null && <em className="ro-sub"> · {idade(pessoa.nascimento)} anos</em>}
+              </b>
+            </div>
+          )}
+          {pessoa.admissao && (
+            <div className="ro">
+              <span>Admissão</span>
+              <b>
+                {dataBR(pessoa.admissao)}
+                {tempoDeEmpresa(pessoa.admissao) && <em className="ro-sub"> · {tempoDeEmpresa(pessoa.admissao)} de empresa</em>}
+              </b>
+            </div>
+          )}
         </div>
 
         <div className="modal-section">
@@ -314,6 +361,7 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
           </div>
         </div>
 
+        {erroSalvar && <div className="modal-alert"><AlertIcon size={16} /><div><b>{erroSalvar}</b></div></div>}
         {erroSol && <div className="modal-alert"><AlertIcon size={16} /><div><b>{erroSol}</b></div></div>}
         {aviso && <div className="modal-note">{aviso}</div>}
 
@@ -355,12 +403,18 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
             </>
           ) : (
             <>
-              <button className="btn btn-ghost" onClick={abrirConfirmacao} disabled={solEnviada}>
-                Solicitar ajuste{mudancas.length ? ` (${mudancas.length})` : ""}
-              </button>
+              {nivelAcesso >= PERFIL.COLABORADOR && (
+                <button className="btn btn-ghost" onClick={abrirConfirmacao} disabled={solEnviada}>
+                  Solicitar ajuste{mudancas.length ? ` (${mudancas.length})` : ""}
+                </button>
+              )}
               <div style={{ flex: 1 }} />
               <button className="btn btn-neutral" onClick={onClose}>{solEnviada ? "Fechar" : "Cancelar"}</button>
-              <button className="btn btn-primary" onClick={salvar}>Salvar</button>
+              {nivelAcesso >= PERFIL.ADMIN && (
+                <button className="btn btn-primary" onClick={salvar} disabled={salvando}>
+                  {salvando ? "Salvando..." : "Salvar"}
+                </button>
+              )}
             </>
           )}
         </div>

@@ -43,8 +43,11 @@ export default function ImportModal({ onClose }) {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf);
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const matriz = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
-      const { erro, linhas } = extrairLinhas(matriz);
+      // raw: true — células de data viram o NÚMERO serial do Excel, que a
+      // validação converte com precisão (raw:false formataria "7/10/91",
+      // ambíguo). Textos (CHAPA, CPF, nomes) permanecem textos.
+      const matriz = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
+      const { erro, linhas, colunas } = extrairLinhas(matriz);
       if (erro) { setErroGeral(erro); setEtapa("selecao"); return; }
 
       // dados do banco para a prévia (novos x atualizados x arquivados)
@@ -69,7 +72,7 @@ export default function ImportModal({ onClose }) {
         avisoBanco = "Banco indisponível — prévia sem comparação com a base atual.";
       }
 
-      const { anotadas, resumo } = validarLinhas(linhas, { matriculasBanco, situacoesValidas, situacoesCodigos });
+      const { anotadas, resumo } = validarLinhas(linhas, { matriculasBanco, situacoesValidas, situacoesCodigos, colunas });
       const noArquivo = new Set(anotadas.filter((l) => l.status !== "erro").map((l) => l.matricula));
       const arquivar = [...matriculasBanco].filter((m) => !noArquivo.has(m));
 
@@ -89,7 +92,9 @@ export default function ImportModal({ onClose }) {
         areasNovas = [...vistas.values()];
       }
 
-      setPrevia({ anotadas, resumo, arquivar, avisoBanco, areasNovas });
+      // o extrato v3 NÃO tem coluna de líder: nesse caso a importação não
+      // mexe nos líderes existentes (a árvore é gerida dentro do portal)
+      setPrevia({ anotadas, resumo, arquivar, avisoBanco, areasNovas, temLider: colunas.matriculaLider !== undefined });
       setEtapa("previa");
     } catch (e) {
       setErroGeral(`Não consegui ler o arquivo: ${e.message}`);
@@ -113,6 +118,7 @@ export default function ImportModal({ onClose }) {
         local: l.local, codigoLocal: l.codigoLocal,
         regional: l.regional,
         situacao: l.situacao, codigoSituacao: l.codigoSituacao,
+        dataNascimento: l.nascISO || null, dataAdmissao: l.admISO || null,
         matriculaLider: l.matriculaLider, liderValido: l.liderValido,
         status: l.status, motivos: [...(l.erros || []), ...(l.alertas || [])],
       });
@@ -137,6 +143,7 @@ export default function ImportModal({ onClose }) {
       const fin = await postJSON({
         acao: "finalizar", importacaoId,
         matriculasArquivo: validas.map((l) => l.matricula),
+        temLider: previa.temLider, // arquivo sem coluna de líder → não mexe na árvore
         liderPares: validas.filter((l) => l.liderValido).map((l) => [l.matricula, l.liderValido]),
         erros: comErro.map(empacota),
       });
@@ -166,7 +173,7 @@ export default function ImportModal({ onClose }) {
           <div className="imp-ico"><UploadIcon size={22} /></div>
           <div>
             <h3>Importar base por Excel</h3>
-            <p>Upsert por matrícula · quem sair do arquivo é arquivado · nada é apagado</p>
+            <p>Extrato do DP (CHAPA, CPF, datas, cargo, situação, local) · CLT que sai do arquivo é arquivado · PJ e árvore de líderes não são afetados</p>
           </div>
         </div>
 

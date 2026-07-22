@@ -21,6 +21,8 @@
 import { randomUUID } from "crypto";
 import { getPool } from "@/lib/db";
 import { normalizar } from "@/data/ti";
+import { exigirNivel } from "@/lib/permissoes";
+import { NIVEL } from "@/lib/perfis";
 
 export const dynamic = "force-dynamic";
 
@@ -32,12 +34,15 @@ const erro400 = (m) => Response.json({ ok: false, erro: m }, { status: 400 });
 
 // gera o PRÓXIMO código da sequência oficial de cada catálogo, lendo o maior
 // já usado no banco. O usuário não digita código — o sistema segue a série.
-//   setor SET300… · local LOCTRA200… · nível NH500… · cargo numérico (1,2,…)
+//   setor SET300… · nível NH500… · cargo numérico (1,2,…)
 //   situação: próxima LETRA livre de A a Z (série fechada)
+//   local: SEM geração — o código é o número oficial da obra no DP (mig. 06)
+//   e entra pela importação; local criado à mão fica sem código até a obra
+//   aparecer no extrato (inventar número aqui poderia colidir com o DP).
 async function proximoCodigo(pool, tipo) {
+  if (tipo === "local") return null;
   const seq = {
     setor: { tabela: "setor", col: "codigo_dp", prefixo: "SET" },
-    local: { tabela: "local_trabalho", col: "codigo_dp", prefixo: "LOCTRA" },
     nivel: { tabela: "nivel_hierarquico", col: "codigo_nh", prefixo: "NH" },
     cargo: { tabela: "cargo", col: "codigo_cargo_dp", prefixo: "" },
   }[tipo];
@@ -84,6 +89,7 @@ const DEFS = {
     desvincular: [
       "UPDATE colaborador SET local_id = NULL WHERE local_id = ?",
       "UPDATE colaborador_historico SET local_id = NULL WHERE local_id = ?",
+      "UPDATE setor SET local_id = NULL WHERE local_id = ?", // vínculo setor→local (mig. 05)
     ],
   },
   regional: {
@@ -100,12 +106,17 @@ const DEFS = {
 };
 
 export async function GET() {
+  const bloqueio = exigirNivel(NIVEL.ADMIN);
+  if (bloqueio) return bloqueio;
   try {
     const pool = getPool();
     const [setores] = await pool.query(
-      `SELECT s.id, s.codigo_dp AS codigo, s.nome, COUNT(c.id) AS usos
-         FROM setor s LEFT JOIN colaborador c ON c.setor_id = s.id AND c.ativo = 1
-        GROUP BY s.id, s.codigo_dp, s.nome ORDER BY s.nome`
+      `SELECT s.id, s.codigo_dp AS codigo, s.nome, s.local_id AS localId, l.nome AS localNome,
+              COUNT(c.id) AS usos
+         FROM setor s
+         LEFT JOIN local_trabalho l ON l.id = s.local_id
+         LEFT JOIN colaborador c ON c.setor_id = s.id AND c.ativo = 1
+        GROUP BY s.id, s.codigo_dp, s.nome, s.local_id, l.nome ORDER BY s.nome`
     );
     const [cargos] = await pool.query(
       `SELECT cg.id, cg.codigo_cargo_dp AS codigo, cg.nome, cg.nivel_id AS nivelId, COUNT(c.id) AS usos
@@ -187,6 +198,16 @@ async function validar(pool, tipo, campos, idAtual) {
     v.nivelId = nivelId;
   }
 
+  if (tipo === "setor") {
+    // vínculo setor→local (obra/unidade) — opcional; NULL = sem local fixo
+    let localId = campos.localId || null;
+    if (localId) {
+      const [[l]] = await pool.query("SELECT id FROM local_trabalho WHERE id = ?", [localId]);
+      if (!l) return { erro: "Local de trabalho selecionado não existe." };
+    }
+    v.localId = localId;
+  }
+
   if (tipo === "situacao") {
     v.ativoArvore = campos.ativoArvore ? 1 : 0;
   }
@@ -195,6 +216,8 @@ async function validar(pool, tipo, campos, idAtual) {
 }
 
 export async function POST(req) {
+  const bloqueio = exigirNivel(NIVEL.ADMIN);
+  if (bloqueio) return bloqueio;
   let conn;
   try {
     const body = await req.json();
@@ -221,6 +244,7 @@ export async function POST(req) {
         vals.push(valores.ordem, valores.variacao, valores.codVar, valores.familia);
       }
       if (tipo === "cargo") { sets.push("nivel_id = ?"); vals.push(valores.nivelId); }
+      if (tipo === "setor") { sets.push("local_id = ?"); vals.push(valores.localId); }
       if (tipo === "situacao") { sets.push("ativo_na_arvore = ?"); vals.push(valores.ativoArvore); }
 
       if (criando) {

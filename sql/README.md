@@ -32,7 +32,11 @@ de nível hierárquico**.
 ## Códigos oficiais do DP
 
 Os lookups guardam o código externo do DP, único:
-- `setor.codigo_dp` (SET…), `local_trabalho.codigo_dp` (LOCTRA…), `situacao.codigo_dp` (letra: A, F, V…).
+- `setor.codigo_dp` (SET…), `situacao.codigo_dp` (letra: A, F, V…).
+- `local_trabalho.codigo_dp` é o **número da obra no DP** (ex.: 472 = Reserva JK),
+  o mesmo que vem no prefixo do local no extrato ("472 - Reserva JK") — migração 06
+  (a série interna LOCTRA… foi aposentada). Locais sem correspondência no extrato
+  ficam com código NULL e casam por nome.
 - `cargo.codigo_cargo_dp` é **anotação não-única** (o mesmo cargo aparece com códigos
   diferentes na base — ex.: variantes PJ), então a identidade do cargo é o nome.
 

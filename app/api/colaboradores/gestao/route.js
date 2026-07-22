@@ -11,6 +11,8 @@
 import { randomUUID } from "crypto";
 import { getPool } from "@/lib/db";
 import { normalizar } from "@/data/ti";
+import { exigirNivel } from "@/lib/permissoes";
+import { NIVEL } from "@/lib/perfis";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +34,8 @@ async function carregarColaborador(pool, id) {
   const [rows] = await pool.query(
     `SELECT c.id, c.codigo_dp, c.nome, c.email, c.tipo_contratacao, c.ativo,
             c.cpf, c.telefone,
+            DATE_FORMAT(c.data_nascimento, '%Y-%m-%d') AS data_nascimento,
+            DATE_FORMAT(c.data_admissao, '%Y-%m-%d')   AS data_admissao,
             c.cargo_id, c.setor_id, c.local_id, c.regional_id, c.situacao_id, c.lider_id,
             c.nivel_id AS nivel_pessoal_id, cg.nivel_id AS cargo_nivel_id,
             cg.nome AS cargo, s.nome AS setor, lt.nome AS local,
@@ -83,6 +87,9 @@ async function resolverEstruturais(pool, campos, idAtual, nivelAtual) {
   return { liderId, nivelPessoal };
 }
 
+// data vinda do formulário (input type=date): ISO válido ou null — nunca lixo
+const dataOuNull = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || "").trim()) ? String(v).trim() : null);
+
 // próxima matrícula PJ disponível (PJ#### incremental)
 async function proximaMatriculaPJ(pool) {
   const [rows] = await pool.query(
@@ -97,6 +104,8 @@ async function proximaMatriculaPJ(pool) {
 }
 
 export async function GET(req) {
+  const bloqueio = exigirNivel(NIVEL.ADMIN);
+  if (bloqueio) return bloqueio;
   try {
     const pool = getPool();
     const url = new URL(req.url);
@@ -169,6 +178,8 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
+  const bloqueio = exigirNivel(NIVEL.ADMIN);
+  if (bloqueio) return bloqueio;
   let conn;
   try {
     const pool = getPool();
@@ -198,11 +209,13 @@ export async function POST(req) {
       await pool.query(
         `INSERT INTO colaborador
            (id, codigo_dp, nome, email, tipo_contratacao, cpf, telefone,
+            data_nascimento, data_admissao,
             cargo_id, nivel_id, setor_id, local_id, regional_id, situacao_id, lider_id, ativo)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
         [
           novoId, codigo, nome, (campos.email || "").trim() || null, tipo,
-          (campos.cpf || "").trim() || null, (campos.telefone || "").trim() || null,
+          String(campos.cpf || "").replace(/\D/g, "") || null, (campos.telefone || "").trim() || null,
+          dataOuNull(campos.dataNascimento), dataOuNull(campos.dataAdmissao),
           fk(campos.cargoId), vinc.nivelPessoal, fk(campos.setorId), fk(campos.localId),
           fk(campos.regionalId), fk(campos.situacaoId), vinc.liderId,
         ]
@@ -311,8 +324,10 @@ export async function POST(req) {
     const tem = (c) => Object.prototype.hasOwnProperty.call(campos, c);
     const extraSet = [];
     const extraVal = [];
-    if (tem("cpf")) { extraSet.push("cpf = ?"); extraVal.push((campos.cpf || "").trim() || null); }
+    if (tem("cpf")) { extraSet.push("cpf = ?"); extraVal.push(String(campos.cpf || "").replace(/\D/g, "") || null); }
     if (tem("telefone")) { extraSet.push("telefone = ?"); extraVal.push((campos.telefone || "").trim() || null); }
+    if (tem("dataNascimento")) { extraSet.push("data_nascimento = ?"); extraVal.push(dataOuNull(campos.dataNascimento)); }
+    if (tem("dataAdmissao")) { extraSet.push("data_admissao = ?"); extraVal.push(dataOuNull(campos.dataAdmissao)); }
 
     await pool.query(
       `UPDATE colaborador

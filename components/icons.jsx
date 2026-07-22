@@ -47,6 +47,34 @@ export function GridIcon({ size = 15 }) {
     </svg>
   );
 }
+
+// bolo de aniversário — colorido (chama, vela, cobertura, massa e prato)
+export function CakeIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="3.1" r="1.15" fill="#f59e0b" />
+      <rect x="11.5" y="4" width="1" height="3" rx="0.5" fill="#38bdf8" />
+      <path d="M5 11.2c0-1.15.95-2.1 2.1-2.1h9.8c1.15 0 2.1.95 2.1 2.1V13H5v-1.8z" fill="#f472b6" />
+      <rect x="4" y="13" width="16" height="6.2" rx="1.6" fill="#a78bfa" />
+      <circle cx="8.5" cy="16" r="0.7" fill="#fde68a" />
+      <circle cx="12" cy="16.6" r="0.7" fill="#fde68a" />
+      <circle cx="15.5" cy="16" r="0.7" fill="#fde68a" />
+      <rect x="3" y="19.6" width="18" height="1.8" rx="0.9" fill="#cbd5e1" />
+    </svg>
+  );
+}
+
+// organograma: um nó no topo ligado a dois abaixo (hierarquia)
+export function OrgIcon({ size = 15 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <rect x="9" y="2.5" width="6" height="5" rx="1.3" />
+      <rect x="2.5" y="16.5" width="6" height="5" rx="1.3" />
+      <rect x="15.5" y="16.5" width="6" height="5" rx="1.3" />
+      <path d="M12 7.5v4M5.5 16.5v-2.5h13v2.5" />
+    </svg>
+  );
+}
 export function ChevronIcon({ size = 14 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

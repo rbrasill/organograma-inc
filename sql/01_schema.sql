@@ -74,9 +74,13 @@ CREATE TABLE IF NOT EXISTS setor (
   codigo_dp             VARCHAR(20)  NULL,   -- código oficial do DP (SET…)
   nome                  VARCHAR(160) NOT NULL,
   nome_normalizado      VARCHAR(160) NOT NULL,
+  -- local (obra/unidade) a que o setor pertence — usado pela importação para
+  -- detectar setor desatualizado quando o colaborador muda de local (mig. 05)
+  local_id              CHAR(36)     NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_setor_norm (nome_normalizado),
-  UNIQUE KEY uq_setor_dp (codigo_dp)
+  UNIQUE KEY uq_setor_dp (codigo_dp),
+  KEY ix_setor_local (local_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 1.4 local_trabalho
@@ -89,6 +93,10 @@ CREATE TABLE IF NOT EXISTS local_trabalho (
   UNIQUE KEY uq_local_norm (nome_normalizado),
   UNIQUE KEY uq_local_dp (codigo_dp)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- FK do vínculo setor→local (declarada aqui porque setor é criado antes)
+ALTER TABLE setor
+  ADD CONSTRAINT fk_setor_local FOREIGN KEY (local_id) REFERENCES local_trabalho (id);
 
 -- 1.5 regional
 CREATE TABLE IF NOT EXISTS regional (
@@ -129,6 +137,8 @@ CREATE TABLE IF NOT EXISTS colaborador (
   -- CPF de QUALQUER colaborador (CLT ou PJ) — opcional; vem da importação
   -- por Excel ou do cadastro PJ. Na tela de edição é somente visualização.
   cpf               VARCHAR(20)      NULL,
+  data_nascimento   DATE             NULL,   -- vem do extrato do DP (mig. 07)
+  data_admissao     DATE             NULL,   -- vem do extrato do DP (mig. 07)
   telefone          VARCHAR(30)      NULL,   -- contato (hoje usado no cadastro PJ)
   cargo_id          CHAR(36)         NULL,
   nivel_id          CHAR(36)         NULL,   -- variação de nível DA PESSOA (sobrepõe o padrão do cargo; NULL = herda)
@@ -253,13 +263,16 @@ CREATE TABLE IF NOT EXISTS solicitacao_ajuste (
   CONSTRAINT fk_sol_aprov FOREIGN KEY (aprovador_id)        REFERENCES colaborador (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 4.4 usuario_perfil — perfis de acesso (sem colaboradores em geral)
+-- 4.4 usuario_perfil — perfis de acesso (mig. 09).
+--   Sem linha = perfil PADRÃO (só visualiza o organograma; não aparece na
+--   tela /acessos). Um perfil por colaborador. A mudança vale a partir do
+--   PRÓXIMO login (o perfil é claim da sessão).
 CREATE TABLE IF NOT EXISTS usuario_perfil (
   id             CHAR(36) NOT NULL,
   colaborador_id CHAR(36) NOT NULL,
-  perfil         ENUM('LIDER','RH','DIRETORIA') NOT NULL,
+  perfil         ENUM('COLABORADOR','GESTOR','ADMIN') NOT NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_perfil_colab (colaborador_id, perfil),
+  UNIQUE KEY uq_perfil_colab (colaborador_id),
   CONSTRAINT fk_perfil_colab FOREIGN KEY (colaborador_id) REFERENCES colaborador (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -279,6 +292,20 @@ CREATE TABLE IF NOT EXISTS auth_codigo (
   tentativas   TINYINT      NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   KEY ix_auth_email (email, criado_em)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4.6 auth_login_tentativa — rate-limit do login por CPF + nascimento (mig. 08).
+--   Janelas de contagem: >=5 falhas do CPF em 15 min, >=30 do IP em 1 h → 429.
+--   Linhas com mais de 1 dia são removidas oportunisticamente pelo endpoint.
+CREATE TABLE IF NOT EXISTS auth_login_tentativa (
+  id        CHAR(36)    NOT NULL,
+  cpf       VARCHAR(11) NOT NULL,
+  ip        VARCHAR(64) NULL,
+  sucesso   TINYINT(1)  NOT NULL DEFAULT 0,
+  criado_em DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY ix_alt_cpf (cpf, criado_em),
+  KEY ix_alt_ip (ip, criado_em)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

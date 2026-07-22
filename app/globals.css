@@ -206,6 +206,8 @@ main{padding:20px 24px 24px}
 .legend .lg-vazio{font-size:12px;color:var(--ink-faint);font-style:italic}
 .chip{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-soft);font-weight:600}
 .chip i{width:10px;height:10px;border-radius:999px;display:inline-block}
+/* nível da família na legenda: tom suave ao lado do nome (N4, N12...) */
+.lg-nivel{font-size:10.5px;font-weight:700;color:var(--ink-faint);background:#f1f5fb;border-radius:6px;padding:1px 6px;letter-spacing:.02em}
 
 .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(3px);display:grid;place-items:center;padding:20px;z-index:100;animation:fade .25s var(--ease)}
 .modal{width:100%;max-width:520px;max-height:calc(100dvh - 40px);display:flex;flex-direction:column;overflow:hidden;background:#fff;border-radius:22px;box-shadow:0 30px 80px -20px rgba(16,24,40,.5);position:relative;animation:pop .35s var(--ease)}
@@ -231,12 +233,18 @@ main{padding:20px 24px 24px}
 .fld span{font-size:12px;font-weight:600;color:var(--ink-soft)}
 .fld input{border:1px solid var(--line);border-radius:11px;padding:9px 12px;font:inherit;font-size:13.5px;color:var(--ink);outline:none;transition:border-color .2s,box-shadow .2s}
 .fld input:focus{border-color:var(--inc);box-shadow:0 0 0 3px rgba(255,83,15,.12)}
+/* campo com valor inválido (ex.: CPF que não passa na validação) */
+.fld input.input-invalido{border-color:#e5484d;background:#fdf3f2}
+.fld input.input-invalido:focus{border-color:#e5484d;box-shadow:0 0 0 3px rgba(229,72,77,.14)}
+.fld-erro{font-style:normal;font-weight:700;color:#c62828}
 /* somente visualização (ex.: CPF) e campos dentro de fieldset desabilitado */
 .fld input:disabled,.fld select:disabled{background:#f2f5fa;color:var(--ink-soft);cursor:not-allowed}
 .ro-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .ro{background:#f7f9fd;border:1px solid var(--line-soft);border-radius:11px;padding:9px 12px}
 .ro span{display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint)}
 .ro b{font-size:13px;color:var(--ink);font-weight:600}
+.ro-cake{display:inline-flex;align-items:center;gap:6px}
+.ro-sub{font-style:normal;font-weight:600;color:var(--ink-soft)}
 .modal-note{background:#eefaf0;border:1px solid #c7ebd0;color:#177245;border-radius:11px;padding:10px 13px;font-size:12.5px;font-weight:600;margin-bottom:14px}
 .modal-foot{display:flex;align-items:center;gap:9px}
 
@@ -484,8 +492,27 @@ main{padding:20px 24px 24px}
 .ct-erro{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#b42318;background:#fdeaea;border:1px solid #f6cfcb;border-radius:9px;padding:8px 11px;margin-top:10px}
 .ct-del:hover{color:#b42318;background:#fdeaea}
 .ct-del-confirma{margin-top:10px;display:flex;flex-direction:column;gap:9px}
+.ct-del-txt{font-size:13px;line-height:1.55;color:var(--ink-soft)}
 .ct-editando{border-color:var(--inc);box-shadow:0 0 0 3px rgba(255,83,15,.08)}
 .ct-form-titulo{font-size:13.5px;font-weight:800;color:var(--brand)}
+
+/* tabela de Áreas (local · código · colaboradores · editar) */
+.ct-tabela-wrap{border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.ct-tabela{width:100%;border-collapse:collapse;font-size:13px}
+.ct-tabela th{background:#eef1f8;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--brand);font-weight:800;padding:13px 16px;white-space:nowrap}
+.ct-tabela td{padding:11px 16px;color:var(--ink-soft);border-top:1px solid var(--line-soft);vertical-align:middle}
+.ct-tabela tbody tr:nth-child(even){background:#f6f8fc}
+.ct-tabela tbody tr:hover{background:#eef2fb}
+.ct-tabela .td-nome{font-weight:700;color:var(--ink)}
+.ct-tabela .ct-code{margin-left:0}
+.ct-vazio{color:var(--ink-faint);font-size:12px}
+.ct-col-acoes{text-align:right;width:1%}
+.ct-acoes-cel{display:inline-flex;align-items:center;gap:7px}
+.ct-acoes-cel .btn-primary{background:linear-gradient(145deg,#274a86,#1f3864);box-shadow:0 8px 18px -12px rgba(31,56,100,.9)}
+.ct-pill{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:3px 10px;margin-left:8px}
+.ac-ava{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#eef2ff;color:#3b5bdb;vertical-align:middle;margin-right:2px}
+.ct-pill.on{background:#e8f7ee;color:#177245}
+.ct-pill.off{background:#fff1d6;color:#b45309}
 
 /* ===== líderes por área (agrupado por diretor) ===== */
 /* paleta de tons leves e discretos (atribuídos pelo nome da área/diretor) */
@@ -599,6 +626,7 @@ main{padding:20px 24px 24px}
 .login-form{width:100%;max-width:400px}
 .login-form h2{margin:0;font-size:30px;font-weight:800;letter-spacing:-.02em;color:var(--ink)}
 .login-sub{margin:8px 0 26px;font-size:14px;color:var(--ink-soft);font-weight:500;line-height:1.5}
+.login-nota{margin:14px 0 0;font-size:12.5px;color:var(--ink-faint);line-height:1.5}
 
 .login-campo{display:flex;align-items:center;gap:11px;background:#f4f6fb;border:1.5px solid transparent;border-radius:14px;padding:14px 16px;margin-bottom:14px;transition:border-color .2s,background .2s}
 .login-campo:focus-within{background:#fff;border-color:var(--inc);box-shadow:0 0 0 3px rgba(241,96,33,.12)}

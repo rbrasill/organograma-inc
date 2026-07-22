@@ -10,6 +10,8 @@
 import { randomUUID } from "crypto";
 import { getPool } from "@/lib/db";
 import { normalizar } from "@/data/ti";
+import { exigirNivel } from "@/lib/permissoes";
+import { NIVEL } from "@/lib/perfis";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +27,23 @@ function parsePayload(p) {
 }
 
 export async function GET(req) {
+  // fila do RH (lista e contagem do badge) é área administrativa
+  const bloqueio = exigirNivel(NIVEL.ADMIN);
+  if (bloqueio) return bloqueio;
   try {
     const pool = getPool();
-    const status = new URL(req.url).searchParams.get("status");
+    const url = new URL(req.url);
+
+    // modo leve para o POLLING do badge (HeroNav, a cada 45s por aba):
+    // só o COUNT de pendentes, sem a listagem com JOINs
+    if (url.searchParams.get("contagem") === "1") {
+      const [[cont]] = await pool.query(
+        "SELECT COUNT(*) AS pendentes FROM solicitacao_ajuste WHERE status = 'pendente'"
+      );
+      return Response.json({ ok: true, pendentes: Number(cont.pendentes) });
+    }
+
+    const status = url.searchParams.get("status");
     const cond = status && status !== "todas" ? "WHERE s.status = ?" : "";
     const args = status && status !== "todas" ? [status] : [];
     const [rows] = await pool.query(
@@ -82,6 +98,9 @@ export async function POST(req) {
 
     // ---- criar (aberta pelo modal do colaborador) ----
     if (body.acao === "criar") {
+      // solicitar ajuste: perfil COLABORADOR para cima
+      const bloqueio = exigirNivel(NIVEL.COLABORADOR);
+      if (bloqueio) return bloqueio;
       const { matricula, alvoNome, solicitanteNome, observacao, mudancas, tipo } = body;
       if (!matricula || !Array.isArray(mudancas) || mudancas.length === 0) {
         return Response.json({ ok: false, erro: "Nada a solicitar (nenhuma mudança estrutural)." }, { status: 400 });
@@ -98,6 +117,8 @@ export async function POST(req) {
 
     // ---- aprovar: aplica as mudanças no colaborador ----
     if (body.acao === "aprovar") {
+      const bloqueio = exigirNivel(NIVEL.ADMIN);
+      if (bloqueio) return bloqueio;
       conn = await pool.getConnection();
       await conn.beginTransaction();
       const [[sol]] = await conn.query(
@@ -165,6 +186,8 @@ export async function POST(req) {
 
     // ---- devolver: registra a devolução com observação ----
     if (body.acao === "devolver") {
+      const bloqueio = exigirNivel(NIVEL.ADMIN);
+      if (bloqueio) return bloqueio;
       const [[sol]] = await pool.query("SELECT payload, status FROM solicitacao_ajuste WHERE id = ?", [body.id]);
       if (!sol) return Response.json({ ok: false, erro: "Solicitação não encontrada." }, { status: 404 });
       if (sol.status !== "pendente") return Response.json({ ok: false, erro: "Solicitação já decidida." }, { status: 409 });

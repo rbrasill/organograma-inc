@@ -8,6 +8,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import HeroNav from "@/components/HeroNav";
+import useSessao from "@/components/useSessao";
+import { NIVEL } from "@/lib/perfis";
 import {
   UserIcon, CheckIcon, CloseIcon, AlertIcon, SearchIcon,
 } from "@/components/icons";
@@ -21,6 +23,7 @@ function tomDe(nome) {
 }
 
 export default function LideresView() {
+  const sessao = useSessao(); // COLABORADOR/GESTOR: somente leitura; ADMIN edita
   const [dados, setDados] = useState(null); // { diretores, semDiretor }
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
@@ -161,9 +164,11 @@ export default function LideresView() {
             </span>
             <em>{area.lider.cargo || "Cargo a definir"}</em>
           </span>
-          <button className="la-btn" onClick={() => abrirTroca(area, diretorNome)}>
-            Alterar líder
-          </button>
+          {sessao.nivel >= NIVEL.ADMIN && (
+            <button className="la-btn" onClick={() => abrirTroca(area, diretorNome)}>
+              Alterar líder
+            </button>
+          )}
         </div>
       </div>
     );

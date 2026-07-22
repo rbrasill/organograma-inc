@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import HeroNav from "@/components/HeroNav";
 import { normalizar } from "@/data/ti";
+import { formatarCpf, cpfValido, soDigitos } from "@/lib/cpf";
 import {
   UserIcon, BriefcaseIcon, CheckIcon, AlertIcon, SearchIcon, ChevronIcon, PlusIcon, CloseIcon,
 } from "@/components/icons";
@@ -17,6 +18,7 @@ const rotuloNivel = (n) =>
 
 const VAZIO = {
   matricula: "", nome: "", cpf: "", telefone: "", email: "",
+  dataNascimento: "", dataAdmissao: "",
   situacaoId: "", cargoId: "", nivelId: "", setorId: "", regionalId: "", localId: "",
   liderMatricula: "", liderNome: "", ativo: 1,
 };
@@ -96,7 +98,8 @@ export default function PjView() {
       const c = j.colaborador;
       setForm({
         matricula: c.codigo_dp || "", nome: c.nome || "",
-        cpf: c.cpf || "", telefone: c.telefone || "", email: c.email || "",
+        cpf: formatarCpf(c.cpf || ""), telefone: c.telefone || "", email: c.email || "",
+        dataNascimento: c.data_nascimento || "", dataAdmissao: c.data_admissao || "",
         situacaoId: c.situacao_id || "", cargoId: c.cargo_id || "",
         nivelId: c.nivel_pessoal_id || c.cargo_nivel_id || "",
         setorId: c.setor_id || "", regionalId: c.regional_id || "", localId: c.local_id || "",
@@ -139,8 +142,14 @@ export default function PjView() {
 
   async function salvar() {
     if (!form.nome.trim()) { setErro("Informe o nome do prestador."); return; }
+    // CPF é opcional, mas se preenchido tem de ser válido (dígitos verificadores)
+    if (soDigitos(form.cpf) && !cpfValido(form.cpf)) {
+      setErro("CPF inválido — confira os números digitados.");
+      return;
+    }
     setSalvando(true); setErro("");
-    const campos = { ...form, tipo: "PJ" };
+    // envia o CPF só com dígitos (o banco guarda assim; é como o login casa)
+    const campos = { ...form, cpf: soDigitos(form.cpf), tipo: "PJ" };
     const j = modo === "novo"
       ? await post({ acao: "criar", campos })
       : await post({ acao: "salvar", id: modo, campos });
@@ -173,6 +182,9 @@ export default function PjView() {
 
   const padraoNivel = form ? nivelDoCargo(form.cargoId) : null;
   const somenteLeitura = form && modo !== "novo" && form.ativo === 0;
+  // CPF: inválido só quando já tem os 11 dígitos e não passa na validação
+  // (não "grita" enquanto o usuário ainda está digitando)
+  const cpfInvalido = form ? soDigitos(form.cpf).length === 11 && !cpfValido(form.cpf) : false;
 
   return (
     <div className="sol-shell">
@@ -246,13 +258,27 @@ export default function PjView() {
                 <label className="fld"><span>Nome</span>
                   <input value={form.nome} onChange={(e) => set("nome", e.target.value)} /></label>
                 <div className="col-grid2">
-                  <label className="fld"><span>CPF</span>
-                    <input value={form.cpf} placeholder="000.000.000-00" onChange={(e) => set("cpf", e.target.value)} /></label>
+                  <label className="fld">
+                    <span>CPF{cpfInvalido && <em className="fld-erro"> · CPF inválido</em>}</span>
+                    <input
+                      value={form.cpf}
+                      inputMode="numeric"
+                      placeholder="000.000.000-00"
+                      className={cpfInvalido ? "input-invalido" : ""}
+                      onChange={(e) => set("cpf", formatarCpf(e.target.value))}
+                    />
+                  </label>
                   <label className="fld"><span>Telefone</span>
                     <input value={form.telefone} placeholder="(00) 00000-0000" onChange={(e) => set("telefone", e.target.value)} /></label>
                 </div>
                 <label className="fld"><span>E-mail</span>
                   <input value={form.email} placeholder="nome@meuinc.com.br" onChange={(e) => set("email", e.target.value)} /></label>
+                <div className="col-grid2">
+                  <label className="fld"><span>Data de nascimento</span>
+                    <input type="date" value={form.dataNascimento} onChange={(e) => set("dataNascimento", e.target.value)} /></label>
+                  <label className="fld"><span>Data de admissão <em className="ct-ex">· quando foi contratado</em></span>
+                    <input type="date" value={form.dataAdmissao} onChange={(e) => set("dataAdmissao", e.target.value)} /></label>
+                </div>
                 <div className="col-grid2">
                   <label className="fld"><span>Situação</span>
                     <select value={form.situacaoId} onChange={(e) => set("situacaoId", e.target.value)}>
