@@ -15,6 +15,13 @@ const CAMPOS_LABEL = {
   nome: "Nome", email: "E-mail", tipo: "Contratação", cargo: "Cargo",
   setor: "Área / Setor", local: "Local de trabalho", regional: "Regional",
   situacao: "Situação", lider: "Líder direto", nivel: "Nível do cargo",
+  dataNascimento: "Data de nascimento", dataAdmissao: "Data de admissão",
+};
+
+// "YYYY-MM-DD" → "DD/MM/AAAA" (para os diffs de confirmação)
+const dataBR = (iso) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "—";
 };
 
 // rótulo de um nível hierárquico: "14.E · Secretária"
@@ -151,6 +158,8 @@ export default function ColaboradoresView() {
         nome: c.nome || "",
         email: c.email || "",
         cpf: c.cpf || "", // exibição apenas — não é enviado no salvar
+        dataNascimento: c.data_nascimento || "", // CLT: só visualização (vem do DP)
+        dataAdmissao: c.data_admissao || "",
         tipo: c.tipo_contratacao || "CLT",
         cargoId: c.cargo_id || "",
         setorId: c.setor_id || "",
@@ -169,6 +178,7 @@ export default function ColaboradoresView() {
         regional: c.regional || "", situacao: c.situacao || "",
         liderMatricula: c.lider_mat || "", liderNome: c.lider_nome || "",
         nivelId: nivelEfetivo,
+        dataNascimento: c.data_nascimento || "", dataAdmissao: c.data_admissao || "",
       });
     } catch (e) { setErro(e.message); }
     setCarregandoDet(false);
@@ -210,6 +220,13 @@ export default function ColaboradoresView() {
         de: rotuloNivel(nivelPorId(original.nivelId)) || "Sem nível",
         para: rotuloNivel(nivelPorId(form.nivelId)) || "Sem nível",
       });
+    // datas: editáveis só para PJ (CLT vem do DP) — só entram no diff quando PJ
+    if (form.tipo === "PJ") {
+      if ((form.dataNascimento || "") !== (original.dataNascimento || ""))
+        ms.push({ campo: "dataNascimento", de: dataBR(original.dataNascimento), para: dataBR(form.dataNascimento) });
+      if ((form.dataAdmissao || "") !== (original.dataAdmissao || ""))
+        ms.push({ campo: "dataAdmissao", de: dataBR(original.dataAdmissao), para: dataBR(form.dataAdmissao) });
+    }
     return ms;
   }, [form, original, nomeDe, nivelPorId]);
 
@@ -223,9 +240,10 @@ export default function ColaboradoresView() {
   async function salvar() {
     setSalvando(true); setErro("");
     try {
-      // CPF é somente visualização nesta tela: sai do payload para a API
-      // preservar o valor gravado (ela só atualiza cpf quando o campo vem).
-      const { cpf: _cpf, ...campos } = form;
+      // CPF nunca é enviado (só visualização). Datas só vão no payload para
+      // PJ — para CLT elas vêm do DP e a API preserva o que não recebe.
+      const { cpf: _cpf, dataNascimento, dataAdmissao, ...campos } = form;
+      if (form.tipo === "PJ") { campos.dataNascimento = dataNascimento; campos.dataAdmissao = dataAdmissao; }
       const r = await fetch("/api/colaboradores/gestao", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: selId, campos }),
@@ -241,7 +259,10 @@ export default function ColaboradoresView() {
         regional: c.regional || "", situacao: c.situacao || "",
         liderMatricula: c.lider_mat || "", liderNome: c.lider_nome || "",
         nivelId: c.nivel_pessoal_id || c.cargo_nivel_id || "",
+        dataNascimento: c.data_nascimento || "", dataAdmissao: c.data_admissao || "",
       });
+      // reflete no formulário as datas efetivamente gravadas
+      setForm((f) => f ? { ...f, dataNascimento: c.data_nascimento || "", dataAdmissao: c.data_admissao || "" } : f);
       setResultados((rs) => rs.map((x) => (x.id === selId ? { ...x, nome: c.nome, cargo: c.cargo, setor: c.setor } : x)));
       setConfirmando(false); setSalvo(true);
     } catch (e) { setErro(`Falha ao salvar: ${e.message}`); }
@@ -385,6 +406,28 @@ export default function ColaboradoresView() {
                       placeholder="Não informado"
                       disabled
                       title="O CPF vem da importação por Excel (ou do cadastro PJ) e não é editável aqui."
+                    />
+                  </label>
+                </div>
+                <div className="col-grid2">
+                  <label className="fld">
+                    <span>Data de nascimento{form.tipo === "CLT" ? <em className="ct-ex"> · vem do DP</em> : null}</span>
+                    <input
+                      type="date"
+                      value={form.dataNascimento}
+                      disabled={form.tipo === "CLT"}
+                      title={form.tipo === "CLT" ? "Vem da importação por Excel (DP) e não é editável para CLT." : ""}
+                      onChange={(e) => set("dataNascimento", e.target.value)}
+                    />
+                  </label>
+                  <label className="fld">
+                    <span>Data de admissão{form.tipo === "CLT" ? <em className="ct-ex"> · vem do DP</em> : null}</span>
+                    <input
+                      type="date"
+                      value={form.dataAdmissao}
+                      disabled={form.tipo === "CLT"}
+                      title={form.tipo === "CLT" ? "Vem da importação por Excel (DP) e não é editável para CLT." : ""}
+                      onChange={(e) => set("dataAdmissao", e.target.value)}
                     />
                   </label>
                 </div>
