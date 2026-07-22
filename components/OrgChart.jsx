@@ -615,22 +615,6 @@ export default function OrgChart() {
               )}
             </div>
             <div className="actions">
-              {totais && (
-                <div className="org-stats" title="Total de colaboradores ativos">
-                  <div className="org-stat">
-                    <span className="os-ic"><BuildingIcon size={17} /></span>
-                    <span className="os-txt"><b>{totais.sede}</b><em>Sede · Rossi</em></span>
-                  </div>
-                  <div className="org-stat">
-                    <span className="os-ic"><UsersIcon size={17} /></span>
-                    <span className="os-txt"><b>{totais.campo}</b><em>Demais locais</em></span>
-                  </div>
-                  <div className="org-stat total">
-                    <span className="os-ic"><UsersIcon size={17} /></span>
-                    <span className="os-txt"><b>{totais.geral}</b><em>Total geral</em></span>
-                  </div>
-                </div>
-              )}
               {sessao.nivel >= NIVEL.COLABORADOR && (
                 <button
                   className="btn btn-ghost btn-baixar"
@@ -653,6 +637,22 @@ export default function OrgChart() {
                 {fullscreen ? <CloseIcon /> : <FullscreenIcon />}
               </button>
             </div>
+            {totais && (
+              <div className="org-stats" title="Total de colaboradores ativos">
+                <div className="org-stat">
+                  <span className="os-ic"><BuildingIcon size={17} /></span>
+                  <span className="os-txt"><b>{totais.sede}</b><em>Sede · Rossi</em></span>
+                </div>
+                <div className="org-stat">
+                  <span className="os-ic"><UsersIcon size={17} /></span>
+                  <span className="os-txt"><b>{totais.campo}</b><em>Demais locais</em></span>
+                </div>
+                <div className="org-stat total">
+                  <span className="os-ic"><UsersIcon size={17} /></span>
+                  <span className="os-txt"><b>{totais.geral}</b><em>Total geral</em></span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div

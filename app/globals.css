@@ -100,10 +100,11 @@ main{padding:20px 24px 24px}
 .subline{margin:8px 0 0;font-size:13px;color:var(--ink-soft);font-weight:500}
 .subline b{color:var(--ink)}
 .actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
-/* cartões de total (rosa/branco) — Sede (Rossi) e Demais locais */
-.org-stats{display:flex;gap:9px;margin-right:4px}
+/* cartões de total (rosa/branco) — Sede (Rossi), Demais locais e Total geral.
+   Ficam à direita do board-head (title | ações | totais via space-between). */
+.org-stats{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end}
 .org-stat{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid #fbd0e4;border-radius:14px;padding:7px 13px 7px 9px;box-shadow:0 6px 16px -12px rgba(216,27,120,.45)}
-.org-stat .os-ic{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;flex:none;background:linear-gradient(150deg,#ec4899,#d81b78);color:#fff}
+.org-stat .os-ic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none;background:linear-gradient(150deg,#ec4899,#d81b78);color:#fff}
 .org-stat .os-txt{display:flex;flex-direction:column;line-height:1.15}
 .org-stat .os-txt b{font-size:16px;font-weight:800;color:var(--ink)}
 .org-stat .os-txt em{font-style:normal;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#c2277a}
