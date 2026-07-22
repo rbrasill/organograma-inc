@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { nivelDe, NIVEIS, inconsistenciasDe, CARGOS, AREAS, LOCAIS, normalizar } from "@/data/ti";
 import { NIVEL as PERFIL } from "@/lib/perfis";
-import { dataBR, idade, tempoDeEmpresa } from "@/lib/datas";
+import { dataBR, tempoDeEmpresa } from "@/lib/datas";
 import { UserIcon, CloseIcon, AlertIcon, SearchIcon, ChevronIcon, CheckIcon, CakeIcon } from "@/components/icons";
 
 // Edição direta (aplica na hora, só ADMIN): nome, e-mail, local.
@@ -250,10 +250,7 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
           {pessoa.nascimento && (
             <div className="ro">
               <span>Aniversário</span>
-              <b className="ro-cake">
-                <CakeIcon size={16} /> {dataBR(pessoa.nascimento)}
-                {idade(pessoa.nascimento) != null && <em className="ro-sub"> · {idade(pessoa.nascimento)} anos</em>}
-              </b>
+              <b className="ro-cake"><CakeIcon size={16} /> {dataBR(pessoa.nascimento)}</b>
             </div>
           )}
           {pessoa.admissao && (
