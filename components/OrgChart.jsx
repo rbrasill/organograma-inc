@@ -6,7 +6,7 @@ import { NIVEIS, nivelDe, inconsistenciasDe, construirArvore, normalizar } from 
 import {
   UserIcon, PinIcon, CheckIcon, CloseIcon, GridIcon,
   SearchIcon, FullscreenIcon, AlertIcon,
-  PlusIcon, MinusIcon, TargetIcon, DownloadIcon,
+  PlusIcon, MinusIcon, TargetIcon, DownloadIcon, BuildingIcon, UsersIcon,
 } from "@/components/icons";
 import PersonModal from "@/components/PersonModal";
 import ImportModal from "@/components/ImportModal";
@@ -200,6 +200,9 @@ export default function OrgChart() {
   const [pessoas, setPessoas] = useState([]);
   const [setores, setSetores] = useState([]);
   const [areaId, setAreaId] = useState(null);
+  const [localId, setLocalId] = useState(null);       // escopo por local (obra/sede)
+  const [locais, setLocais] = useState([]);           // locais p/ o filtro
+  const [totais, setTotais] = useState(null);         // { geral, sede, campo }
   const [listas, setListas] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [erroApi, setErroApi] = useState("");
@@ -220,17 +223,23 @@ export default function OrgChart() {
   const viewportRef = useRef(null);
   const treeRef = useRef(null);
 
-  const carregar = useCallback(async (area) => {
+  // escopo do organograma: por ÁREA ou por LOCAL (um de cada vez — escolher
+  // um limpa o outro). Sem escopo, mostra só os totais e os seletores.
+  const carregar = useCallback(async (area, local) => {
     setCarregando(true);
     setErroApi("");
     try {
-      const r = await fetch(`/api/organograma${area ? `?area=${encodeURIComponent(area)}` : ""}`);
+      const qs = area ? `?area=${encodeURIComponent(area)}` : local ? `?local=${encodeURIComponent(local)}` : "";
+      const r = await fetch(`/api/organograma${qs}`);
       const j = await r.json();
       if (!j.ok) throw new Error(j.erro || "Falha ao carregar o organograma.");
       setSetores(j.setores);
       setAreaId(j.areaId);
+      setLocalId(j.localId || null);
       setPessoas(j.pessoas);
       setListas(j.listas);
+      if (j.locais) setLocais(j.locais);
+      if (j.totais) setTotais(j.totais);
       setCollapsedSet(new Set());
       setQuery("");
     } catch (e) {
@@ -240,7 +249,7 @@ export default function OrgChart() {
     setCarregando(false);
   }, []);
 
-  useEffect(() => { carregar(null); }, [carregar]);
+  useEffect(() => { carregar(null, null); }, [carregar]);
 
   // vindo de outra página com ?abrir=importar|areas → abre o modal direto
   useEffect(() => {
@@ -250,6 +259,8 @@ export default function OrgChart() {
   }, []);
 
   const nomeArea = setores.find((s) => s.id === areaId)?.nome || "—";
+  const nomeLocal = locais.find((l) => l.id === localId)?.nome || "—";
+  const escopoNome = areaId ? nomeArea : localId ? nomeLocal : null;
 
   // pan & zoom
   const [view, setView] = useState({ x: 0, y: 24, scale: 1 });
@@ -468,7 +479,7 @@ export default function OrgChart() {
       return;
     }
     focoPendenteRef.current = res.matricula;
-    carregar(res.setorId || null);
+    carregar(res.setorId || null, null);
   }
 
   // quando a área nova termina de carregar (byId muda), foca a pessoa pendente
@@ -528,18 +539,31 @@ export default function OrgChart() {
         onAcao={(k) => { if (k === "importar") setShowImport(true); }}
       />
 
-      {/* controles do dia a dia: escolher a área e buscar pessoa */}
+      {/* controles do dia a dia: escolher a área OU o local e buscar pessoa */}
       <div className="controls-bar">
         <div className="select">
           <GridIcon /> Área:
           <select
             className="area-select"
             value={areaId || ""}
-            onChange={(e) => carregar(e.target.value || null)}
+            onChange={(e) => carregar(e.target.value || null, null)}
             disabled={carregando || setores.length === 0}
           >
             <option value="">Selecione uma área...</option>
             {setores.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+          </select>
+        </div>
+        <div className="select">
+          <BuildingIcon size={15} /> Local:
+          <select
+            className="area-select"
+            value={localId || ""}
+            onChange={(e) => carregar(null, e.target.value || null)}
+            disabled={carregando || locais.length === 0}
+            title="Ver o organograma de um local de trabalho (obra/sede)"
+          >
+            <option value="">Selecione um local...</option>
+            {locais.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
           </select>
         </div>
         <div className="search" ref={boxRef}>
@@ -574,19 +598,35 @@ export default function OrgChart() {
         <div className="board">
           <div className="board-head">
             <div className="title-wrap">
-              <span className="eyebrow">Organograma da área</span>
-              <h2>{areaId ? nomeArea : "Selecione uma área"}</h2>
+              <span className="eyebrow">{areaId ? "Organograma da área" : localId ? "Organograma do local" : "Organograma"}</span>
+              <h2>{escopoNome || "Selecione uma área ou local"}</h2>
               {areaId ? (
                 <p className="subline">
                   {totalArea} pessoas &nbsp;·&nbsp; Líder da área: <b>{liderArea}</b> &nbsp;·&nbsp; Última validação: <b>pendente</b>
                 </p>
+              ) : localId ? (
+                <p className="subline">
+                  {totalArea} colaborador(es) neste local de trabalho
+                </p>
               ) : (
                 <p className="subline">
-                  Escolha uma área no seletor acima — ou busque uma pessoa para abrir a área dela.
+                  Escolha uma <b>área</b> ou um <b>local</b> no seletor acima — ou busque uma pessoa para abrir a área dela.
                 </p>
               )}
             </div>
             <div className="actions">
+              {totais && (
+                <div className="org-stats" title="Total de colaboradores ativos">
+                  <div className="org-stat">
+                    <span className="os-ic"><BuildingIcon size={17} /></span>
+                    <span className="os-txt"><b>{totais.sede}</b><em>Sede · Rossi</em></span>
+                  </div>
+                  <div className="org-stat">
+                    <span className="os-ic"><UsersIcon size={17} /></span>
+                    <span className="os-txt"><b>{totais.campo}</b><em>Demais locais</em></span>
+                  </div>
+                </div>
+              )}
               {sessao.nivel >= NIVEL.COLABORADOR && (
                 <button
                   className="btn btn-ghost btn-baixar"
@@ -692,7 +732,7 @@ export default function OrgChart() {
           areaNome={nomeArea}
           qtdDiretos={pessoas.filter((p) => !p.externo && p.lider === liderAreaAlvo.id).length}
           onClose={() => setLiderAreaAlvo(null)}
-          onTrocado={() => { setLiderAreaAlvo(null); carregar(areaId); }}
+          onTrocado={() => { setLiderAreaAlvo(null); carregar(areaId, localId); }}
         />
       )}
 
