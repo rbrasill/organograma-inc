@@ -6,7 +6,7 @@
 
 import { useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { extrairLinhas, validarLinhas } from "@/lib/importacao";
+import { extrairLinhas, validarLinhas, cargoNormalizado, normalizarCodigoCargo } from "@/lib/importacao";
 import { normalizar } from "@/data/ti";
 import { CloseIcon, AlertIcon, CheckIcon, UploadIcon, DownloadIcon } from "@/components/icons";
 
@@ -58,6 +58,7 @@ export default function ImportModal({ onClose }) {
       let situacoesValidas = null;
       let situacoesCodigos = null;
       let setoresNome = null, setoresCod = null;
+      let cargosBanco = null; // [{ codigo, nome, normalizado }]
       let avisoBanco = "";
       try {
         const r = await fetch("/api/importacao");
@@ -70,6 +71,7 @@ export default function ImportModal({ onClose }) {
           situacoesCodigos = new Set(j.situacoes.map((s) => (s.codigo || "").toLowerCase()).filter(Boolean));
           setoresNome = new Set((j.setores || []).map((s) => s.normalizado));
           setoresCod = new Set((j.setores || []).map((s) => s.codigo).filter(Boolean));
+          cargosBanco = j.cargos || [];
         } else {
           avisoBanco = j.erro || "Banco indisponível — prévia sem comparação com a base atual.";
         }
@@ -100,9 +102,35 @@ export default function ImportModal({ onClose }) {
         areasNovas = [...vistas.values()];
       }
 
+      // CARGOS (identidade pelo código do DP): o que a gravação vai criar e
+      // o que vai renomear — transparência antes de confirmar
+      let cargosNovos = [], cargosRenomeados = [];
+      if (cargosBanco) {
+        const porCod = new Map(), porNome = new Map();
+        cargosBanco.forEach((c) => {
+          const k = normalizarCodigoCargo(c.codigo);
+          if (k) porCod.set(k, c);
+          porNome.set(c.normalizado, c);
+        });
+        const vistos = new Set();
+        anotadas.forEach((l) => {
+          if (l.status === "erro" || !l.cargo) return;
+          const cod = normalizarCodigoCargo(l.codigoCargo);
+          if (!cod || vistos.has(cod)) return;
+          vistos.add(cod);
+          const nomeLimpo = l.cargo.trim().replace(/\s+/g, " ");
+          const atual = porCod.get(cod);
+          if (!atual) {
+            if (!porNome.has(cargoNormalizado(l.cargo))) cargosNovos.push(`${l.codigoCargo} · ${nomeLimpo}`);
+          } else if (atual.nome !== nomeLimpo) {
+            cargosRenomeados.push(`${l.codigoCargo}: "${atual.nome}" → "${nomeLimpo}"`);
+          }
+        });
+      }
+
       // o extrato v3 NÃO tem coluna de líder: nesse caso a importação não
       // mexe nos líderes existentes (a árvore é gerida dentro do portal)
-      setPrevia({ anotadas, resumo, arquivar, avisoBanco, areasNovas, temLider: colunas.matriculaLider !== undefined });
+      setPrevia({ anotadas, resumo, arquivar, avisoBanco, areasNovas, cargosNovos, cargosRenomeados, temLider: colunas.matriculaLider !== undefined });
       setEtapa("previa");
     } catch (e) {
       setErroGeral(`Não consegui ler o arquivo: ${e.message}`);
@@ -283,6 +311,22 @@ export default function ImportModal({ onClose }) {
                   <b><AlertIcon size={13} /> Áreas novas que serão criadas ({previa.areasNovas.length}):</b>
                   <span>{previa.areasNovas.join(" · ")}</span>
                   <em>Confira se não é um nome digitado diferente de uma área existente. Se for, corrija o Excel antes de gravar — o nome oficial das áreas se edita em Catálogos → Áreas.</em>
+                </div>
+              )}
+
+              {previa.cargosNovos?.length > 0 && (
+                <div className="imp-areas-novas">
+                  <b><AlertIcon size={13} /> Cargos novos que serão criados ({previa.cargosNovos.length}):</b>
+                  <span>{previa.cargosNovos.join(" · ")}</span>
+                  <em>Entram já vinculados ao nível pela família do nome; sem família reconhecível, classifique depois em Catálogos → Cargos.</em>
+                </div>
+              )}
+
+              {previa.cargosRenomeados?.length > 0 && (
+                <div className="imp-areas-novas">
+                  <b><AlertIcon size={13} /> Cargos que serão renomeados pelo DP ({previa.cargosRenomeados.length}):</b>
+                  <span>{previa.cargosRenomeados.join(" · ")}</span>
+                  <em>O código identifica o cargo e o nome do extrato do DP passa a valer no catálogo e no organograma.</em>
                 </div>
               )}
 

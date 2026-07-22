@@ -34,17 +34,16 @@ const erro400 = (m) => Response.json({ ok: false, erro: m }, { status: 400 });
 
 // gera o PRÓXIMO código da sequência oficial de cada catálogo, lendo o maior
 // já usado no banco. O usuário não digita código — o sistema segue a série.
-//   setor SET300… · nível NH500… · cargo numérico (1,2,…)
+//   setor SET300… · nível NH500…
 //   situação: próxima LETRA livre de A a Z (série fechada)
-//   local: SEM geração — o código é o número oficial da obra no DP (mig. 06)
-//   e entra pela importação; local criado à mão fica sem código até a obra
+//   local e cargo: SEM geração — o código é o oficial do DP (migs. 06 e 10)
+//   e entra pela importação; registro criado à mão fica sem código até
 //   aparecer no extrato (inventar número aqui poderia colidir com o DP).
 async function proximoCodigo(pool, tipo) {
-  if (tipo === "local") return null;
+  if (tipo === "local" || tipo === "cargo") return null;
   const seq = {
     setor: { tabela: "setor", col: "codigo_dp", prefixo: "SET" },
     nivel: { tabela: "nivel_hierarquico", col: "codigo_nh", prefixo: "NH" },
-    cargo: { tabela: "cargo", col: "codigo_cargo_dp", prefixo: "" },
   }[tipo];
 
   if (tipo === "situacao") {
@@ -74,7 +73,7 @@ const DEFS = {
     ],
   },
   cargo: {
-    tabela: "cargo", colCodigo: "codigo_cargo_dp", temNome: true, codigoUnico: false,
+    tabela: "cargo", colCodigo: "codigo_cargo_dp", temNome: true, codigoUnico: true, // mig. 10
     desvincular: [
       "UPDATE colaborador SET cargo_id = NULL WHERE cargo_id = ?",
       "UPDATE colaborador_historico SET cargo_id = NULL WHERE cargo_id = ?",

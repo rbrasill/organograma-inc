@@ -10,7 +10,7 @@
 import { randomUUID } from "crypto";
 import { getPool } from "@/lib/db";
 import { normalizar } from "@/data/ti";
-import { localComCodigo, normalizarCodigoLocal, cargoNormalizado } from "@/lib/importacao";
+import { localComCodigo, normalizarCodigoLocal, cargoNormalizado, normalizarCodigoCargo, familiaDoCargo } from "@/lib/importacao";
 import { exigirNivel } from "@/lib/permissoes";
 import { NIVEL } from "@/lib/perfis";
 
@@ -35,12 +35,14 @@ export async function GET() {
     );
     const [sits] = await pool.query("SELECT nome, nome_normalizado, codigo_dp FROM situacao");
     const [setores] = await pool.query("SELECT nome_normalizado, codigo_dp FROM setor");
+    const [cargos] = await pool.query("SELECT codigo_cargo_dp, nome, nome_normalizado FROM cargo");
     return Response.json({
       ok: true,
       clt: colabs.map((c) => ({ cpf: c.cpf || "", matricula: c.codigo_dp || "" })),
       matriculas: colabs.map((c) => c.codigo_dp).filter(Boolean), // validação de líder (arquivos v2)
       situacoes: sits.map((s) => ({ nome: s.nome, normalizado: s.nome_normalizado, codigo: s.codigo_dp })),
       setores: setores.map((s) => ({ normalizado: s.nome_normalizado, codigo: s.codigo_dp })),
+      cargos: cargos.map((c) => ({ codigo: c.codigo_cargo_dp, nome: c.nome, normalizado: c.nome_normalizado })),
     });
   } catch (e) {
     return erroResposta(e);
@@ -87,9 +89,9 @@ export async function POST(req) {
       const [setRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado FROM setor");
       const [locRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado FROM local_trabalho");
       const [sitRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado FROM situacao");
-      const [carRows] = await conn.query("SELECT id, nome_normalizado FROM cargo");
+      const [carRows] = await conn.query("SELECT id, codigo_cargo_dp, nome, nome_normalizado FROM cargo");
       const [regRows] = await conn.query("SELECT id, nome_normalizado FROM regional");
-      const [nhRows]  = await conn.query("SELECT id, codigo_nh FROM nivel_hierarquico");
+      const [nhRows]  = await conn.query("SELECT id, codigo_nh, familia FROM nivel_hierarquico");
 
       const setCod = new Map(), setNome = new Map();
       setRows.forEach((r) => { if (r.codigo_dp) setCod.set(r.codigo_dp, r.id); setNome.set(r.nome_normalizado, r.id); });
@@ -97,9 +99,16 @@ export async function POST(req) {
       locRows.forEach((r) => { if (r.codigo_dp) locCod.set(r.codigo_dp, r.id); locNome.set(r.nome_normalizado, r.id); });
       const sitCod = new Map(), sitNome = new Map();
       sitRows.forEach((r) => { if (r.codigo_dp) sitCod.set(String(r.codigo_dp).toLowerCase(), r.id); sitNome.set(r.nome_normalizado, r.id); });
+      // CARGO: o CÓDIGO do DP é a identidade (mig. 10); nome é fallback
       const carNome = new Map(carRows.map((r) => [r.nome_normalizado, r.id]));
+      const carCod = new Map(); // código normalizado -> { id, nome, norm }
+      carRows.forEach((r) => {
+        const k = normalizarCodigoCargo(r.codigo_cargo_dp);
+        if (k) carCod.set(k, { id: r.id, nome: r.nome, norm: r.nome_normalizado });
+      });
       const regNome = new Map(regRows.map((r) => [r.nome_normalizado, r.id]));
       const nhId = new Map(nhRows.map((r) => [r.codigo_nh, r.id]));
+      const familias = nhRows.filter((r) => r.familia); // p/ nível automático de cargo novo
 
       // local no formato novo do DP ("472 - Reserva JK"): deriva o código do
       // DP do prefixo quando a coluna de código não veio, e guarda o nome
@@ -133,11 +142,45 @@ export async function POST(req) {
           novoLoc.push([id, l.codigoLocal || null, nome, norm]);
           if (l.codigoLocal) locCod.set(l.codigoLocal, id); locNome.set(norm, id);
         }
-        // cargo casa por nome com alias do DP (grafias abreviadas → canônico)
+        // CARGO — identidade pelo código do DP (mig. 10):
+        //  * código existe no catálogo + nome diverge → RENOMEIA (o DP manda
+        //    no nome), a menos que o nome novo colida com outro cargo;
+        //  * código não existe + nome existe → cargo legado ADOTA o código;
+        //  * código não existe + nome não existe → CRIA, já com o nível
+        //    assimilado pela família do nome (prefixo mais longo);
+        //  * sem código (arquivos antigos) → fallback por nome, como antes.
         const cNorm = l.cargo ? cargoNormalizado(l.cargo) : null;
-        if (cNorm && !carNome.has(cNorm)) {
-          const id = randomUUID(); const nivelId = l.codigoNH ? (nhId.get(l.codigoNH) || null) : null;
-          novoCar.push([id, l.codigoCargo || null, l.cargo.trim().replace(/\s+/g, " "), cNorm, nivelId]);
+        const cCod = normalizarCodigoCargo(l.codigoCargo);
+        const nomeLimpo = l.cargo ? l.cargo.trim().replace(/\s+/g, " ") : "";
+        if (cCod && cNorm) {
+          const atual = carCod.get(cCod);
+          if (atual) {
+            if (atual.nome !== nomeLimpo) {
+              const donoNome = carNome.get(cNorm);
+              if (donoNome && donoNome !== atual.id) {
+                l.motivos = [...(l.motivos || []), `Cargo cód. ${l.codigoCargo}: rename para "${nomeLimpo}" colidiria com outro cargo — nome atual mantido`];
+              } else {
+                await conn.query("UPDATE cargo SET nome = ?, nome_normalizado = ? WHERE id = ?", [nomeLimpo, cNorm, atual.id]);
+                carNome.delete(atual.norm);
+                carNome.set(cNorm, atual.id);
+                carCod.set(cCod, { id: atual.id, nome: nomeLimpo, norm: cNorm });
+              }
+            }
+          } else if (carNome.has(cNorm)) {
+            const id = carNome.get(cNorm); // cargo legado sem código: adota
+            await conn.query("UPDATE cargo SET codigo_cargo_dp = ? WHERE id = ?", [l.codigoCargo.trim(), id]);
+            carCod.set(cCod, { id, nome: nomeLimpo, norm: cNorm });
+          } else {
+            const id = randomUUID();
+            const nivelId = (l.codigoNH && nhId.get(l.codigoNH)) || familiaDoCargo(nomeLimpo, familias)?.id || null;
+            novoCar.push([id, l.codigoCargo.trim(), nomeLimpo, cNorm, nivelId]);
+            carNome.set(cNorm, id);
+            carCod.set(cCod, { id, nome: nomeLimpo, norm: cNorm });
+          }
+        } else if (cNorm && !carNome.has(cNorm)) {
+          const id = randomUUID();
+          const nivelId = (l.codigoNH && nhId.get(l.codigoNH)) || familiaDoCargo(nomeLimpo, familias)?.id || null;
+          novoCar.push([id, null, nomeLimpo, cNorm, nivelId]);
           carNome.set(cNorm, id);
         }
         const rNorm = l.regional ? normalizar(l.regional) : null;
@@ -186,7 +229,9 @@ export async function POST(req) {
         const setorId = (l.codigoSetor && setCod.get(l.codigoSetor)) || (l.setor && setNome.get(normalizar(l.setor))) || null;
         const localId = (l.codigoLocal && locCod.get(l.codigoLocal)) || (l.local && locNome.get(normalizar(l.local))) || null;
         const sitId   = (l.codigoSituacao && sitCod.get(String(l.codigoSituacao).toLowerCase())) || (l.situacao && sitNome.get(normalizar(l.situacao))) || null;
-        const cargoId = l.cargo ? carNome.get(cargoNormalizado(l.cargo)) || null : null;
+        const cargoId =
+          (normalizarCodigoCargo(l.codigoCargo) && carCod.get(normalizarCodigoCargo(l.codigoCargo))?.id) ||
+          (l.cargo ? carNome.get(cargoNormalizado(l.cargo)) || null : null);
         const regId   = l.regional ? regNome.get(normalizar(l.regional)) || null : null;
         // tipo de contratação: coluna explícita da v2; fallback = prefixo "PJ"
         const tipo = l.tipo
