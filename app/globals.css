@@ -107,6 +107,11 @@ main{padding:20px 24px 24px}
 .org-stat .os-txt{display:flex;flex-direction:column;line-height:1.15}
 .org-stat .os-txt b{font-size:16px;font-weight:800;color:var(--ink)}
 .org-stat .os-txt em{font-style:normal;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#c2277a}
+/* cartão do total geral — rosa cheio, para destacar a soma */
+.org-stat.total{background:linear-gradient(150deg,#ec4899,#d81b78);border-color:transparent}
+.org-stat.total .os-ic{background:rgba(255,255,255,.22);color:#fff}
+.org-stat.total .os-txt b{color:#fff}
+.org-stat.total .os-txt em{color:#ffe3f1}
 .btn{border:0;cursor:pointer;font:inherit;font-weight:600;font-size:13px;border-radius:999px;padding:10px 16px;display:inline-flex;align-items:center;gap:9px;transition:transform .5s var(--ease),box-shadow .5s var(--ease),background .3s var(--ease)}
 .btn:active{transform:scale(.97)}
 .btn .ic{width:22px;height:22px;border-radius:999px;display:grid;place-items:center;transition:transform .5s var(--ease)}

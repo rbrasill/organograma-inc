@@ -625,6 +625,10 @@ export default function OrgChart() {
                     <span className="os-ic"><UsersIcon size={17} /></span>
                     <span className="os-txt"><b>{totais.campo}</b><em>Demais locais</em></span>
                   </div>
+                  <div className="org-stat total">
+                    <span className="os-ic"><UsersIcon size={17} /></span>
+                    <span className="os-txt"><b>{totais.geral}</b><em>Total geral</em></span>
+                  </div>
                 </div>
               )}
               {sessao.nivel >= NIVEL.COLABORADOR && (
