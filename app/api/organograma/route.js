@@ -74,6 +74,8 @@ export async function GET(req) {
     // outro setor que lidera a área inteira. O campo `externo` marca o nó.
     const [extRows] = await pool.query(
       `SELECT DISTINCT c.id, c.codigo_dp, c.nome, c.email, c.tipo_contratacao,
+              DATE_FORMAT(c.data_nascimento, '%Y-%m-%d') AS data_nascimento,
+              DATE_FORMAT(c.data_admissao, '%Y-%m-%d') AS data_admissao,
               cg.nome AS cargo, lt.nome AS local, st.nome AS situacao,
               COALESCE(nhp.ordem, nh.ordem) AS nivel_ordem,
               COALESCE(nhp.familia, nh.familia) AS familia,
@@ -101,6 +103,9 @@ export async function GET(req) {
       lider: null, // âncora da área: a cadeia acima dele não é desenhada aqui
       liderNome: "",
       pj: r.tipo_contratacao === "PJ",
+      regional: r.regional || "",
+      nascimento: r.data_nascimento || "",
+      admissao: r.data_admissao || "",
       nivelOrdem: r.nivel_ordem || null,
       familia: r.familia || "",
       cor: r.cor || null,
