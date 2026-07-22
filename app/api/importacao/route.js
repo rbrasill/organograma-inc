@@ -27,15 +27,18 @@ export async function GET() {
   if (bloqueio) return bloqueio;
   try {
     const pool = getPool();
-    // só CLT: PJ nunca entra na comparação nem na lista de arquivamento
+    // só CLT: PJ nunca entra na comparação nem na lista de arquivamento.
+    // A identidade é o CPF (a chapa pode mudar no DP) — a prévia usa os pares
+    // cpf+matrícula para calcular novos × atualizados × a arquivar.
     const [colabs] = await pool.query(
-      "SELECT codigo_dp FROM colaborador WHERE codigo_dp IS NOT NULL AND ativo = 1 AND tipo_contratacao = 'CLT'"
+      "SELECT cpf, codigo_dp FROM colaborador WHERE ativo = 1 AND tipo_contratacao = 'CLT'"
     );
     const [sits] = await pool.query("SELECT nome, nome_normalizado, codigo_dp FROM situacao");
     const [setores] = await pool.query("SELECT nome_normalizado, codigo_dp FROM setor");
     return Response.json({
       ok: true,
-      matriculas: colabs.map((c) => c.codigo_dp),
+      clt: colabs.map((c) => ({ cpf: c.cpf || "", matricula: c.codigo_dp || "" })),
+      matriculas: colabs.map((c) => c.codigo_dp).filter(Boolean), // validação de líder (arquivos v2)
       situacoes: sits.map((s) => ({ nome: s.nome, normalizado: s.nome_normalizado, codigo: s.codigo_dp })),
       setores: setores.map((s) => ({ normalizado: s.nome_normalizado, codigo: s.codigo_dp })),
     });
@@ -149,16 +152,31 @@ export async function POST(req) {
       if (novoCar.length) await bulkInsert(conn, "INSERT INTO cargo (id, codigo_cargo_dp, nome, nome_normalizado, nivel_id) VALUES ?", novoCar);
       if (novoReg.length) await bulkInsert(conn, "INSERT INTO regional (id, nome, nome_normalizado) VALUES ?", novoReg);
 
-      const matriculas = linhas.map((l) => l.matricula);
+      // IDENTIDADE PELO CPF: a chapa pode mudar no DP; o CPF nunca. O lookup
+      // vem ordenado do "melhor" candidato para o pior (ativo primeiro, depois
+      // admissão mais recente) — com CPF duplicado no banco (recontratação),
+      // o primeiro da ordem é o que recebe a atualização.
+      const cpfs = linhas.map((l) => l.cpf).filter(Boolean);
       const [ex] = await conn.query(
         `SELECT id, codigo_dp, nome, cpf, cargo_id, setor_id, local_id, regional_id, situacao_id,
                 tipo_contratacao, ativo,
                 DATE_FORMAT(data_nascimento, '%Y-%m-%d') AS data_nascimento,
                 DATE_FORMAT(data_admissao, '%Y-%m-%d') AS data_admissao
-           FROM colaborador WHERE codigo_dp IN (?)`,
-        [matriculas]
+           FROM colaborador WHERE cpf IN (?)
+          ORDER BY ativo DESC, data_admissao DESC, criado_em DESC`,
+        [cpfs.length ? cpfs : [""]]
       );
-      const exMap = new Map(ex.map((c) => [c.codigo_dp, c]));
+      const exMap = new Map();
+      for (const c of ex) if (!exMap.has(c.cpf)) exMap.set(c.cpf, c);
+
+      // dono atual de cada CHAPA do lote (para a troca de chapa não colidir
+      // com a UNIQUE quando a chapa pertencer a OUTRO CPF)
+      const matriculas = linhas.map((l) => l.matricula).filter(Boolean);
+      const [donos] = await conn.query(
+        "SELECT id, codigo_dp, cpf FROM colaborador WHERE codigo_dp IN (?)",
+        [matriculas.length ? matriculas : [""]]
+      );
+      const chapaDono = new Map(donos.map((d) => [d.codigo_dp, d]));
 
       const novos = [], hist = [], itens = [];
       let inseridos = 0, atualizados = 0;
@@ -182,27 +200,37 @@ export async function POST(req) {
         const nasc = l.dataNascimento || null; // já em ISO (cliente valida)
         const adm = l.dataAdmissao || null;
 
-        const cur = exMap.get(l.matricula);
+        const cur = cpfNovo ? exMap.get(cpfNovo) : null; // identidade é o CPF
         if (cur) {
+          // CHAPA pode ter mudado no DP — atualiza, exceto se a chapa nova já
+          // pertence a OUTRO CPF (colisão de UNIQUE: mantém a atual e registra)
+          const dono = l.matricula ? chapaDono.get(l.matricula) : null;
+          let chapaNova = l.matricula || null;
+          if (chapaNova && dono && dono.id !== cur.id) {
+            chapaNova = null; // conflito: não troca
+            l.motivos = [...(l.motivos || []), `Chapa ${l.matricula} já pertence a outro CPF — chapa atual mantida`];
+            l.status = l.status === "ok" ? "alerta" : l.status;
+          }
           // "mudou" só quando o arquivo TRAZ um valor e ele difere do atual
           const diff = (novo, atual) => novo !== null && novo !== undefined && novo !== "" && novo !== atual;
           const mudou =
-            diff(l.nome, cur.nome) || diff(cargoId, cur.cargo_id) || diff(setorId, cur.setor_id) ||
+            diff(l.nome, cur.nome) || diff(chapaNova, cur.codigo_dp) ||
+            diff(cargoId, cur.cargo_id) || diff(setorId, cur.setor_id) ||
             diff(localId, cur.local_id) || diff(regId, cur.regional_id) || diff(sitId, cur.situacao_id) ||
-            cur.ativo !== 1 || diff(cpfNovo, cur.cpf) ||
+            cur.ativo !== 1 ||
             diff(nasc, cur.data_nascimento) || diff(adm, cur.data_admissao);
           if (mudou) {
-            // tipo_contratacao NUNCA é alterado em registro existente (regra 4)
+            // tipo_contratacao e CPF NUNCA mudam em registro existente
             await conn.query(
               `UPDATE colaborador SET
-                 nome = COALESCE(?, nome), cpf = COALESCE(?, cpf),
+                 codigo_dp = COALESCE(?, codigo_dp), nome = COALESCE(?, nome),
                  data_nascimento = COALESCE(?, data_nascimento),
                  data_admissao = COALESCE(?, data_admissao),
                  cargo_id = COALESCE(?, cargo_id), setor_id = COALESCE(?, setor_id),
                  local_id = COALESCE(?, local_id), regional_id = COALESCE(?, regional_id),
                  situacao_id = COALESCE(?, situacao_id), ativo = 1
                WHERE id = ?`,
-              [l.nome || null, cpfNovo, nasc, adm, cargoId, setorId, localId, regId, sitId, cur.id]
+              [chapaNova, l.nome || null, nasc, adm, cargoId, setorId, localId, regId, sitId, cur.id]
             );
             await conn.query(
               "UPDATE colaborador_historico SET data_fim = NOW() WHERE colaborador_id = ? AND data_fim IS NULL",
@@ -211,11 +239,23 @@ export async function POST(req) {
             hist.push([randomUUID(), cur.id, cargoId ?? cur.cargo_id, setorId ?? cur.setor_id, localId ?? cur.local_id, sitId ?? cur.situacao_id, "importacao"]);
             atualizados++;
           }
+          // a chapa que este registro passa a usar fica reservada para ele
+          if (chapaNova) chapaDono.set(chapaNova, { id: cur.id, cpf: cpfNovo });
         } else {
-          const nid = randomUUID();
-          novos.push([nid, l.matricula, l.nome, cpfNovo, nasc, adm, tipo, cargoId, setorId, localId, regId, sitId, 1]);
-          hist.push([randomUUID(), nid, cargoId, setorId, localId, sitId, "importacao"]);
-          inseridos++;
+          // NOVO colaborador — se a chapa já pertence a outro CPF, a linha é
+          // pulada com erro (inserir colidiria com a UNIQUE da matrícula)
+          const dono = l.matricula ? chapaDono.get(l.matricula) : null;
+          if (dono) {
+            l.status = "erro";
+            l.motivos = [...(l.motivos || []), `Chapa ${l.matricula} já pertence a outro CPF — linha não importada`];
+          } else {
+            const nid = randomUUID();
+            novos.push([nid, l.matricula, l.nome, cpfNovo, nasc, adm, tipo, cargoId, setorId, localId, regId, sitId, 1]);
+            hist.push([randomUUID(), nid, cargoId, setorId, localId, sitId, "importacao"]);
+            if (l.matricula) chapaDono.set(l.matricula, { id: nid, cpf: cpfNovo });
+            if (cpfNovo) exMap.set(cpfNovo, { id: nid, codigo_dp: l.matricula }); // linha repetida no lote não duplica
+            inseridos++;
+          }
         }
         itens.push([
           randomUUID(), importacaoId, l.linha, JSON.stringify(l),
@@ -234,11 +274,11 @@ export async function POST(req) {
       return Response.json({ ok: true, inseridos, atualizados });
     }
 
-    // ---- finalizar: resolve líderes + arquivamento (poucas queries) ----
+    // ---- finalizar: resolve líderes + arquivamento por CPF (poucas queries) ----
     if (acao === "finalizar") {
       // temLider=false (extrato v3, sem coluna de líder): a importação NÃO
       // mexe em nenhum lider_id — a árvore é gerida dentro do portal.
-      const { importacaoId, matriculasArquivo = [], liderPares = [], erros = [], temLider = true } = body;
+      const { importacaoId, cpfsArquivo = [], liderPares = [], erros = [], temLider = true } = body;
       conn = await pool.getConnection();
       await conn.beginTransaction();
 
@@ -254,17 +294,17 @@ export async function POST(req) {
 
       await conn.query("DROP TEMPORARY TABLE IF EXISTS _imp_file");
       await conn.query("DROP TEMPORARY TABLE IF EXISTS _imp_lider");
-      await conn.query("CREATE TEMPORARY TABLE _imp_file (m VARCHAR(40) PRIMARY KEY)");
+      await conn.query("CREATE TEMPORARY TABLE _imp_file (cpf VARCHAR(11) PRIMARY KEY)");
       await conn.query("CREATE TEMPORARY TABLE _imp_lider (m VARCHAR(40), l VARCHAR(40), KEY(m), KEY(l))");
 
-      if (matriculasArquivo.length)
-        await bulkInsert(conn, "INSERT IGNORE INTO _imp_file (m) VALUES ?",
-          matriculasArquivo.map((m) => [m]));
+      if (cpfsArquivo.length)
+        await bulkInsert(conn, "INSERT IGNORE INTO _imp_file (cpf) VALUES ?",
+          cpfsArquivo.map((c) => [String(c).replace(/\D/g, "")]).filter((c) => c[0]));
       if (liderPares.length)
         await bulkInsert(conn, "INSERT INTO _imp_lider (m, l) VALUES ?", liderPares);
 
       if (temLider) {
-        // define o líder de quem tem par válido
+        // define o líder de quem tem par válido (pares por matrícula — v2)
         await conn.query(
           `UPDATE colaborador c
              JOIN _imp_lider t ON t.m = c.codigo_dp
@@ -274,28 +314,41 @@ export async function POST(req) {
         // quem veio no arquivo mas sem par válido → sem líder (raiz)
         await conn.query(
           `UPDATE colaborador c
-             JOIN _imp_file f ON f.m = c.codigo_dp
+             JOIN _imp_file f ON f.cpf = c.cpf
              LEFT JOIN _imp_lider t ON t.m = c.codigo_dp
               SET c.lider_id = NULL
             WHERE t.m IS NULL`
         );
       }
-      // arquivamento: CLT ativo que não veio no arquivo. PJ NUNCA é
-      // arquivado por importação (gestão exclusiva pelo menu PJ).
+      // arquivamento POR CPF: CLT ativo cujo CPF não veio no arquivo (inclui
+      // quem está sem CPF no banco — invisível para o extrato do DP).
+      // PJ NUNCA é arquivado por importação (gestão exclusiva pelo menu PJ).
       const [arq] = await conn.query(
         `UPDATE colaborador c
-           LEFT JOIN _imp_file f ON f.m = c.codigo_dp
+           LEFT JOIN _imp_file f ON f.cpf = c.cpf
             SET c.ativo = 0
-          WHERE c.ativo = 1 AND f.m IS NULL AND c.codigo_dp IS NOT NULL
+          WHERE c.ativo = 1 AND f.cpf IS NULL
             AND c.tipo_contratacao = 'CLT'`
       );
+      // colapso de duplicatas: se o MESMO CPF tem mais de um registro CLT
+      // ativo (recontratação com chapa nova), fica só o vínculo de admissão
+      // mais recente — o mesmo desempate do login. Os demais são arquivados.
+      const [dup] = await conn.query(
+        `UPDATE colaborador c
+           JOIN colaborador d
+             ON d.cpf = c.cpf AND d.id <> c.id
+            AND d.ativo = 1 AND d.tipo_contratacao = 'CLT'
+            AND (d.data_admissao > c.data_admissao
+                 OR (d.data_admissao <=> c.data_admissao AND d.criado_em > c.criado_em))
+            SET c.ativo = 0
+          WHERE c.ativo = 1 AND c.tipo_contratacao = 'CLT' AND c.cpf IS NOT NULL`
+      );
+      // invariante: registro arquivado não mantém histórico em aberto
       await conn.query(
         `UPDATE colaborador_historico h
            JOIN colaborador c ON c.id = h.colaborador_id
-           LEFT JOIN _imp_file f ON f.m = c.codigo_dp
             SET h.data_fim = NOW()
-          WHERE h.data_fim IS NULL AND c.ativo = 0 AND f.m IS NULL AND c.codigo_dp IS NOT NULL
-            AND c.tipo_contratacao = 'CLT'`
+          WHERE h.data_fim IS NULL AND c.ativo = 0`
       );
 
       await conn.query("DROP TEMPORARY TABLE IF EXISTS _imp_file");
@@ -303,7 +356,10 @@ export async function POST(req) {
       await conn.query("UPDATE importacao SET status = 'confirmado' WHERE id = ?", [importacaoId]);
       await conn.commit();
 
-      return Response.json({ ok: true, arquivados: arq.affectedRows || 0 });
+      return Response.json({
+        ok: true,
+        arquivados: (arq.affectedRows || 0) + (dup.affectedRows || 0),
+      });
     }
 
     return Response.json({ ok: false, erro: "Ação desconhecida." }, { status: 400 });

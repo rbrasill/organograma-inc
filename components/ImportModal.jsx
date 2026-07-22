@@ -50,7 +50,10 @@ export default function ImportModal({ onClose }) {
       const { erro, linhas, colunas } = extrairLinhas(matriz);
       if (erro) { setErroGeral(erro); setEtapa("selecao"); return; }
 
-      // dados do banco para a prévia (novos x atualizados x arquivados)
+      // dados do banco para a prévia (novos x atualizados x arquivados).
+      // A identidade é o CPF: a chapa pode mudar no DP, o CPF nunca.
+      let cpfsBanco = new Set();
+      let cltBanco = [];
       let matriculasBanco = new Set();
       let situacoesValidas = null;
       let situacoesCodigos = null;
@@ -60,6 +63,8 @@ export default function ImportModal({ onClose }) {
         const r = await fetch("/api/importacao");
         const j = await r.json();
         if (j.ok) {
+          cltBanco = j.clt || [];
+          cpfsBanco = new Set(cltBanco.map((c) => c.cpf).filter(Boolean));
           matriculasBanco = new Set(j.matriculas);
           situacoesValidas = new Set(j.situacoes.map((s) => s.normalizado));
           situacoesCodigos = new Set(j.situacoes.map((s) => (s.codigo || "").toLowerCase()).filter(Boolean));
@@ -72,9 +77,12 @@ export default function ImportModal({ onClose }) {
         avisoBanco = "Banco indisponível — prévia sem comparação com a base atual.";
       }
 
-      const { anotadas, resumo } = validarLinhas(linhas, { matriculasBanco, situacoesValidas, situacoesCodigos, colunas });
-      const noArquivo = new Set(anotadas.filter((l) => l.status !== "erro").map((l) => l.matricula));
-      const arquivar = [...matriculasBanco].filter((m) => !noArquivo.has(m));
+      const { anotadas, resumo } = validarLinhas(linhas, { cpfsBanco, matriculasBanco, situacoesValidas, situacoesCodigos, colunas });
+      // a arquivar: CLT ativo do banco cujo CPF não veio no arquivo
+      const cpfsArquivo = new Set(anotadas.filter((l) => l.status !== "erro").map((l) => l.cpf).filter(Boolean));
+      const arquivar = cltBanco
+        .filter((c) => !c.cpf || !cpfsArquivo.has(c.cpf))
+        .map((c) => c.matricula || c.cpf);
 
       // áreas do arquivo que ainda não existem no banco (por código ou nome) —
       // destaque para o RH conferir typos antes de gravar
@@ -142,7 +150,7 @@ export default function ImportModal({ onClose }) {
 
       const fin = await postJSON({
         acao: "finalizar", importacaoId,
-        matriculasArquivo: validas.map((l) => l.matricula),
+        cpfsArquivo: validas.map((l) => l.cpf).filter(Boolean),
         temLider: previa.temLider, // arquivo sem coluna de líder → não mexe na árvore
         liderPares: validas.filter((l) => l.liderValido).map((l) => [l.matricula, l.liderValido]),
         erros: comErro.map(empacota),
@@ -173,7 +181,7 @@ export default function ImportModal({ onClose }) {
           <div className="imp-ico"><UploadIcon size={22} /></div>
           <div>
             <h3>Importar base por Excel</h3>
-            <p>Extrato do DP (CHAPA, CPF, datas, cargo, situação, local) · CLT que sai do arquivo é arquivado · PJ e árvore de líderes não são afetados</p>
+            <p>Identificação pelo CPF (a chapa pode mudar) · CLT cujo CPF sai do arquivo é arquivado · PJ e árvore de líderes não são afetados</p>
           </div>
         </div>
 
