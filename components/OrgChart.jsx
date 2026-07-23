@@ -592,6 +592,27 @@ export default function OrgChart() {
             </div>
           )}
         </div>
+
+        {totais && (
+          <div className="org-stats" title="Total de colaboradores ativos">
+            <div className="org-stat">
+              <span className="os-ic"><BuildingIcon size={17} /></span>
+              <span className="os-txt"><b>{totais.sede}</b><em>Sede · Rossi</em></span>
+            </div>
+            <div className="org-stat">
+              <span className="os-ic"><UsersIcon size={17} /></span>
+              <span className="os-txt"><b>{totais.campo}</b><em>Demais locais</em></span>
+            </div>
+            <div className="org-stat">
+              <span className="os-ic"><BriefcaseIcon size={16} /></span>
+              <span className="os-txt"><b>{totais.pj}</b><em>Colaboradores PJ</em></span>
+            </div>
+            <div className="org-stat total">
+              <span className="os-ic"><UsersIcon size={17} /></span>
+              <span className="os-txt"><b>{totais.geral}</b><em>Total geral</em></span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className={`board-shell ${fullscreen ? "fs" : ""}`}>
@@ -637,26 +658,6 @@ export default function OrgChart() {
                 {fullscreen ? <CloseIcon /> : <FullscreenIcon />}
               </button>
             </div>
-            {totais && (
-              <div className="org-stats" title="Total de colaboradores ativos">
-                <div className="org-stat">
-                  <span className="os-ic"><BuildingIcon size={17} /></span>
-                  <span className="os-txt"><b>{totais.sede}</b><em>Sede · Rossi</em></span>
-                </div>
-                <div className="org-stat">
-                  <span className="os-ic"><UsersIcon size={17} /></span>
-                  <span className="os-txt"><b>{totais.campo}</b><em>Demais locais</em></span>
-                </div>
-                <div className="org-stat">
-                  <span className="os-ic"><BriefcaseIcon size={16} /></span>
-                  <span className="os-txt"><b>{totais.pj}</b><em>Colaboradores PJ</em></span>
-                </div>
-                <div className="org-stat total">
-                  <span className="os-ic"><UsersIcon size={17} /></span>
-                  <span className="os-txt"><b>{totais.geral}</b><em>Total geral</em></span>
-                </div>
-              </div>
-            )}
           </div>
 
           <div
