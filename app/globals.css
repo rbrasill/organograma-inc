@@ -103,17 +103,18 @@ main{padding:20px 24px 24px}
 /* cartões de total (rosa/branco) — Sede (Rossi), Demais locais e Total geral.
    Ficam à direita do board-head (title | ações | totais via space-between). */
 /* totais na barra de controles — à direita, na mesma linha dos filtros;
-   estilo clean: cartão claro, ícone em quadradinho de tom suave (rosa INC) */
+   estilo clean das referências: cartão claro, ícone teal em quadradinho
+   branco com sombra suave (igual ao tile "SEC Filings") */
 .org-stats{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto}
 .org-stat{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 14px 6px 7px;box-shadow:var(--shadow-soft)}
-.org-stat .os-ic{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none;background:#fff0f7;color:#d81b78}
+.org-stat .os-ic{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none;background:#fff;color:#0e7490;box-shadow:0 4px 10px -4px rgba(14,116,144,.35),inset 0 0 0 1px #e2eef2}
 .org-stat .os-txt{display:flex;flex-direction:column;line-height:1.12}
 .org-stat .os-txt b{font-size:16px;font-weight:800;color:var(--ink)}
 .org-stat .os-txt em{font-style:normal;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint)}
-/* cartão do total geral — leve destaque rosa, sem pesar */
-.org-stat.total{background:#fff0f7;border-color:#fbd0e4}
-.org-stat.total .os-ic{background:linear-gradient(150deg,#ec4899,#d81b78);color:#fff}
-.org-stat.total .os-txt em{color:#c2277a}
+/* cartão do total geral — leve destaque azul-teal, como o badge da data */
+.org-stat.total{background:#e8f4fb;border-color:#cfe8f6}
+.org-stat.total .os-ic{background:linear-gradient(150deg,#22b3c9,#0e7490);color:#fff;box-shadow:0 4px 10px -4px rgba(14,116,144,.5)}
+.org-stat.total .os-txt em{color:#0e7490}
 .btn{border:0;cursor:pointer;font:inherit;font-weight:600;font-size:13px;border-radius:999px;padding:10px 16px;display:inline-flex;align-items:center;gap:9px;transition:transform .5s var(--ease),box-shadow .5s var(--ease),background .3s var(--ease)}
 .btn:active{transform:scale(.97)}
 .btn .ic{width:22px;height:22px;border-radius:999px;display:grid;place-items:center;transition:transform .5s var(--ease)}
