@@ -68,9 +68,13 @@ main{padding:20px 24px 24px}
 .hc-badge{font-style:normal;font-size:10px;font-weight:800;background:#fff;color:var(--inc);border-radius:999px;padding:1px 6px;line-height:1.4}
 @media (max-width:820px){ .hero-txt h1{font-size:20px} }
 
-.controls-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+/* barra em uma linha só (sem quebrar): seletores e cartões ficam no tamanho
+   natural; a busca é o item flexível que encolhe para caber o resto */
+.controls-bar{display:flex;align-items:center;gap:12px;flex-wrap:nowrap;margin-bottom:16px}
 .select,.search{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--line);padding:9px 13px;border-radius:12px;box-shadow:var(--shadow-soft);font-size:13px;color:var(--ink-soft);font-weight:500;position:relative}
-.search input{border:0;outline:0;font:inherit;color:var(--ink);background:transparent;width:210px}
+.select{flex:0 0 auto}
+.search{flex:1 1 auto;min-width:120px}
+.search input{border:0;outline:0;font:inherit;color:var(--ink);background:transparent;width:100%;min-width:0}
 .select svg,.search svg{color:var(--ink-faint)}
 .select b{color:var(--ink);font-weight:600}
 
@@ -105,12 +109,12 @@ main{padding:20px 24px 24px}
 /* totais na barra de controles — à direita, na mesma linha dos filtros;
    estilo clean das referências: cartão claro, ícone teal em quadradinho
    branco com sombra suave (igual ao tile "SEC Filings") */
-.org-stats{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto}
-.org-stat{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 14px 6px 7px;box-shadow:var(--shadow-soft)}
-.org-stat .os-ic{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none;background:#fff;color:#0e7490;box-shadow:0 4px 10px -4px rgba(14,116,144,.35),inset 0 0 0 1px #e2eef2}
+.org-stats{display:flex;gap:8px;flex-wrap:nowrap;margin-left:auto;flex:0 0 auto}
+.org-stat{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 12px 6px 6px;box-shadow:var(--shadow-soft);white-space:nowrap}
+.org-stat .os-ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none;background:#fff;color:#0e7490;box-shadow:0 4px 10px -4px rgba(14,116,144,.35),inset 0 0 0 1px #e2eef2}
 .org-stat .os-txt{display:flex;flex-direction:column;line-height:1.12}
 .org-stat .os-txt b{font-size:16px;font-weight:800;color:var(--ink)}
-.org-stat .os-txt em{font-style:normal;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint)}
+.org-stat .os-txt em{font-style:normal;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-faint)}
 /* cartão do total geral — leve destaque azul-teal, como o badge da data */
 .org-stat.total{background:#e8f4fb;border-color:#cfe8f6}
 .org-stat.total .os-ic{background:linear-gradient(150deg,#22b3c9,#0e7490);color:#fff;box-shadow:0 4px 10px -4px rgba(14,116,144,.5)}
@@ -313,7 +317,7 @@ main{padding:20px 24px 24px}
 .ll-vazio{padding:12px 10px;font-size:12px;color:var(--ink-faint);text-align:center}
 
 /* seletor de área (dados do banco) */
-.area-select{border:0;outline:0;font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:transparent;cursor:pointer;max-width:230px}
+.area-select{border:0;outline:0;font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:transparent;cursor:pointer;max-width:170px}
 .area-select:disabled{color:var(--ink-faint);cursor:default}
 
 /* estados do viewport (carregando / vazio / erro do banco) */
