@@ -8,6 +8,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import HeroNav from "@/components/HeroNav";
 import {
+  OBRIGATORIOS_EDICAO, PENDENCIAS_EDICAO,
+  validarColaborador, mensagemValidacao, listarRotulos,
+} from "@/lib/validacao";
+import {
   UserIcon, CheckIcon, AlertIcon, ChevronIcon, SearchIcon, PencilIcon,
 } from "@/components/icons";
 
@@ -56,6 +60,9 @@ export default function ColaboradoresView() {
   const [confirmando, setConfirmando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
+  // erro de FORMATO (e-mail, datas) só aparece depois de tentar salvar — não
+  // fica vermelho no meio da digitação. Campo obrigatório esvaziado avisa na hora.
+  const [tentou, setTentou] = useState(false);
 
   // picker de líder
   const [liderPicker, setLiderPicker] = useState(false);
@@ -144,7 +151,7 @@ export default function ColaboradoresView() {
   const selecionar = useCallback(async (id) => {
     setSelId(id);
     setErro(""); setConfirmando(false); setSalvo(false); setLiderPicker(false);
-    setConfirmandoDesativar(false); setMsgAtivo("");
+    setConfirmandoDesativar(false); setMsgAtivo(""); setTentou(false);
     setCarregandoDet(true); setForm(null); setOriginal(null);
     try {
       const r = await fetch(`/api/colaboradores/gestao?id=${encodeURIComponent(id)}`);
@@ -232,12 +239,54 @@ export default function ColaboradoresView() {
 
   function set(campo, valor) { setForm((f) => ({ ...f, [campo]: valor })); setSalvo(false); }
 
+  // ===== obrigatoriedade (mesma régua da API, @/lib/validacao) =====
+  // Só valida o que ESTA tela edita: CPF e, para CLT, as datas vêm do DP e são
+  // somente visualização — não faz sentido travar o save por legado que a tela
+  // nem altera. Faltou algo obrigatório → bloqueia; o resto vira pendência.
+  const validacao = useMemo(() => {
+    if (!form) return null;
+    return validarColaborador({
+      ...form,
+      cpf: "",
+      dataNascimento: form.tipo === "PJ" ? form.dataNascimento : "",
+      dataAdmissao: form.tipo === "PJ" ? form.dataAdmissao : "",
+    }, { novo: false });
+  }, [form]);
+
+  const problema = useCallback((campo) => {
+    if (!validacao) return "";
+    // campo obrigatório esvaziado: avisa na hora (o usuário acabou de apagar)
+    if (validacao.faltantes.includes(campo)) return "obrigatório";
+    return tentou ? (validacao.erros[campo] || "") : "";
+  }, [validacao, tentou]);
+
+  const rot = (texto, campo, extra = null) => (
+    <span>
+      {texto}
+      {OBRIGATORIOS_EDICAO.includes(campo) && <em className="fld-obrig" title="Campo obrigatório"> *</em>}
+      {extra}
+      {problema(campo) && <em className="fld-erro"> · {problema(campo)}</em>}
+    </span>
+  );
+  const classe = (campo) => (problema(campo) ? "input-invalido" : "");
+
+  // pendências: cadastro incompleto, mas não impedem salvar (vieram assim do DP)
+  const pendencias = useMemo(() => {
+    if (!form) return [];
+    const valor = { cpf: form.cpf, regionalId: form.regionalId, liderMatricula: form.liderMatricula, dataAdmissao: form.dataAdmissao };
+    return PENDENCIAS_EDICAO.filter((c) => String(valor[c] ?? "").trim() === "");
+  }, [form]);
+
   function escolherLider(res) {
     setForm((f) => ({ ...f, liderMatricula: res ? res.matricula : "", liderNome: res ? res.nome : "" }));
     setLiderPicker(false); setLiderBusca(""); setSalvo(false);
   }
 
   async function salvar() {
+    // trava de segurança: a API aplica a mesma régua e recusaria o payload
+    if (validacao && !validacao.ok) {
+      setErro(mensagemValidacao(validacao)); setConfirmando(false); return;
+    }
     setSalvando(true); setErro("");
     try {
       // CPF nunca é enviado (só visualização). Datas só vão no payload para
@@ -387,17 +436,26 @@ export default function ColaboradoresView() {
               {salvo && <div className="modal-note sol-ok"><b>Alterações salvas no banco.</b></div>}
               {msgAtivo && <div className="modal-note sol-ok"><b>{msgAtivo}</b></div>}
 
+              {/* cadastro incompleto: informa sem impedir o save (esses campos
+                  vieram em branco do extrato do DP em parte da base) */}
+              {form.ativo !== 0 && pendencias.length > 0 && (
+                <div className="modal-note col-pendencias">
+                  <b>Cadastro incompleto — falta {listarRotulos(pendencias)}.</b>{" "}
+                  Não impede salvar, mas vale completar quando o dado estiver disponível.
+                </div>
+              )}
+
               {/* desativado = somente visualização: o fieldset desabilita
                   todos os campos e botões internos (inclusive trocar líder) */}
               <fieldset className="col-form" disabled={form.ativo === 0}>
                 <label className="fld">
-                  <span>Nome</span>
-                  <input value={form.nome} onChange={(e) => set("nome", e.target.value)} />
+                  {rot("Nome", "nome")}
+                  <input value={form.nome} className={classe("nome")} onChange={(e) => set("nome", e.target.value)} />
                 </label>
                 <div className="col-grid2">
                   <label className="fld">
-                    <span>E-mail corporativo</span>
-                    <input value={form.email} placeholder="nome@meuinc.com.br" onChange={(e) => set("email", e.target.value)} />
+                    {rot("E-mail corporativo", "email")}
+                    <input value={form.email} className={classe("email")} placeholder="nome@meuinc.com.br" onChange={(e) => set("email", e.target.value)} />
                   </label>
                   <label className="fld">
                     <span>CPF <em className="ct-ex">· somente visualização</em></span>
@@ -440,16 +498,16 @@ export default function ColaboradoresView() {
                     </select>
                   </label>
                   <label className="fld">
-                    <span>Situação</span>
-                    <select value={form.situacaoId} onChange={(e) => set("situacaoId", e.target.value)}>
+                    {rot("Situação", "situacaoId")}
+                    <select value={form.situacaoId} className={classe("situacaoId")} onChange={(e) => set("situacaoId", e.target.value)}>
                       <option value="">— selecione —</option>
                       {(listas?.situacoes || []).map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
                     </select>
                   </label>
                 </div>
                 <label className="fld">
-                  <span>Cargo</span>
-                  <select value={form.cargoId} onChange={(e) => trocaCargo(e.target.value)}>
+                  {rot("Cargo", "cargoId")}
+                  <select value={form.cargoId} className={classe("cargoId")} onChange={(e) => trocaCargo(e.target.value)}>
                     <option value="">— selecione —</option>
                     {(listas?.cargos || []).map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                   </select>
@@ -497,8 +555,8 @@ export default function ColaboradoresView() {
                 })()}
                 <div className="col-grid2">
                   <label className="fld">
-                    <span>Área / Setor</span>
-                    <select value={form.setorId} onChange={(e) => set("setorId", e.target.value)}>
+                    {rot("Área / Setor", "setorId")}
+                    <select value={form.setorId} className={classe("setorId")} onChange={(e) => set("setorId", e.target.value)}>
                       <option value="">— selecione —</option>
                       {(listas?.setores || []).map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
                     </select>
@@ -512,8 +570,8 @@ export default function ColaboradoresView() {
                   </label>
                 </div>
                 <label className="fld">
-                  <span>Local de trabalho</span>
-                  <select value={form.localId} onChange={(e) => set("localId", e.target.value)}>
+                  {rot("Local de trabalho", "localId")}
+                  <select value={form.localId} className={classe("localId")} onChange={(e) => set("localId", e.target.value)}>
                     <option value="">— selecione —</option>
                     {(listas?.locais || []).map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
                   </select>
@@ -630,7 +688,7 @@ export default function ColaboradoresView() {
                   <>
                     <button className="btn btn-neutral" onClick={() => setConfirmando(false)}>Voltar</button>
                     <div style={{ flex: 1 }} />
-                    <button className="btn btn-primary" disabled={salvando || mudancas.length === 0} onClick={salvar}>
+                    <button className="btn btn-primary" disabled={salvando || mudancas.length === 0 || !validacao?.ok} onClick={salvar}>
                       <span className="ic"><CheckIcon /></span>{salvando ? "Salvando..." : "Confirmar e salvar"}
                     </button>
                   </>
@@ -641,7 +699,12 @@ export default function ColaboradoresView() {
                       className="btn btn-primary"
                       disabled={mudancas.length === 0}
                       title={mudancas.length === 0 ? "Nenhuma alteração feita" : ""}
-                      onClick={() => { setErro(""); setConfirmando(true); }}
+                      onClick={() => {
+                        setErro(""); setTentou(true);
+                        // mostra o que falta em vez de abrir a confirmação
+                        if (!validacao?.ok) { setErro(mensagemValidacao(validacao)); return; }
+                        setConfirmando(true);
+                      }}
                     >
                       <span className="ic"><CheckIcon /></span>Salvar alterações{mudancas.length ? ` (${mudancas.length})` : ""}
                     </button>

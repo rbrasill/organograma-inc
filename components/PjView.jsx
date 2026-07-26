@@ -10,6 +10,9 @@ import HeroNav from "@/components/HeroNav";
 import { normalizar } from "@/data/ti";
 import { formatarCpf, cpfValido, soDigitos } from "@/lib/cpf";
 import {
+  OBRIGATORIOS_NOVO, OBRIGATORIOS_EDICAO, validarColaborador, mensagemValidacao,
+} from "@/lib/validacao";
+import {
   UserIcon, BriefcaseIcon, CheckIcon, AlertIcon, SearchIcon, ChevronIcon, PlusIcon, CloseIcon,
 } from "@/components/icons";
 
@@ -39,6 +42,9 @@ export default function PjView() {
   const [salvando, setSalvando] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [agindo, setAgindo] = useState(false);
+  // só destaca campo em branco depois da primeira tentativa de salvar
+  // (não "grita" com o formulário recém-aberto)
+  const [tentou, setTentou] = useState(false);
 
   const [liderPicker, setLiderPicker] = useState(false);
   const [liderBusca, setLiderBusca] = useState("");
@@ -79,6 +85,17 @@ export default function PjView() {
   const nivelDoCargo = useCallback((cargoId) => nivelPorId((listas?.cargos || []).find((c) => c.id === cargoId)?.nivelId), [listas, nivelPorId]);
   const nomeDe = useCallback((lista, id) => (listas?.[lista] || []).find((x) => x.id === id)?.nome || "", [listas]);
 
+  // todo cadastro novo nasce "Ativo" — a situação não é escolhida no cadastro
+  // (o servidor força a mesma regra); na edição volta a ser editável.
+  const situacaoAtivo = useMemo(
+    () => (listas?.situacoes || []).find((s) => normalizar(s.nome) === "ativo") || null,
+    [listas]
+  );
+  useEffect(() => {
+    if (modo !== "novo" || !situacaoAtivo) return;
+    setForm((f) => (f && !f.situacaoId ? { ...f, situacaoId: situacaoAtivo.id } : f));
+  }, [modo, situacaoAtivo]);
+
   function set(campo, valor) { setForm((f) => ({ ...f, [campo]: valor })); setMsg(""); }
   function trocaCargo(cargoId) {
     const cg = (listas?.cargos || []).find((c) => c.id === cargoId);
@@ -86,10 +103,12 @@ export default function PjView() {
   }
 
   function novo() {
-    setModo("novo"); setForm({ ...VAZIO }); setErro(""); setMsg(""); setConfirmDel(false); setLiderPicker(false);
+    setModo("novo");
+    setForm({ ...VAZIO, situacaoId: situacaoAtivo?.id || "" });
+    setErro(""); setMsg(""); setConfirmDel(false); setLiderPicker(false); setTentou(false);
   }
   const abrir = useCallback(async (id) => {
-    setModo(id); setForm(null); setErro(""); setMsg(""); setConfirmDel(false); setLiderPicker(false);
+    setModo(id); setForm(null); setErro(""); setMsg(""); setConfirmDel(false); setLiderPicker(false); setTentou(false);
     setCarregandoDet(true);
     try {
       const r = await fetch(`/api/colaboradores/gestao?id=${encodeURIComponent(id)}`);
@@ -141,12 +160,11 @@ export default function PjView() {
   }
 
   async function salvar() {
-    if (!form.nome.trim()) { setErro("Informe o nome do prestador."); return; }
-    // CPF é opcional, mas se preenchido tem de ser válido (dígitos verificadores)
-    if (soDigitos(form.cpf) && !cpfValido(form.cpf)) {
-      setErro("CPF inválido — confira os números digitados.");
-      return;
-    }
+    setTentou(true);
+    // mesma régua da API (@/lib/validacao): cadastro novo exige o núcleo
+    // completo; na edição só o que não trava registro antigo
+    const v = validarColaborador(form, { novo: modo === "novo" });
+    if (!v.ok) { setErro(mensagemValidacao(v)); return; }
     setSalvando(true); setErro("");
     // envia o CPF só com dígitos (o banco guarda assim; é como o login casa)
     const campos = { ...form, cpf: soDigitos(form.cpf), tipo: "PJ" };
@@ -185,6 +203,28 @@ export default function PjView() {
   // CPF: inválido só quando já tem os 11 dígitos e não passa na validação
   // (não "grita" enquanto o usuário ainda está digitando)
   const cpfInvalido = form ? soDigitos(form.cpf).length === 11 && !cpfValido(form.cpf) : false;
+
+  // ===== obrigatoriedade (mesma régua da API) =====
+  const cadastroNovo = modo === "novo";
+  const obrigatorios = cadastroNovo ? OBRIGATORIOS_NOVO : OBRIGATORIOS_EDICAO;
+  const validacao = form ? validarColaborador(form, { novo: cadastroNovo }) : null;
+  const exigido = (campo) => obrigatorios.includes(campo);
+  // problema a destacar no campo: só depois de tentar salvar
+  const problema = (campo) => {
+    if (!tentou || !validacao) return "";
+    if (validacao.faltantes.includes(campo)) return "obrigatório";
+    return validacao.erros[campo] || "";
+  };
+  const classe = (campo) => (problema(campo) ? "input-invalido" : "");
+  // rótulo com o marcador * e o aviso do que está errado no campo
+  const rot = (texto, campo, extra = null) => (
+    <span>
+      {texto}
+      {exigido(campo) && <em className="fld-obrig" title="Campo obrigatório"> *</em>}
+      {extra}
+      {problema(campo) && <em className="fld-erro"> · {problema(campo)}</em>}
+    </span>
+  );
 
   return (
     <div className="sol-shell">
@@ -255,38 +295,51 @@ export default function PjView() {
               )}
 
               <fieldset className="col-form" disabled={somenteLeitura}>
-                <label className="fld"><span>Nome</span>
-                  <input value={form.nome} onChange={(e) => set("nome", e.target.value)} /></label>
+                {cadastroNovo && (
+                  <p className="col-obrig-nota">
+                    Campos com <em className="fld-obrig">*</em> são obrigatórios — o cadastro só é criado
+                    com o núcleo completo (nome, CPF, cargo, área, regional, líder e admissão).
+                  </p>
+                )}
+                <label className="fld">{rot("Nome", "nome")}
+                  <input value={form.nome} className={classe("nome")} onChange={(e) => set("nome", e.target.value)} /></label>
                 <div className="col-grid2">
                   <label className="fld">
-                    <span>CPF{cpfInvalido && <em className="fld-erro"> · CPF inválido</em>}</span>
+                    {rot("CPF", "cpf", cpfInvalido && !problema("cpf") ? <em className="fld-erro"> · CPF inválido</em> : null)}
                     <input
                       value={form.cpf}
                       inputMode="numeric"
                       placeholder="000.000.000-00"
-                      className={cpfInvalido ? "input-invalido" : ""}
+                      className={cpfInvalido || problema("cpf") ? "input-invalido" : ""}
                       onChange={(e) => set("cpf", formatarCpf(e.target.value))}
                     />
                   </label>
-                  <label className="fld"><span>Telefone</span>
-                    <input value={form.telefone} placeholder="(00) 00000-0000" onChange={(e) => set("telefone", e.target.value)} /></label>
+                  <label className="fld">{rot("Telefone", "telefone")}
+                    <input value={form.telefone} className={classe("telefone")} placeholder="(00) 00000-0000" onChange={(e) => set("telefone", e.target.value)} /></label>
                 </div>
-                <label className="fld"><span>E-mail</span>
-                  <input value={form.email} placeholder="nome@meuinc.com.br" onChange={(e) => set("email", e.target.value)} /></label>
+                <label className="fld">{rot("E-mail", "email")}
+                  <input value={form.email} className={classe("email")} placeholder="nome@meuinc.com.br" onChange={(e) => set("email", e.target.value)} /></label>
                 <div className="col-grid2">
-                  <label className="fld"><span>Data de nascimento</span>
-                    <input type="date" value={form.dataNascimento} onChange={(e) => set("dataNascimento", e.target.value)} /></label>
-                  <label className="fld"><span>Data de admissão <em className="ct-ex">· quando foi contratado</em></span>
-                    <input type="date" value={form.dataAdmissao} onChange={(e) => set("dataAdmissao", e.target.value)} /></label>
+                  <label className="fld">{rot("Data de nascimento", "dataNascimento")}
+                    <input type="date" value={form.dataNascimento} className={classe("dataNascimento")} onChange={(e) => set("dataNascimento", e.target.value)} /></label>
+                  <label className="fld">{rot("Data de admissão", "dataAdmissao", <em className="ct-ex"> · quando foi contratado</em>)}
+                    <input type="date" value={form.dataAdmissao} className={classe("dataAdmissao")} onChange={(e) => set("dataAdmissao", e.target.value)} /></label>
                 </div>
                 <div className="col-grid2">
-                  <label className="fld"><span>Situação</span>
-                    <select value={form.situacaoId} onChange={(e) => set("situacaoId", e.target.value)}>
+                  <label className="fld">
+                    {rot("Situação", "situacaoId", cadastroNovo ? <em className="ct-ex"> · entra como Ativo</em> : null)}
+                    <select
+                      value={form.situacaoId}
+                      className={classe("situacaoId")}
+                      disabled={cadastroNovo}
+                      title={cadastroNovo ? "Todo cadastro novo entra como Ativo — altere depois, se precisar." : ""}
+                      onChange={(e) => set("situacaoId", e.target.value)}
+                    >
                       <option value="">— selecione —</option>
                       {(listas?.situacoes || []).map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
                     </select></label>
-                  <label className="fld"><span>Cargo</span>
-                    <select value={form.cargoId} onChange={(e) => trocaCargo(e.target.value)}>
+                  <label className="fld">{rot("Cargo", "cargoId")}
+                    <select value={form.cargoId} className={classe("cargoId")} onChange={(e) => trocaCargo(e.target.value)}>
                       <option value="">— selecione —</option>
                       {(listas?.cargos || []).map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                     </select></label>
@@ -299,26 +352,26 @@ export default function PjView() {
                   </select>
                 </label>
                 <div className="col-grid2">
-                  <label className="fld"><span>Área / Setor</span>
-                    <select value={form.setorId} onChange={(e) => set("setorId", e.target.value)}>
+                  <label className="fld">{rot("Área / Setor", "setorId")}
+                    <select value={form.setorId} className={classe("setorId")} onChange={(e) => set("setorId", e.target.value)}>
                       <option value="">— selecione —</option>
                       {(listas?.setores || []).map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
                     </select></label>
-                  <label className="fld"><span>Regional</span>
-                    <select value={form.regionalId} onChange={(e) => set("regionalId", e.target.value)}>
+                  <label className="fld">{rot("Regional", "regionalId")}
+                    <select value={form.regionalId} className={classe("regionalId")} onChange={(e) => set("regionalId", e.target.value)}>
                       <option value="">— selecione —</option>
                       {(listas?.regionais || []).map((r) => <option key={r.id} value={r.id}>{r.nome}</option>)}
                     </select></label>
                 </div>
-                <label className="fld"><span>Local de trabalho</span>
-                  <select value={form.localId} onChange={(e) => set("localId", e.target.value)}>
+                <label className="fld">{rot("Local de trabalho", "localId")}
+                  <select value={form.localId} className={classe("localId")} onChange={(e) => set("localId", e.target.value)}>
                     <option value="">— selecione —</option>
                     {(listas?.locais || []).map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
                   </select></label>
 
                 <div className="fld fld-lider" ref={liderRef}>
-                  <span>Líder direto</span>
-                  <div className="lider-atual">
+                  {rot("Líder direto", "liderMatricula")}
+                  <div className={`lider-atual ${problema("liderMatricula") ? "campo-invalido" : ""}`}>
                     <span className="la-ava"><UserIcon size={20} /></span>
                     <span className="la-txt">
                       <b>{form.liderNome || "Sem líder (topo)"}</b>
@@ -335,9 +388,12 @@ export default function PjView() {
                         <input autoFocus placeholder="Buscar o líder (todas as áreas)..." value={liderBusca} onChange={(e) => setLiderBusca(e.target.value)} />
                       </div>
                       <div className="lider-list">
-                        <button type="button" className="ll-item" onClick={() => { set("liderMatricula", ""); setForm((f) => ({ ...f, liderNome: "" })); setLiderPicker(false); }}>
-                          <b>— Sem líder (topo)</b>
-                        </button>
+                        {/* no cadastro novo o líder é obrigatório: não oferece "sem líder" */}
+                        {!cadastroNovo && (
+                          <button type="button" className="ll-item" onClick={() => { set("liderMatricula", ""); setForm((f) => ({ ...f, liderNome: "" })); setLiderPicker(false); }}>
+                            <b>— Sem líder (topo)</b>
+                          </button>
+                        )}
                         {liderResultados.map((l) => (
                           <button type="button" key={l.matricula} className="ll-item" onClick={() => { setForm((f) => ({ ...f, liderMatricula: l.matricula, liderNome: l.nome })); setLiderPicker(false); }}>
                             <b>{l.nome}</b><em>{(l.cargo || "Cargo a definir")}{l.setor ? ` · ${l.setor}` : ""}</em>

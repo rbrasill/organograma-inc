@@ -253,9 +253,18 @@ main{padding:20px 24px 24px}
 .fld input{border:1px solid var(--line);border-radius:11px;padding:9px 12px;font:inherit;font-size:13.5px;color:var(--ink);outline:none;transition:border-color .2s,box-shadow .2s}
 .fld input:focus{border-color:var(--inc);box-shadow:0 0 0 3px rgba(255,83,15,.12)}
 /* campo com valor inválido (ex.: CPF que não passa na validação) */
-.fld input.input-invalido{border-color:#e5484d;background:#fdf3f2}
-.fld input.input-invalido:focus{border-color:#e5484d;box-shadow:0 0 0 3px rgba(229,72,77,.14)}
+.fld input.input-invalido,.fld select.input-invalido{border-color:#e5484d;background:#fdf3f2}
+.fld input.input-invalido:focus,.fld select.input-invalido:focus{border-color:#e5484d;box-shadow:0 0 0 3px rgba(229,72,77,.14)}
 .fld-erro{font-style:normal;font-weight:700;color:#c62828}
+/* marcador de campo obrigatório no rótulo (Nome *) */
+.fld-obrig{font-style:normal;font-weight:800;color:#e5484d}
+/* card do líder quando o vínculo é obrigatório e está vazio */
+.campo-invalido{border-color:#e5484d !important;background:#fdf3f2}
+/* nota "campos com * são obrigatórios" no topo do cadastro novo */
+.col-obrig-nota{margin:0 0 10px;font-size:12px;line-height:1.5;color:var(--ink-soft)}
+/* cadastro incompleto (pendência informativa, não bloqueia salvar) */
+.col-pendencias{background:#fff8ee;border:1px solid #ffe3b3;color:#8a5a00}
+.col-pendencias b{color:#8a5a00}
 /* somente visualização (ex.: CPF) e campos dentro de fieldset desabilitado */
 .fld input:disabled,.fld select:disabled{background:#f2f5fa;color:var(--ink-soft);cursor:not-allowed}
 .ro-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
