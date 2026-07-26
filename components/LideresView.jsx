@@ -42,6 +42,9 @@ export default function LideresView() {
   const [novoDir, setNovoDir] = useState(null);
   const buscaRef = useRef(null);
 
+  // card com as opções de alteração abertas (líder ou diretor)
+  const [escolhaId, setEscolhaId] = useState(null);
+
   // modal de perfil do líder (visão completa dele no organograma)
   const [perfilMat, setPerfilMat] = useState(null);
   const [perfil, setPerfil] = useState(null);
@@ -98,7 +101,7 @@ export default function LideresView() {
       diretorNome: diretorNome || "", diretorMat: diretorMat || "",
     });
     setBusca(""); setResultados([]); setNovo(null); setNovoDir(null);
-    setAba(abaInicial); setErroTroca(""); setMsg("");
+    setAba(abaInicial); setErroTroca(""); setMsg(""); setEscolhaId(null);
   }
   function fecharTroca() {
     setAlvo(null); setNovo(null); setNovoDir(null); setBusca(""); setErroTroca("");
@@ -149,32 +152,18 @@ export default function LideresView() {
     return () => document.removeEventListener("keydown", esc);
   }, [perfilMat]);
 
-  // Card da área com as DUAS figuras da regra, na ordem da hierarquia:
-  // o diretor (a quem a área responde) e o líder direto (topo interno).
-  // Cada linha tem seu próprio "Alterar", que abre o modal já na aba certa —
-  // assim trocar o diretor não passa por adivinhação.
+  // Card da área: mostra só o líder direto — o diretor já é o cabeçalho do
+  // grupo, repetir o nome aqui era ruído. "Alterar" abre, dentro do card, a
+  // escolha do que trocar (líder ou diretor), e daí vai ao modal na aba certa.
   function CardArea({ area, diretorNome, diretorMat }) {
     const admin = sessao.nivel >= NIVEL.ADMIN;
+    const aberto = escolhaId === area.id;
     return (
       <div className="ld-card">
         <div className="ld-area">
           <b>{area.nome}</b>
           <span className="ar-count">{area.pessoas} colab.</span>
         </div>
-
-        <div className="ld-papel">
-          <span className="ld-papel-txt">
-            <span className="ld-papel-rot">Diretor</span>
-            <span className="ld-papel-nome">{diretorNome || "— sem diretor"}</span>
-          </span>
-          {admin && (
-            <button className="ld-papel-btn" onClick={() => abrirTroca(area, diretorNome, diretorMat, "diretor")}>
-              Alterar
-            </button>
-          )}
-        </div>
-
-        <div className="ld-papel-liga">↑ responde a</div>
 
         <div className="lider-atual">
           <span className="la-ava"><UserIcon size={20} /></span>
@@ -194,11 +183,25 @@ export default function LideresView() {
             <em>{area.lider.cargo || "Cargo a definir"}</em>
           </span>
           {admin && (
-            <button className="la-btn" onClick={() => abrirTroca(area, diretorNome, diretorMat, "lider")}>
+            <button className="la-btn" onClick={() => setEscolhaId(aberto ? null : area.id)}>
               Alterar
             </button>
           )}
         </div>
+
+        {admin && aberto && (
+          <div className="ld-escolha">
+            <button className="ld-escolha-btn" onClick={() => abrirTroca(area, diretorNome, diretorMat, "lider")}>
+              Líder direto
+            </button>
+            <button className="ld-escolha-btn" onClick={() => abrirTroca(area, diretorNome, diretorMat, "diretor")}>
+              Diretor
+            </button>
+            <button className="ld-escolha-x" onClick={() => setEscolhaId(null)} aria-label="Fechar">
+              <CloseIcon size={12} />
+            </button>
+          </div>
+        )}
       </div>
     );
   }

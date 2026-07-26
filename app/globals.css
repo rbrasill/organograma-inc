@@ -317,14 +317,14 @@ main{padding:20px 24px 24px}
 /* abas do modal de Diretorias: trocar o líder da área ou a diretoria dela */
 /* área sem líder interno: anomalia que a tela denuncia no card */
 .ld-tag-sem{display:inline-block;background:#fdf3f2;border:1px solid #f6cfcb;color:#b42318;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:800;letter-spacing:.02em}
-/* card da área: as duas figuras da regra (diretor acima, líder direto abaixo) */
-.ld-papel{display:flex;align-items:center;gap:8px;background:#f7f9fd;border:1px solid var(--line-soft);border-radius:11px;padding:7px 10px}
+/* rótulo do papel dentro do card (LÍDER DIRETO) */
 .ld-papel-rot{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint)}
-.ld-papel-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
-.ld-papel-nome{font-size:12.5px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ld-papel-btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:3px 9px;font:inherit;font-size:11px;font-weight:700;color:var(--ink-soft);cursor:pointer;transition:border-color .15s,color .15s}
-.ld-papel-btn:hover{border-color:var(--inc);color:var(--inc)}
-.ld-papel-liga{padding:3px 0 3px 12px;font-size:10px;font-weight:600;color:var(--ink-faint)}
+/* escolha do que alterar, revelada no próprio card ao clicar em Alterar */
+.ld-escolha{display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+.ld-escolha-btn{flex:1;border:1px solid var(--line);background:#fff;border-radius:9px;padding:6px 10px;font:inherit;font-size:11.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+.ld-escolha-btn:hover{border-color:var(--inc);color:var(--inc);background:var(--inc-soft)}
+.ld-escolha-x{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border:0;background:transparent;border-radius:8px;color:var(--ink-faint);cursor:pointer}
+.ld-escolha-x:hover{background:#f2f5fa;color:var(--ink)}
 /* escada da hierarquia no modal: destaca o nível que está sendo alterado */
 .ld-escada{margin-bottom:14px}
 .ld-degrau{display:flex;flex-direction:column;gap:1px;background:#f7f9fd;border:1px solid var(--line-soft);border-radius:11px;padding:8px 11px}
