@@ -230,7 +230,17 @@ export async function GET(req) {
       });
     }
 
-    return Response.json({ ok: true, diretores, semDiretor });
+    // candidatos a responsável de área (trocar diretoria): presidência e
+    // faixa de diretoria (níveis 1–5), únicos que podem responder por áreas
+    const responsaveis = rows
+      .filter((r) => r.ordem != null && r.ordem >= 1 && r.ordem <= 5)
+      .sort((a, b) => ord(a) - ord(b) || a.nome.localeCompare(b.nome, "pt-BR"))
+      .map((r) => ({
+        matricula: r.matricula || "", nome: r.nome, cargo: r.cargo || "",
+        familia: r.familia || "", setor: r.setorNome || "", nivel: r.ordem,
+      }));
+
+    return Response.json({ ok: true, diretores, semDiretor, responsaveis });
   } catch (e) {
     return erroResposta(e);
   }
@@ -244,6 +254,80 @@ export async function POST(req) {
   try {
     const pool = getPool();
     const body = await req.json();
+
+    // ---- trocar_diretor: muda a DIRETORIA da área sem tocar no líder ----
+    // Reaponta os topos internos da área (quem não responde a ninguém de
+    // dentro) para o novo responsável — que tem de ser diretor (níveis 2–5),
+    // presidente ou conselheiro (nível 1). A estrutura interna fica intacta.
+    if (body.acao === "trocar_diretor") {
+      const { areaId, paraMatricula } = body;
+      if (!areaId || !paraMatricula) {
+        return Response.json({ ok: false, erro: "Dados incompletos." }, { status: 400 });
+      }
+      conn = await pool.getConnection();
+      await conn.beginTransaction();
+
+      const [[dir]] = await conn.query(
+        `SELECT c.id, c.nome, c.setor_id, c.lider_id,
+                COALESCE(nhp.ordem, nh.ordem) AS ordem
+           FROM colaborador c
+           LEFT JOIN cargo cg ON cg.id = c.cargo_id
+           LEFT JOIN nivel_hierarquico nh ON nh.id = cg.nivel_id
+           LEFT JOIN nivel_hierarquico nhp ON nhp.id = c.nivel_id
+          WHERE c.codigo_dp = ? AND c.ativo = 1 FOR UPDATE`,
+        [paraMatricula]
+      );
+      if (!dir) { await conn.rollback(); return Response.json({ ok: false, erro: "Novo responsável não encontrado (ou inativo)." }, { status: 404 }); }
+      if (dir.ordem == null || dir.ordem < 1 || dir.ordem > 5) {
+        await conn.rollback();
+        return Response.json({ ok: false, erro: "O responsável por uma área tem de ser diretor, presidente ou conselheiro (níveis 1–5)." }, { status: 400 });
+      }
+
+      // topos internos da área: ativos cujo líder é nulo, inativo ou de fora
+      const [raizes] = await conn.query(
+        `SELECT c.id FROM colaborador c
+           LEFT JOIN colaborador l ON l.id = c.lider_id AND l.ativo = 1
+          WHERE c.ativo = 1 AND c.setor_id = ?
+            AND (c.lider_id IS NULL OR l.id IS NULL OR l.setor_id <> c.setor_id)`,
+        [areaId]
+      );
+      const idsRaizes = raizes.map((r) => r.id).filter((id) => id !== dir.id);
+      if (idsRaizes.length === 0) {
+        await conn.rollback();
+        return Response.json({ ok: false, erro: "A área não tem topo interno para reapontar (ou o topo já é o próprio responsável)." }, { status: 409 });
+      }
+
+      // guarda anticiclo: se a cadeia do novo responsável passa por alguém DA
+      // área, apontar os topos para ele criaria um laço (ele responderia,
+      // indiretamente, a quem passaria a responder a ele)
+      if (dir.setor_id !== areaId) {
+        const vistos = new Set([dir.id]);
+        let curId = dir.lider_id;
+        while (curId && !vistos.has(curId)) {
+          vistos.add(curId);
+          const [[cur]] = await conn.query(
+            "SELECT id, setor_id, lider_id, ativo FROM colaborador WHERE id = ?", [curId]
+          );
+          if (!cur || !cur.ativo) break;
+          if (cur.setor_id === areaId) {
+            await conn.rollback();
+            return Response.json({ ok: false, erro: "Esse responsável responde a alguém desta área — a troca criaria um ciclo na hierarquia." }, { status: 400 });
+          }
+          curId = cur.lider_id;
+        }
+      } else {
+        await conn.rollback();
+        return Response.json({ ok: false, erro: "O responsável é da própria área — para trocar o líder interno, use a aba Líder." }, { status: 400 });
+      }
+
+      const [r] = await conn.query(
+        `UPDATE colaborador SET lider_id = ? WHERE id IN (${idsRaizes.map(() => "?").join(",")})`,
+        [dir.id, ...idsRaizes]
+      );
+      await conn.commit();
+      return Response.json({ ok: true, reapontados: r.affectedRows || 0, diretorNome: dir.nome });
+    }
+
     if (body.acao !== "trocar") return Response.json({ ok: false, erro: "Ação desconhecida." }, { status: 400 });
 
     const { areaId, deMatricula, paraMatricula } = body;
