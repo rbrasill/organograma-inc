@@ -1,7 +1,7 @@
 import LideresView from "@/components/LideresView";
 
 export const metadata = {
-  title: "Líderes por área — Portal de Organograma INC",
+  title: "Diretorias — Portal de Organograma INC",
 };
 
 export default function LideresPage() {

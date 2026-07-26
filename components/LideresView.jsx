@@ -1,10 +1,10 @@
 "use client";
 
-// Líderes por área — visão agrupada por DIRETOR: cada diretor com as áreas
-// que gerencia e o líder de cada área. "Alterar líder" abre um modal com as
-// informações da área e do líder; a troca aplica na área INTEIRA (quem
-// respondia ao antigo passa ao novo; o antigo vira subordinado do novo;
-// novo líder da própria área herda o diretor).
+// Diretorias — cada diretoria (ou a presidência) com as áreas sob sua gestão
+// e o líder de cada área. "Alterar" abre um modal que cobre os dois casos num
+// fluxo só: escolher alguém da própria área troca apenas o líder (a área
+// permanece na diretoria); escolher um diretor ou alguém de outra diretoria
+// move a área inteira para a cadeia dele. A troca aplica na área INTEIRA.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import HeroNav from "@/components/HeroNav";
@@ -166,7 +166,7 @@ export default function LideresView() {
           </span>
           {sessao.nivel >= NIVEL.ADMIN && (
             <button className="la-btn" onClick={() => abrirTroca(area, diretorNome)}>
-              Alterar líder
+              Alterar
             </button>
           )}
         </div>
@@ -177,15 +177,15 @@ export default function LideresView() {
   return (
     <div className="sol-shell">
       <HeroNav
-        titulo="Líderes por área"
-        subtitulo="Diretores, áreas sob sua gestão e o líder de cada área · a troca aplica na área inteira"
+        titulo="Diretorias"
+        subtitulo="Cada diretoria com as áreas sob sua gestão e o líder de cada uma"
         atual="lideres"
       />
 
       <div className="ct-board">
         {erro && <div className="modal-alert"><AlertIcon size={16} /><div><b>{erro}</b></div></div>}
         {msg && <div className="modal-note sol-ok"><b>{msg}</b></div>}
-        {carregando && <div className="ar-vazio">Carregando líderes...</div>}
+        {carregando && <div className="ar-vazio">Carregando diretorias...</div>}
 
         {!carregando && dados && dados.diretores.map((g) => (
           <section className="ld-grupo" key={g.diretor.matricula || g.diretor.nome}>
@@ -199,7 +199,7 @@ export default function LideresView() {
                   {g.diretor.respondeA ? ` · responde a ${g.diretor.respondeA}` : ""}
                 </em>
               </span>
-              <span className="ld-dir-chip">{g.areas.length} área(s) sob gestão</span>
+              <span className="ld-dir-chip">{g.areas.length} área(s) na diretoria</span>
             </div>
             <div className="ld-grid">
               {g.areas.map((a) => <CardArea key={a.id} area={a} diretorNome={g.diretor.nome} />)}
@@ -212,8 +212,8 @@ export default function LideresView() {
             <div className="ld-dir topo">
               <span className="ld-dir-ava"><UserIcon size={22} /></span>
               <span className="ld-dir-txt">
-                <b>Sem diretor na cadeia</b>
-                <em>Áreas cujo líder não chega a nenhum diretor nem à presidência</em>
+                <b>Sem diretoria</b>
+                <em>O líder destas áreas não chega a nenhum diretor nem à presidência — altere o líder para conectá-las a uma diretoria</em>
               </span>
               <span className="ld-dir-chip">{dados.semDiretor.length} área(s)</span>
             </div>
@@ -233,8 +233,8 @@ export default function LideresView() {
             <div className="modal-head">
               <div className="ld-modal-ava"><UserIcon size={26} /></div>
               <div>
-                <h3>Alterar líder — {alvo.areaNome}</h3>
-                <p>A troca vale para todos os colaboradores da área</p>
+                <h3>Alterar liderança — {alvo.areaNome}</h3>
+                <p>Troque o líder da área ou mova a área para outra diretoria</p>
               </div>
             </div>
 
@@ -243,7 +243,7 @@ export default function LideresView() {
               <div className="ro-grid" style={{ marginBottom: 12 }}>
                 <div className="ro"><span>Área</span><b>{alvo.areaNome}</b></div>
                 <div className="ro"><span>Colaboradores</span><b>{alvo.pessoas}</b></div>
-                <div className="ro"><span>Diretor</span><b>{alvo.diretorNome || "— (topo da hierarquia)"}</b></div>
+                <div className="ro"><span>Diretoria</span><b>{alvo.diretorNome || "— (sem diretoria)"}</b></div>
                 <div className="ro"><span>Respondem ao líder</span><b>{alvo.lider.diretos} direto(s)</b></div>
               </div>
 
@@ -266,6 +266,10 @@ export default function LideresView() {
               {!novo && (
                 <div className="modal-section">
                   <span className="sec-title">Novo líder <em>(busca em todas as áreas)</em></span>
+                  <p className="lp-hint" style={{ margin: "0 0 8px" }}>
+                    Alguém <b>da própria área</b> troca apenas o líder — a área permanece nesta diretoria.
+                    Um <b>diretor</b> (ou alguém de outra diretoria) move a área inteira para a diretoria dele.
+                  </p>
                   <div className="lider-pick">
                     <span className="lp-ic"><SearchIcon size={14} /></span>
                     <input
@@ -309,9 +313,9 @@ export default function LideresView() {
                         : ".")
                       : <>, e {alvo.lider.nome} passa a responder ao novo líder.</>}{" "}
                     {novo.setor && novo.setor !== alvo.areaNome
-                      ? `O novo líder é de ${novo.setor} — entra como líder externo (padrão diretor).`
+                      ? `O novo líder é de ${novo.setor} — a área passa para a diretoria da cadeia dele.`
                       : (!alvo.lider.externo && novo.setor === alvo.areaNome
-                        ? "Como o novo líder é da própria área, ele herda o diretor atual."
+                        ? "Como o novo líder é da própria área, ela permanece na diretoria atual."
                         : "")}
                   </p>
                 </div>

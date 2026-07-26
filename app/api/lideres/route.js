@@ -1,4 +1,4 @@
-// Líderes por área — visão agrupada por DIRETOR.
+// Diretorias (ex-Líderes por área) — visão agrupada por DIRETOR.
 //   Regras do domínio (CLAUDE.md): o LÍDER de uma área é o colaborador que,
 //   dentro dela, não responde a ninguém da própria área (topo do subtree
 //   local). O DIRETOR é a quem esse líder responde — tipicamente alguém de
@@ -24,7 +24,7 @@ function erroResposta(e) {
 }
 
 export async function GET(req) {
-  // ver Líderes por Área: perfil COLABORADOR para cima (somente leitura)
+  // ver Diretorias: perfil COLABORADOR para cima (somente leitura)
   const bloqueio = exigirNivel(NIVEL.COLABORADOR);
   if (bloqueio) return bloqueio;
   try {
