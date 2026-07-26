@@ -317,6 +317,22 @@ main{padding:20px 24px 24px}
 /* abas do modal de Diretorias: trocar o líder da área ou a diretoria dela */
 /* área sem líder interno: anomalia que a tela denuncia no card */
 .ld-tag-sem{display:inline-block;background:#fdf3f2;border:1px solid #f6cfcb;color:#b42318;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:800;letter-spacing:.02em}
+/* card da área: as duas figuras da regra (diretor acima, líder direto abaixo) */
+.ld-papel{display:flex;align-items:center;gap:8px;background:#f7f9fd;border:1px solid var(--line-soft);border-radius:11px;padding:7px 10px}
+.ld-papel-rot{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint)}
+.ld-papel-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.ld-papel-nome{font-size:12.5px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ld-papel-btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:3px 9px;font:inherit;font-size:11px;font-weight:700;color:var(--ink-soft);cursor:pointer;transition:border-color .15s,color .15s}
+.ld-papel-btn:hover{border-color:var(--inc);color:var(--inc)}
+.ld-papel-liga{padding:3px 0 3px 12px;font-size:10px;font-weight:600;color:var(--ink-faint)}
+/* escada da hierarquia no modal: destaca o nível que está sendo alterado */
+.ld-escada{margin-bottom:14px}
+.ld-degrau{display:flex;flex-direction:column;gap:1px;background:#f7f9fd;border:1px solid var(--line-soft);border-radius:11px;padding:8px 11px}
+.ld-degrau.foco{background:var(--inc-soft);border-color:var(--inc-line)}
+.ld-degrau-rot{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint)}
+.ld-degrau.foco .ld-degrau-rot{color:var(--inc)}
+.ld-degrau b{font-size:13px;font-weight:700;color:var(--ink)}
+.ld-degrau-liga{padding:3px 0 3px 12px;font-size:10px;font-weight:600;color:var(--ink-faint)}
 .ld-tabs{display:flex;gap:6px;margin-bottom:14px;background:#f2f5fa;border-radius:12px;padding:4px}
 .ld-tab{flex:1;border:0;background:transparent;border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;transition:background .15s,color .15s}
 .ld-tab.sel{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(16,24,40,.08)}
