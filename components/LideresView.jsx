@@ -94,7 +94,8 @@ export default function LideresView() {
   function abrirTroca(area, diretorNome, diretorMat) {
     setAlvo({
       areaId: area.id, areaNome: area.nome, pessoas: area.pessoas,
-      lider: area.lider, diretorNome: diretorNome || "", diretorMat: diretorMat || "",
+      lider: area.lider, semLiderInterno: !!area.semLiderInterno,
+      diretorNome: diretorNome || "", diretorMat: diretorMat || "",
     });
     setBusca(""); setResultados([]); setNovo(null); setNovoDir(null);
     setAba("lider"); setErroTroca(""); setMsg("");
@@ -166,7 +167,9 @@ export default function LideresView() {
                 a mesma altura, com ou sem tag). Detalhe de quantos lidera
                 fica só no perfil completo (clique no nome). */}
             <span className="la-meta">
-              {area.lider.tag && <span className="ld-tag-dir">{area.lider.tag}</span>}
+              {area.semLiderInterno
+                ? <span className="ld-tag-sem">sem líder interno · quem responde é o diretor</span>
+                : (area.lider.tag && <span className="ld-tag-dir">{area.lider.tag}</span>)}
             </span>
             <em>{area.lider.cargo || "Cargo a definir"}</em>
           </span>
@@ -267,9 +270,23 @@ export default function LideresView() {
                 <div className="ro"><span>Respondem ao líder</span><b>{alvo.lider.diretos} direto(s)</b></div>
               </div>
 
+              {aba === "lider" && alvo.semLiderInterno && (
+                <div className="modal-alert" style={{ marginBottom: 12 }}>
+                  <AlertIcon size={16} />
+                  <div>
+                    <b>Esta área está sem líder interno.</b>
+                    <div style={{ fontSize: 12, marginTop: 2 }}>
+                      Os {alvo.lider.diretos} colaboradores respondem direto a {alvo.lider.nome},
+                      que é de outra área. Escolha abaixo alguém <b>de {alvo.areaNome}</b> para ser o
+                      líder direto — a equipe passa a responder a ele, e ele a {alvo.lider.nome}.
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {aba === "lider" && (
               <div className="modal-section">
-                <span className="sec-title">Líder atual</span>
+                <span className="sec-title">{alvo.semLiderInterno ? "Responde hoje a (diretor)" : "Líder atual"}</span>
                 <div className={`lider-atual ${novo ? "trocado" : ""}`}>
                   <span className="la-ava"><UserIcon size={20} /></span>
                   <span className="la-txt">
@@ -343,7 +360,20 @@ export default function LideresView() {
                 </div>
               )}
 
-              {aba === "diretor" && (
+              {aba === "diretor" && alvo.semLiderInterno && (
+                <div className="modal-alert" style={{ marginBottom: 12 }}>
+                  <AlertIcon size={16} />
+                  <div>
+                    <b>Defina o líder da área antes de trocar a diretoria.</b>
+                    <div style={{ fontSize: 12, marginTop: 2 }}>
+                      Sem líder interno, trocar a diretoria penduraria os {alvo.lider.diretos} colaboradores
+                      direto no novo diretor. Use a aba <b>Líder da área</b> primeiro.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {aba === "diretor" && !alvo.semLiderInterno && (
                 <div className="modal-section">
                   <span className="sec-title">Nova diretoria <em>(diretores, presidente e conselheiro)</em></span>
                   <p className="lp-hint" style={{ margin: "0 0 8px" }}>
@@ -394,7 +424,11 @@ export default function LideresView() {
             <div className="modal-foot">
               <button className="btn btn-neutral" onClick={fecharTroca}>Cancelar</button>
               <div style={{ flex: 1 }} />
-              <button className="btn btn-primary" disabled={salvando || (aba === "lider" ? !novo : !novoDir)} onClick={confirmarTroca}>
+              <button
+                className="btn btn-primary"
+                disabled={salvando || (aba === "lider" ? !novo : (!novoDir || alvo.semLiderInterno))}
+                onClick={confirmarTroca}
+              >
                 <span className="ic"><CheckIcon /></span>{salvando ? "Aplicando..." : "Aplicar troca"}
               </button>
             </div>

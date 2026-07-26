@@ -128,6 +128,11 @@ export async function GET(req) {
         nome: membros[0].setorNome || "—",
         pessoas: membros.length,
         outrosTopo: raizes.length - 1,
+        // Regra do domínio: toda área tem um LÍDER DIRETO interno e, acima
+        // dele, um diretor. Quando o único elo é alguém de fora, a área está
+        // SEM líder interno — estado anômalo que a tela precisa denunciar em
+        // vez de exibir o externo como se fosse o líder da área.
+        semLiderInterno: liderExterno,
         lider: {
           matricula: lider.matricula || "",
           nome: lider.nome,
@@ -295,6 +300,16 @@ export async function POST(req) {
       if (idsRaizes.length === 0) {
         await conn.rollback();
         return Response.json({ ok: false, erro: "A área não tem topo interno para reapontar (ou o topo já é o próprio responsável)." }, { status: 409 });
+      }
+      // Regra: a troca de diretoria move o LÍDER da área, e só ele. Com mais de
+      // um topo interno não existe um líder definido — reapontar todos penduraria
+      // a área inteira no diretor (foi assim que o líder se perdia antes).
+      if (idsRaizes.length > 1) {
+        await conn.rollback();
+        return Response.json({
+          ok: false,
+          erro: `Esta área tem ${idsRaizes.length} pessoas no topo, sem um líder direto definido. Defina o líder da área primeiro (aba "Líder da área") — só então a diretoria pode ser trocada sem desmontar a equipe.`,
+        }, { status: 409 });
       }
 
       // guarda anticiclo: se a cadeia do novo responsável passa por alguém DA
