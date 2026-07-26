@@ -42,9 +42,6 @@ export default function LideresView() {
   const [novoDir, setNovoDir] = useState(null);
   const buscaRef = useRef(null);
 
-  // card com as opções de alteração abertas (líder ou diretor)
-  const [escolhaId, setEscolhaId] = useState(null);
-
   // modal de perfil do líder (visão completa dele no organograma)
   const [perfilMat, setPerfilMat] = useState(null);
   const [perfil, setPerfil] = useState(null);
@@ -101,7 +98,7 @@ export default function LideresView() {
       diretorNome: diretorNome || "", diretorMat: diretorMat || "",
     });
     setBusca(""); setResultados([]); setNovo(null); setNovoDir(null);
-    setAba(abaInicial); setErroTroca(""); setMsg(""); setEscolhaId(null);
+    setAba(abaInicial); setErroTroca(""); setMsg("");
   }
   function fecharTroca() {
     setAlvo(null); setNovo(null); setNovoDir(null); setBusca(""); setErroTroca("");
@@ -157,7 +154,7 @@ export default function LideresView() {
   // escolha do que trocar (líder ou diretor), e daí vai ao modal na aba certa.
   function CardArea({ area, diretorNome, diretorMat }) {
     const admin = sessao.nivel >= NIVEL.ADMIN;
-    const aberto = escolhaId === area.id;
+    const aberto = alvo?.areaId === area.id;
     return (
       <div className="ld-card">
         <div className="ld-area">
@@ -183,23 +180,94 @@ export default function LideresView() {
             <em>{area.lider.cargo || "Cargo a definir"}</em>
           </span>
           {admin && (
-            <button className="la-btn" onClick={() => setEscolhaId(aberto ? null : area.id)}>
+            <button className="la-btn" onClick={() => (aberto ? fecharTroca() : abrirTroca(area, diretorNome, diretorMat, "lider"))}>
               Alterar
             </button>
           )}
         </div>
 
+        {/* edição no próprio card: abas de líder direto / diretoria. Sem textos
+            de apoio — a ligação líder→diretor já é visível na própria tela. */}
         {admin && aberto && (
-          <div className="ld-escolha">
-            <button className="ld-escolha-btn" onClick={() => abrirTroca(area, diretorNome, diretorMat, "lider")}>
-              Líder direto
-            </button>
-            <button className="ld-escolha-btn" onClick={() => abrirTroca(area, diretorNome, diretorMat, "diretor")}>
-              Diretor
-            </button>
-            <button className="ld-escolha-x" onClick={() => setEscolhaId(null)} aria-label="Fechar">
-              <CloseIcon size={12} />
-            </button>
+          <div className="ld-edit">
+            <div className="ld-tabs">
+              <button
+                type="button"
+                className={`ld-tab ${aba === "lider" ? "sel" : ""}`}
+                onClick={() => { setAba("lider"); setNovoDir(null); setErroTroca(""); }}
+              >Líder direto</button>
+              <button
+                type="button"
+                className={`ld-tab ${aba === "diretor" ? "sel" : ""}`}
+                onClick={() => { setAba("diretor"); setNovo(null); setErroTroca(""); }}
+              >Diretoria</button>
+              <button className="ld-escolha-x" onClick={fecharTroca} aria-label="Fechar">
+                <CloseIcon size={12} />
+              </button>
+            </div>
+
+            {aba === "lider" && (
+              <>
+                <div className="lider-pick">
+                  <span className="lp-ic"><SearchIcon size={13} /></span>
+                  <input
+                    ref={buscaRef}
+                    placeholder="Buscar pelo nome..."
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                  />
+                </div>
+                <div className="lider-list ld-edit-lista">
+                  {resultados.map((l) => (
+                    <button
+                      key={l.matricula}
+                      className={`ll-item ${novo?.matricula === l.matricula ? "sel" : ""}`}
+                      onClick={() => setNovo(novo?.matricula === l.matricula ? null : l)}
+                    >
+                      <b>{l.nome}</b><em>{(l.cargo || "Cargo a definir")}{l.setor ? ` · ${l.setor}` : ""}</em>
+                    </button>
+                  ))}
+                  {buscando && <div className="ll-vazio">Buscando...</div>}
+                  {!buscando && resultados.length === 0 && (
+                    <div className="ll-vazio">{busca ? "Nada encontrado" : "Digite para buscar"}</div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {aba === "diretor" && (
+              area.semLiderInterno ? (
+                <div className="ld-edit-erro">Defina o líder direto antes de trocar a diretoria.</div>
+              ) : (
+                <div className="lider-list ld-edit-lista">
+                  {(dados?.responsaveis || [])
+                    .filter((d) => d.matricula !== diretorMat && d.matricula !== area.lider.matricula)
+                    .map((d) => (
+                      <button
+                        key={d.matricula}
+                        className={`ll-item ${novoDir?.matricula === d.matricula ? "sel" : ""}`}
+                        onClick={() => setNovoDir(novoDir?.matricula === d.matricula ? null : d)}
+                      >
+                        <b>{d.nome}</b><em>{d.familia || d.cargo || "—"}{d.setor ? ` · ${d.setor}` : ""}</em>
+                      </button>
+                    ))}
+                </div>
+              )
+            )}
+
+            {erroTroca && <div className="ld-edit-erro">{erroTroca}</div>}
+
+            <div className="ld-edit-foot">
+              <button className="btn btn-neutral btn-sm" onClick={fecharTroca}>Cancelar</button>
+              <div style={{ flex: 1 }} />
+              <button
+                className="btn btn-primary btn-sm"
+                disabled={salvando || (aba === "lider" ? !novo : (!novoDir || area.semLiderInterno))}
+                onClick={confirmarTroca}
+              >
+                <span className="ic"><CheckIcon /></span>{salvando ? "Aplicando..." : "Aplicar"}
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -255,221 +323,6 @@ export default function LideresView() {
           </section>
         )}
       </div>
-
-      {/* ===== modal de alterar líder ===== */}
-      {alvo && (
-        <div className="modal-overlay" onMouseDown={fecharTroca}>
-          <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-            <button className="modal-x" onClick={fecharTroca} aria-label="Fechar"><CloseIcon size={16} /></button>
-
-            <div className="modal-head">
-              <div className="ld-modal-ava"><UserIcon size={26} /></div>
-              <div>
-                <h3>{aba === "diretor" ? "Trocar diretor" : "Trocar líder direto"} — {alvo.areaNome}</h3>
-                <p>Toda área tem um líder direto e, acima dele, um diretor</p>
-              </div>
-            </div>
-
-            <div className="modal-body">
-              {/* o que trocar: o líder da área ou a diretoria a que ela responde */}
-              <div className="ld-tabs">
-                <button
-                  type="button"
-                  className={`ld-tab ${aba === "lider" ? "sel" : ""}`}
-                  onClick={() => { setAba("lider"); setNovoDir(null); setErroTroca(""); }}
-                >Trocar líder direto</button>
-                <button
-                  type="button"
-                  className={`ld-tab ${aba === "diretor" ? "sel" : ""}`}
-                  onClick={() => { setAba("diretor"); setNovo(null); setErroTroca(""); }}
-                >Trocar diretor</button>
-              </div>
-
-              {/* escada da hierarquia da área: destaca o nível que a aba altera,
-                  para ficar visível o que muda e o que fica como está */}
-              <div className="ld-escada">
-                <div className={`ld-degrau ${aba === "diretor" ? "foco" : ""}`}>
-                  <span className="ld-degrau-rot">Diretor{aba === "diretor" ? " · alterando" : ""}</span>
-                  <b>{alvo.diretorNome || "— sem diretor"}</b>
-                </div>
-                <div className="ld-degrau-liga">↑ responde a</div>
-                <div className={`ld-degrau ${aba === "lider" ? "foco" : ""}`}>
-                  <span className="ld-degrau-rot">Líder direto{aba === "lider" ? " · alterando" : ""}</span>
-                  <b>{alvo.lider.nome}</b>
-                </div>
-                <div className="ld-degrau-liga">↑ responde a</div>
-                <div className="ld-degrau">
-                  <span className="ld-degrau-rot">Equipe de {alvo.areaNome}</span>
-                  <b>{alvo.pessoas} colaborador(es)</b>
-                </div>
-              </div>
-
-              {aba === "lider" && alvo.semLiderInterno && (
-                <div className="modal-alert" style={{ marginBottom: 12 }}>
-                  <AlertIcon size={16} />
-                  <div>
-                    <b>Esta área está sem líder interno.</b>
-                    <div style={{ fontSize: 12, marginTop: 2 }}>
-                      Os {alvo.lider.diretos} colaboradores respondem direto a {alvo.lider.nome},
-                      que é de outra área. Escolha abaixo alguém <b>de {alvo.areaNome}</b> para ser o
-                      líder direto — a equipe passa a responder a ele, e ele a {alvo.lider.nome}.
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {aba === "lider" && (
-              <div className="modal-section">
-                <span className="sec-title">{alvo.semLiderInterno ? "Responde hoje a (diretor)" : "Líder atual"}</span>
-                <div className={`lider-atual ${novo ? "trocado" : ""}`}>
-                  <span className="la-ava"><UserIcon size={20} /></span>
-                  <span className="la-txt">
-                    <b>{novo ? novo.nome : alvo.lider.nome}</b>
-                    <em>{novo
-                      ? `${novo.cargo || "Cargo a definir"}${novo.setor ? ` · ${novo.setor}` : ""}`
-                      : `${alvo.lider.cargo || "Cargo a definir"} · matrícula ${alvo.lider.matricula}`}</em>
-                  </span>
-                  {novo && (
-                    <button className="la-btn undo" onClick={() => setNovo(null)}>Desfazer</button>
-                  )}
-                </div>
-              </div>
-              )}
-
-              {aba === "lider" && !novo && (
-                <div className="modal-section">
-                  <span className="sec-title">Novo líder <em>(busca em todas as áreas)</em></span>
-                  <p className="lp-hint" style={{ margin: "0 0 8px" }}>
-                    Troca quem lidera a área por dentro — ela permanece nesta diretoria.
-                    Para mudar a quem a área responde, use a aba <b>Diretoria</b>.
-                  </p>
-                  <div className="lider-pick">
-                    <span className="lp-ic"><SearchIcon size={14} /></span>
-                    <input
-                      ref={buscaRef}
-                      placeholder="Buscar pelo nome do novo líder..."
-                      value={busca}
-                      onChange={(e) => setBusca(e.target.value)}
-                    />
-                  </div>
-                  <div className="lider-list ld-modal-lista">
-                    {resultados.map((l) => (
-                      <button key={l.matricula} className="ll-item" onClick={() => setNovo(l)}>
-                        <b>{l.nome}</b><em>{(l.cargo || "Cargo a definir")}{l.setor ? ` · ${l.setor}` : ""}</em>
-                      </button>
-                    ))}
-                    {buscando && <div className="ll-vazio">Buscando...</div>}
-                    {!buscando && resultados.length === 0 && (
-                      <div className="ll-vazio">{busca ? `Nenhuma pessoa encontrada para "${busca}"` : "Digite para buscar"}</div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {aba === "lider" && novo && (
-                <div className="sol-confirma">
-                  <b className="sol-titulo">Confirmar a troca</b>
-                  <ul className="sol-diffs">
-                    <li>
-                      <span className="sol-campo">Líder</span>
-                      <span className="sol-de">{alvo.lider.nome}</span>
-                      <span className="sol-seta">→</span>
-                      <span className="sol-para">{novo.nome}</span>
-                    </li>
-                  </ul>
-                  <p className="sol-texto" style={{ marginTop: 8 }}>
-                    <b>{alvo.lider.diretos}</b> colaborador(es) que respondem a {alvo.lider.nome} passam a
-                    responder a <b>{novo.nome}</b>
-                    {alvo.lider.externo
-                      ? (novo.setor === alvo.areaNome
-                        ? <>, e <b>{novo.nome}</b> passa a responder ao diretor {alvo.lider.nome}.</>
-                        : ".")
-                      : <>, e {alvo.lider.nome} passa a responder ao novo líder.</>}{" "}
-                    {novo.setor && novo.setor !== alvo.areaNome
-                      ? `Atenção: o novo líder é de ${novo.setor} — a área passa a responder pela cadeia dele. Para trocar só a diretoria, cancele e use a aba Diretoria.`
-                      : (!alvo.lider.externo && novo.setor === alvo.areaNome
-                        ? "Como o novo líder é da própria área, ela permanece na diretoria atual."
-                        : "")}
-                  </p>
-                </div>
-              )}
-
-              {aba === "diretor" && alvo.semLiderInterno && (
-                <div className="modal-alert" style={{ marginBottom: 12 }}>
-                  <AlertIcon size={16} />
-                  <div>
-                    <b>Defina o líder da área antes de trocar a diretoria.</b>
-                    <div style={{ fontSize: 12, marginTop: 2 }}>
-                      Sem líder interno, trocar a diretoria penduraria os {alvo.lider.diretos} colaboradores
-                      direto no novo diretor. Use a aba <b>Líder da área</b> primeiro.
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {aba === "diretor" && !alvo.semLiderInterno && (
-                <div className="modal-section">
-                  <span className="sec-title">Novo diretor <em>(diretores, presidente e conselheiro)</em></span>
-                  <p className="lp-hint" style={{ margin: "0 0 8px" }}>
-                    Só o diretor muda. <b>{alvo.lider.nome}</b> continua líder direto de {alvo.areaNome},
-                    com os {alvo.lider.diretos} colaboradores respondendo a ele — passa apenas a
-                    responder ao novo diretor.
-                  </p>
-                  <div className="lider-list ld-modal-lista">
-                    {(dados?.responsaveis || [])
-                      .filter((d) => d.matricula !== alvo.diretorMat && d.matricula !== alvo.lider.matricula)
-                      .map((d) => (
-                        <button
-                          key={d.matricula}
-                          className={`ll-item ${novoDir?.matricula === d.matricula ? "sel" : ""}`}
-                          onClick={() => setNovoDir(d)}
-                        >
-                          <b>{d.nome}</b>
-                          <em>{d.familia || d.cargo || "—"}{d.setor ? ` · ${d.setor}` : ""}</em>
-                        </button>
-                      ))}
-                    {(dados?.responsaveis || []).length === 0 && (
-                      <div className="ll-vazio">Nenhum diretor cadastrado nos níveis 1–5.</div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {aba === "diretor" && novoDir && (
-                <div className="sol-confirma">
-                  <b className="sol-titulo">Confirmar a troca de diretor</b>
-                  <ul className="sol-diffs">
-                    <li>
-                      <span className="sol-campo">Diretor</span>
-                      <span className="sol-de">{alvo.diretorNome || "Sem diretoria"}</span>
-                      <span className="sol-seta">→</span>
-                      <span className="sol-para">{novoDir.nome}</span>
-                    </li>
-                  </ul>
-                  <p className="sol-texto" style={{ marginTop: 8 }}>
-                    <b>{alvo.lider.nome}</b> continua líder direto de {alvo.areaNome} e passa a responder
-                    a <b>{novoDir.nome}</b>. Os {alvo.lider.diretos} colaboradores da equipe não mudam de líder.
-                  </p>
-                </div>
-              )}
-
-              {erroTroca && <div className="modal-alert"><AlertIcon size={16} /><div><b>{erroTroca}</b></div></div>}
-            </div>
-
-            <div className="modal-foot">
-              <button className="btn btn-neutral" onClick={fecharTroca}>Cancelar</button>
-              <div style={{ flex: 1 }} />
-              <button
-                className="btn btn-primary"
-                disabled={salvando || (aba === "lider" ? !novo : (!novoDir || alvo.semLiderInterno))}
-                onClick={confirmarTroca}
-              >
-                <span className="ic"><CheckIcon /></span>{salvando ? "Aplicando..." : "Aplicar troca"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ===== modal de perfil do líder (visão completa no organograma) ===== */}
       {perfilMat && (
