@@ -319,17 +319,23 @@ main{padding:20px 24px 24px}
 .ld-tag-sem{display:inline-block;background:#fdf3f2;border:1px solid #f6cfcb;color:#b42318;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:800;letter-spacing:.02em}
 /* rótulo do papel dentro do card (LÍDER DIRETO) */
 .ld-papel-rot{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint)}
-/* edição dentro do card: abas + lista + rodapé, sem textos de apoio */
-.ld-edit{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line)}
-.ld-edit .ld-tabs{margin-bottom:9px}
-.ld-edit-lista{max-height:186px;overflow-y:auto;margin-top:7px}
-.ld-edit-erro{background:#fdf3f2;border:1px solid #f6cfcb;border-radius:10px;padding:8px 10px;font-size:11.5px;font-weight:600;color:#b42318}
-.ld-edit-foot{display:flex;align-items:center;gap:8px;margin-top:9px}
-.ld-escolha-x{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border:0;background:transparent;border-radius:8px;color:var(--ink-faint);cursor:pointer;flex:0 0 auto}
-.ld-escolha-x:hover{background:#f2f5fa;color:var(--ink)}
-.ld-tabs{display:flex;gap:6px;margin-bottom:14px;background:#f2f5fa;border-radius:12px;padding:4px}
-.ld-tab{flex:1;border:0;background:transparent;border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;transition:background .15s,color .15s}
-.ld-tab.sel{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(16,24,40,.08)}
+/* modais de Diretorias: um pouco mais estreitos que o padrão */
+.ld-alt-modal,.ld-info-modal{max-width:440px}
+/* caixa de erro nos modais de Diretorias */
+.ld-erro-box{background:#fdf3f2;border:1px solid #f6cfcb;border-radius:10px;padding:9px 11px;font-size:12px;font-weight:600;color:#b42318}
+/* modal Alterar: as duas opções (líder direto / diretoria) */
+.md-opts{display:flex;flex-direction:column;gap:10px}
+.md-opt{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:12px;padding:15px 16px;font:inherit;cursor:pointer;transition:border-color .15s,background .15s}
+.md-opt:hover{border-color:var(--inc);background:var(--inc-soft)}
+.md-opt-ic{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:var(--inc-soft);color:var(--inc);flex:0 0 auto}
+.md-opt-tx b{font-size:14px;font-weight:700;color:var(--ink)}
+/* modal de informações: hierarquia da área com setas */
+.ld-escada{margin:2px 0}
+.ld-degrau{display:flex;flex-direction:column;gap:1px;background:#f7f9fd;border:1px solid var(--line-soft);border-radius:11px;padding:10px 13px}
+.ld-degrau.foco{background:var(--inc-soft);border-color:var(--inc-line)}
+.ld-degrau-rot{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint)}
+.ld-degrau b{font-size:13.5px;font-weight:700;color:var(--ink)}
+.ld-degrau-liga{padding:4px 0 4px 13px;font-size:10.5px;font-weight:600;color:var(--ink-faint)}
 .lider-pick{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:11px;padding:9px 11px;background:#fbfcfe}
 .lider-pick .lp-ic{color:var(--ink-faint);display:flex}
 .lider-pick input{border:0;outline:0;font:inherit;font-size:13px;width:100%;color:var(--ink);background:transparent}
