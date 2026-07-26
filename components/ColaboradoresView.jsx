@@ -406,7 +406,8 @@ export default function ColaboradoresView() {
           </div>
         </aside>
 
-        {/* DETALHE / EDIÇÃO */}
+        {/* DETALHE / EDIÇÃO + zona de perigo (cards empilhados) */}
+        <div className="sol-coluna">
         <section className="sol-detalhe">
           {!selId && <div className="sol-info grande">Selecione um colaborador à esquerda para editar.</div>}
           {selId && carregandoDet && <div className="sol-info grande">Carregando dados...</div>}
@@ -637,51 +638,6 @@ export default function ColaboradoresView() {
                 </div>
               )}
 
-              {/* zona de ativação: desativar (arquivar) ou reativar */}
-              {!confirmando && (
-                <div className="col-perigo">
-                  {form.ativo === 0 ? (
-                    <div className="cp-linha">
-                      <div className="cp-txt">
-                        <b>Reativar colaborador</b>
-                        <em>Volta a aparecer no organograma e na busca. Entra sem líder — defina depois se precisar.</em>
-                      </div>
-                      <button className="btn btn-neutral" disabled={processandoAtivo} onClick={reativar}>
-                        {processandoAtivo ? "Reativando..." : "Reativar"}
-                      </button>
-                    </div>
-                  ) : confirmandoDesativar ? (
-                    <div className="cp-confirma">
-                      <b className="cp-tit"><AlertIcon size={14} /> Desativar {original?.nome || form.nome}?</b>
-                      <p className="sol-texto">
-                        O colaborador é <b>arquivado</b> (sai do organograma, das contagens e da busca), mas o
-                        registro e o histórico são preservados — dá para reativar depois.
-                        {form.subordinados > 0 && (
-                          <> Os <b>{form.subordinados}</b> subordinado(s) diretos passam a responder ao
-                          líder acima ({form.liderNome || "sem líder / viram topo da área"}).</>
-                        )}
-                      </p>
-                      <div className="cp-acoes">
-                        <button className="btn btn-neutral btn-sm" onClick={() => setConfirmandoDesativar(false)}>Cancelar</button>
-                        <button className="btn btn-ghost btn-sm" disabled={processandoAtivo} onClick={desativar}>
-                          {processandoAtivo ? "Desativando..." : "Confirmar desativação"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="cp-linha">
-                      <div className="cp-txt">
-                        <b>Desativar colaborador</b>
-                        <em>Para quem saiu da empresa. Arquiva sem apagar — reversível.</em>
-                      </div>
-                      <button className="btn btn-ghost btn-sm" onClick={() => { setErro(""); setMsgAtivo(""); setConfirmandoDesativar(true); }}>
-                        Desativar
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
               {form.ativo !== 0 && (
               <div className="col-foot">
                 {confirmando ? (
@@ -715,6 +671,58 @@ export default function ColaboradoresView() {
             </>
           )}
         </section>
+
+        {/* ZONA DE PERIGO — card separado, longe do "Salvar alterações", para
+            desativar não ficar a um clique de distância do save. Fica oculta
+            enquanto a confirmação das alterações está aberta. */}
+        {selId && !carregandoDet && form && !confirmando && (
+          <section className={`sol-perigo ${form.ativo === 0 ? "inativo" : ""}`}>
+            <b className="sol-perigo-tit">
+              <AlertIcon size={13} />
+              {form.ativo === 0 ? "Status do cadastro" : "Zona de perigo"}
+            </b>
+            {form.ativo === 0 ? (
+              <div className="cp-linha">
+                <div className="cp-txt">
+                  <b>Reativar colaborador</b>
+                  <em>Volta a aparecer no organograma e na busca. Entra sem líder — defina depois se precisar.</em>
+                </div>
+                <button className="btn btn-neutral" disabled={processandoAtivo} onClick={reativar}>
+                  {processandoAtivo ? "Reativando..." : "Reativar"}
+                </button>
+              </div>
+            ) : confirmandoDesativar ? (
+              <div className="cp-confirma">
+                <b className="cp-tit"><AlertIcon size={14} /> Desativar {original?.nome || form.nome}?</b>
+                <p className="sol-texto">
+                  O colaborador é <b>arquivado</b> (sai do organograma, das contagens e da busca), mas o
+                  registro e o histórico são preservados — dá para reativar depois.
+                  {form.subordinados > 0 && (
+                    <> Os <b>{form.subordinados}</b> subordinado(s) diretos passam a responder ao
+                    líder acima ({form.liderNome || "sem líder / viram topo da área"}).</>
+                  )}
+                </p>
+                <div className="cp-acoes">
+                  <button className="btn btn-neutral btn-sm" onClick={() => setConfirmandoDesativar(false)}>Cancelar</button>
+                  <button className="btn btn-ghost btn-sm" disabled={processandoAtivo} onClick={desativar}>
+                    {processandoAtivo ? "Desativando..." : "Confirmar desativação"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="cp-linha">
+                <div className="cp-txt">
+                  <b>Desativar colaborador</b>
+                  <em>Para quem saiu da empresa. Arquiva sem apagar — reversível.</em>
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setErro(""); setMsgAtivo(""); setConfirmandoDesativar(true); }}>
+                  Desativar
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+        </div>
       </div>
     </div>
   );

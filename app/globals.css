@@ -497,6 +497,13 @@ main{padding:20px 24px 24px}
 .col-arquivado b{color:#8a2b21}
 /* zona de ativar/desativar */
 .col-perigo{margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)}
+/* coluna direita do board: card principal + zona de perigo empilhados */
+.sol-coluna{display:flex;flex-direction:column;gap:14px;min-width:0}
+/* zona de perigo em card próprio — ações destrutivas fora do alcance do Salvar */
+.sol-perigo{background:var(--panel);border:1px solid #f6cfcb;border-radius:18px;padding:15px 22px 17px;box-shadow:var(--shadow-soft)}
+.sol-perigo.inativo{border-color:var(--line)}
+.sol-perigo-tit{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#b42318;margin-bottom:11px}
+.sol-perigo.inativo .sol-perigo-tit{color:var(--ink-soft)}
 .cp-linha{display:flex;align-items:center;gap:14px}
 .cp-txt{display:flex;flex-direction:column;flex:1;min-width:0}
 .cp-txt b{font-size:13px;font-weight:700;color:var(--ink)}

@@ -268,7 +268,8 @@ export default function PjView() {
           </div>
         </aside>
 
-        {/* DETALHE / FORM */}
+        {/* DETALHE / FORM + zona de perigo (cards empilhados) */}
+        <div className="sol-coluna">
         <section className="sol-detalhe">
           {!modo && <div className="sol-info grande">Selecione um PJ à esquerda ou clique em "Novo PJ".</div>}
           {modo && carregandoDet && <div className="sol-info grande">Carregando...</div>}
@@ -409,45 +410,6 @@ export default function PjView() {
                 </div>
               </fieldset>
 
-              {/* zona de status/exclusão (só na edição, não no cadastro novo) */}
-              {modo !== "novo" && (
-                <div className="col-perigo">
-                  {confirmDel ? (
-                    <div className="cp-confirma">
-                      <b className="cp-tit"><AlertIcon size={14} /> Excluir {form.nome} em definitivo?</b>
-                      <p className="sol-texto">
-                        Remove o cadastro do banco para sempre (irreversível). Subordinados diretos, se houver,
-                        sobem para o líder acima; registros ligados a ele são limpos. Para apenas afastar
-                        temporariamente, use <b>Desativar</b>.
-                      </p>
-                      <div className="cp-acoes">
-                        <button className="btn btn-neutral btn-sm" onClick={() => setConfirmDel(false)}>Cancelar</button>
-                        <button className="btn btn-ghost btn-sm" disabled={agindo} onClick={excluir}>
-                          {agindo ? "Excluindo..." : "Excluir em definitivo"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="cp-linha">
-                      <div className="cp-txt">
-                        <b>{form.ativo === 0 ? "Reativar cadastro" : "Status do cadastro"}</b>
-                        <em>{form.ativo === 0 ? "Traz o PJ de volta ao organograma e à busca." : "Desativar arquiva (reversível); excluir remove de vez."}</em>
-                      </div>
-                      {form.ativo === 0 ? (
-                        <button className="btn btn-neutral" disabled={agindo} onClick={() => mudarAtivo("reativar")}>
-                          {agindo ? "Reativando..." : "Reativar"}
-                        </button>
-                      ) : (
-                        <>
-                          <button className="btn btn-neutral btn-sm" disabled={agindo} onClick={() => mudarAtivo("desativar")}>Desativar</button>
-                          <button className="btn btn-ghost btn-sm" onClick={() => { setErro(""); setMsg(""); setConfirmDel(true); }}>Excluir</button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
               {!somenteLeitura && (
                 <div className="col-foot">
                   {modo !== "novo" && <button className="btn btn-neutral" onClick={() => setModo(null)}>Fechar</button>}
@@ -461,6 +423,52 @@ export default function PjView() {
             </>
           )}
         </section>
+
+        {/* ZONA DE PERIGO — card separado, longe do "Salvar alterações", para
+            desativar/excluir não ficarem a um clique de distância do save.
+            Só na edição (no cadastro novo não há o que desativar). */}
+        {modo && modo !== "novo" && !carregandoDet && form && (
+          <section className={`sol-perigo ${form.ativo === 0 ? "inativo" : ""}`}>
+            <b className="sol-perigo-tit">
+              <AlertIcon size={13} />
+              {form.ativo === 0 ? "Status do cadastro" : "Zona de perigo"}
+            </b>
+            {confirmDel ? (
+              <div className="cp-confirma">
+                <b className="cp-tit"><AlertIcon size={14} /> Excluir {form.nome} em definitivo?</b>
+                <p className="sol-texto">
+                  Remove o cadastro do banco para sempre (irreversível). Subordinados diretos, se houver,
+                  sobem para o líder acima; registros ligados a ele são limpos. Para apenas afastar
+                  temporariamente, use <b>Desativar</b>.
+                </p>
+                <div className="cp-acoes">
+                  <button className="btn btn-neutral btn-sm" onClick={() => setConfirmDel(false)}>Cancelar</button>
+                  <button className="btn btn-ghost btn-sm" disabled={agindo} onClick={excluir}>
+                    {agindo ? "Excluindo..." : "Excluir em definitivo"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="cp-linha">
+                <div className="cp-txt">
+                  <b>{form.ativo === 0 ? "Reativar cadastro" : "Desativar ou excluir"}</b>
+                  <em>{form.ativo === 0 ? "Traz o PJ de volta ao organograma e à busca." : "Desativar arquiva (reversível); excluir remove de vez."}</em>
+                </div>
+                {form.ativo === 0 ? (
+                  <button className="btn btn-neutral" disabled={agindo} onClick={() => mudarAtivo("reativar")}>
+                    {agindo ? "Reativando..." : "Reativar"}
+                  </button>
+                ) : (
+                  <>
+                    <button className="btn btn-neutral btn-sm" disabled={agindo} onClick={() => mudarAtivo("desativar")}>Desativar</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => { setErro(""); setMsg(""); setConfirmDel(true); }}>Excluir</button>
+                  </>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+        </div>
       </div>
     </div>
   );
