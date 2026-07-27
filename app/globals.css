@@ -144,7 +144,9 @@ main{padding:20px 24px 24px}
      desconto menor = área um pouco mais alta, mas sempre dentro da tela */
   height:max(520px, calc(100dvh - 288px));
   border:1px solid var(--line-soft);border-radius:16px;
-  background:radial-gradient(var(--line) 1px, transparent 1px) 0 0/22px 22px, #fbfcfe;
+  /* creme claro da paleta INC; os pontinhos da grade acompanham num tom
+     quente — o cinza-azulado de antes brigava com o fundo bege */
+  background:radial-gradient(#f1e9dc 1px, transparent 1px) 0 0/22px 22px, #fffcf8;
   cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;
 }
 .tree-viewport.dragging{cursor:grabbing}
