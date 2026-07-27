@@ -1,10 +1,10 @@
 "use client";
 
-// Líderes por área — visão agrupada por DIRETOR: cada diretor com as áreas
-// que gerencia e o líder de cada área. "Alterar líder" abre um modal com as
-// informações da área e do líder; a troca aplica na área INTEIRA (quem
-// respondia ao antigo passa ao novo; o antigo vira subordinado do novo;
-// novo líder da própria área herda o diretor).
+// Diretorias — cada diretoria (ou a presidência) com as áreas sob sua gestão
+// e o líder de cada área. Clicar no nome do líder abre um modal só com as
+// informações da área (hierarquia + contagem). "Alterar" abre um modal com
+// duas opções — Líder direto ou Diretoria — e cada uma leva ao seletor
+// correspondente. A troca aplica na área INTEIRA.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import HeroNav from "@/components/HeroNav";
@@ -37,13 +37,13 @@ export default function LideresView() {
   const [novo, setNovo] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [erroTroca, setErroTroca] = useState("");
+  // passo do modal Alterar: null = escolha (líder/diretoria); depois o seletor
+  const [aba, setAba] = useState(null); // null | "lider" | "diretor"
+  const [novoDir, setNovoDir] = useState(null);
   const buscaRef = useRef(null);
 
-  // modal de perfil do líder (visão completa dele no organograma)
-  const [perfilMat, setPerfilMat] = useState(null);
-  const [perfil, setPerfil] = useState(null);
-  const [perfilCarregando, setPerfilCarregando] = useState(false);
-  const [perfilErro, setPerfilErro] = useState("");
+  // modal de informações da área (aberto ao clicar no nome do líder direto)
+  const [info, setInfo] = useState(null); // { areaNome, diretorNome, liderNome, pessoas }
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -59,9 +59,9 @@ export default function LideresView() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  // busca do novo líder (todas as áreas), com debounce
+  // busca do novo líder (todas as áreas), com debounce — só no passo do líder
   useEffect(() => {
-    if (!alvo || novo) return;
+    if (!alvo || aba !== "lider" || novo) return;
     let ativo = true;
     setBuscando(true);
     const t = setTimeout(async () => {
@@ -73,11 +73,11 @@ export default function LideresView() {
       if (ativo) setBuscando(false);
     }, 250);
     return () => { ativo = false; clearTimeout(t); };
-  }, [busca, alvo, novo]);
+  }, [busca, alvo, aba, novo]);
 
   useEffect(() => {
-    if (alvo && !novo && buscaRef.current) buscaRef.current.focus();
-  }, [alvo, novo]);
+    if (alvo && aba === "lider" && !novo && buscaRef.current) buscaRef.current.focus();
+  }, [alvo, aba, novo]);
 
   // Esc fecha o modal
   useEffect(() => {
@@ -88,61 +88,65 @@ export default function LideresView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alvo]);
 
-  function abrirTroca(area, diretorNome) {
+  function abrirTroca(area, diretorNome, diretorMat) {
     setAlvo({
       areaId: area.id, areaNome: area.nome, pessoas: area.pessoas,
-      lider: area.lider, diretorNome: diretorNome || "",
+      lider: area.lider, semLiderInterno: !!area.semLiderInterno,
+      diretorNome: diretorNome || "", diretorMat: diretorMat || "",
     });
-    setBusca(""); setResultados([]); setNovo(null); setErroTroca(""); setMsg("");
+    setBusca(""); setResultados([]); setNovo(null); setNovoDir(null);
+    setAba(null); setErroTroca(""); setMsg("");
   }
   function fecharTroca() {
-    setAlvo(null); setNovo(null); setBusca(""); setErroTroca("");
+    setAlvo(null); setNovo(null); setNovoDir(null); setBusca(""); setErroTroca("");
   }
 
   async function confirmarTroca() {
-    if (!alvo || !novo) return;
+    if (!alvo || (aba === "lider" ? !novo : !novoDir)) return;
     setSalvando(true);
     setErroTroca("");
     try {
+      const payload = aba === "lider"
+        ? { acao: "trocar", areaId: alvo.areaId, deMatricula: alvo.lider.matricula, paraMatricula: novo.matricula }
+        : { acao: "trocar_diretor", areaId: alvo.areaId, paraMatricula: novoDir.matricula };
       const r = await fetch("/api/lideres", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          acao: "trocar", areaId: alvo.areaId,
-          deMatricula: alvo.lider.matricula, paraMatricula: novo.matricula,
-        }),
+        body: JSON.stringify(payload),
       });
       const txt = await r.text();
       let j; try { j = JSON.parse(txt); } catch { j = { ok: false, erro: `Servidor respondeu ${r.status}.` }; }
-      if (!j.ok) { setErroTroca(j.erro || "Falha ao trocar o líder."); setSalvando(false); return; }
-      setMsg(`Líder de ${alvo.areaNome} alterado para ${novo.nome}. ${j.reapontados} colaborador(es) reapontado(s)${j.antigoReaponta ? ` — ${alvo.lider.nome} agora responde ao novo líder` : ""}.`);
+      if (!j.ok) { setErroTroca(j.erro || "Falha ao aplicar a troca."); setSalvando(false); return; }
+      setMsg(aba === "lider"
+        ? `Líder de ${alvo.areaNome} alterado para ${novo.nome}. ${j.reapontados} colaborador(es) reapontado(s)${j.antigoReaponta ? ` — ${alvo.lider.nome} agora responde ao novo líder` : ""}.`
+        : `Diretor de ${alvo.areaNome} alterado para ${j.diretorNome || novoDir.nome}. O líder direto continua sendo ${alvo.lider.nome}.`);
       fecharTroca();
       await carregar();
     } catch (e) { setErroTroca(`Falha: ${e.message}`); }
     setSalvando(false);
   }
 
-  // ===== perfil do líder =====
-  const abrirPerfil = useCallback(async (matricula) => {
-    if (!matricula) return;
-    setPerfilMat(matricula); setPerfil(null); setPerfilErro(""); setPerfilCarregando(true);
-    try {
-      const r = await fetch(`/api/lideres?perfil=${encodeURIComponent(matricula)}`);
-      const j = await r.json();
-      if (!j.ok) throw new Error(j.erro || "Falha ao carregar o perfil.");
-      setPerfil(j.perfil);
-    } catch (e) { setPerfilErro(e.message); }
-    setPerfilCarregando(false);
-  }, []);
-  function fecharPerfil() { setPerfilMat(null); setPerfil(null); setPerfilErro(""); }
+  // ===== modal de informações da área (clique no líder direto) =====
+  function abrirInfo(area, diretorNome) {
+    setInfo({
+      areaNome: area.nome,
+      diretorNome: diretorNome || "",
+      liderNome: area.lider.nome,
+      pessoas: area.pessoas,
+    });
+  }
+  function fecharInfo() { setInfo(null); }
 
   useEffect(() => {
-    if (!perfilMat) return;
-    function esc(e) { if (e.key === "Escape") fecharPerfil(); }
+    if (!info) return;
+    function esc(e) { if (e.key === "Escape") fecharInfo(); }
     document.addEventListener("keydown", esc);
     return () => document.removeEventListener("keydown", esc);
-  }, [perfilMat]);
+  }, [info]);
 
-  function CardArea({ area, diretorNome }) {
+  // Card da área: mostra só o líder direto. Clicar no nome abre o modal de
+  // informações; "Alterar" abre o modal com as duas opções (líder / diretoria).
+  function CardArea({ area, diretorNome, diretorMat }) {
+    const admin = sessao.nivel >= NIVEL.ADMIN;
     return (
       <div className="ld-card">
         <div className="ld-area">
@@ -153,20 +157,20 @@ export default function LideresView() {
         <div className="lider-atual">
           <span className="la-ava"><UserIcon size={20} /></span>
           <span className="la-txt">
-            <button className="la-nome-btn" onClick={() => abrirPerfil(area.lider.matricula)} title="Ver perfil completo do líder">
+            <span className="ld-papel-rot">Líder direto</span>
+            <button className="la-nome-btn" onClick={() => abrirInfo(area, diretorNome)} title="Ver informações da área">
               {area.lider.nome}
             </button>
-            {/* linha discreta reservada (sempre presente → todos os cards com
-                a mesma altura, com ou sem tag). Detalhe de quantos lidera
-                fica só no perfil completo (clique no nome). */}
             <span className="la-meta">
-              {area.lider.tag && <span className="ld-tag-dir">{area.lider.tag}</span>}
+              {area.semLiderInterno
+                ? <span className="ld-tag-sem">sem líder interno · quem responde é o diretor</span>
+                : (area.lider.tag && <span className="ld-tag-dir">{area.lider.tag}</span>)}
             </span>
             <em>{area.lider.cargo || "Cargo a definir"}</em>
           </span>
-          {sessao.nivel >= NIVEL.ADMIN && (
-            <button className="la-btn" onClick={() => abrirTroca(area, diretorNome)}>
-              Alterar líder
+          {admin && (
+            <button className="la-btn" onClick={() => abrirTroca(area, diretorNome, diretorMat)}>
+              Alterar
             </button>
           )}
         </div>
@@ -177,15 +181,15 @@ export default function LideresView() {
   return (
     <div className="sol-shell">
       <HeroNav
-        titulo="Líderes por área"
-        subtitulo="Diretores, áreas sob sua gestão e o líder de cada área · a troca aplica na área inteira"
+        titulo="Diretorias"
+        subtitulo="Cada diretoria com as áreas sob sua gestão e o líder de cada uma"
         atual="lideres"
       />
 
       <div className="ct-board">
         {erro && <div className="modal-alert"><AlertIcon size={16} /><div><b>{erro}</b></div></div>}
         {msg && <div className="modal-note sol-ok"><b>{msg}</b></div>}
-        {carregando && <div className="ar-vazio">Carregando líderes...</div>}
+        {carregando && <div className="ar-vazio">Carregando diretorias...</div>}
 
         {!carregando && dados && dados.diretores.map((g) => (
           <section className="ld-grupo" key={g.diretor.matricula || g.diretor.nome}>
@@ -199,10 +203,10 @@ export default function LideresView() {
                   {g.diretor.respondeA ? ` · responde a ${g.diretor.respondeA}` : ""}
                 </em>
               </span>
-              <span className="ld-dir-chip">{g.areas.length} área(s) sob gestão</span>
+              <span className="ld-dir-chip">{g.areas.length} área(s) na diretoria</span>
             </div>
             <div className="ld-grid">
-              {g.areas.map((a) => <CardArea key={a.id} area={a} diretorNome={g.diretor.nome} />)}
+              {g.areas.map((a) => <CardArea key={a.id} area={a} diretorNome={g.diretor.nome} diretorMat={g.diretor.matricula} />)}
             </div>
           </section>
         ))}
@@ -212,230 +216,157 @@ export default function LideresView() {
             <div className="ld-dir topo">
               <span className="ld-dir-ava"><UserIcon size={22} /></span>
               <span className="ld-dir-txt">
-                <b>Sem diretor na cadeia</b>
-                <em>Áreas cujo líder não chega a nenhum diretor nem à presidência</em>
+                <b>Sem diretoria</b>
+                <em>O líder destas áreas não chega a nenhum diretor nem à presidência — altere o líder para conectá-las a uma diretoria</em>
               </span>
               <span className="ld-dir-chip">{dados.semDiretor.length} área(s)</span>
             </div>
             <div className="ld-grid">
-              {dados.semDiretor.map((a) => <CardArea key={a.id} area={a} diretorNome="" />)}
+              {dados.semDiretor.map((a) => <CardArea key={a.id} area={a} diretorNome="" diretorMat="" />)}
             </div>
           </section>
         )}
       </div>
 
-      {/* ===== modal de alterar líder ===== */}
+      {/* ===== modal Alterar: passo 1 = escolha; passo 2 = seletor ===== */}
       {alvo && (
         <div className="modal-overlay" onMouseDown={fecharTroca}>
-          <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+          <div className="modal ld-alt-modal" onMouseDown={(e) => e.stopPropagation()}>
             <button className="modal-x" onClick={fecharTroca} aria-label="Fechar"><CloseIcon size={16} /></button>
 
             <div className="modal-head">
-              <div className="ld-modal-ava"><UserIcon size={26} /></div>
               <div>
-                <h3>Alterar líder — {alvo.areaNome}</h3>
-                <p>A troca vale para todos os colaboradores da área</p>
+                <h3>
+                  {aba === "lider" ? "Alterar líder direto"
+                    : aba === "diretor" ? "Alterar diretoria"
+                    : "Alterar"} — {alvo.areaNome}
+                </h3>
+                {aba === null && <p>O que você quer alterar?</p>}
               </div>
             </div>
 
             <div className="modal-body">
-              {/* contexto da área e do líder atual */}
-              <div className="ro-grid" style={{ marginBottom: 12 }}>
-                <div className="ro"><span>Área</span><b>{alvo.areaNome}</b></div>
-                <div className="ro"><span>Colaboradores</span><b>{alvo.pessoas}</b></div>
-                <div className="ro"><span>Diretor</span><b>{alvo.diretorNome || "— (topo da hierarquia)"}</b></div>
-                <div className="ro"><span>Respondem ao líder</span><b>{alvo.lider.diretos} direto(s)</b></div>
-              </div>
-
-              <div className="modal-section">
-                <span className="sec-title">Líder atual</span>
-                <div className={`lider-atual ${novo ? "trocado" : ""}`}>
-                  <span className="la-ava"><UserIcon size={20} /></span>
-                  <span className="la-txt">
-                    <b>{novo ? novo.nome : alvo.lider.nome}</b>
-                    <em>{novo
-                      ? `${novo.cargo || "Cargo a definir"}${novo.setor ? ` · ${novo.setor}` : ""}`
-                      : `${alvo.lider.cargo || "Cargo a definir"} · matrícula ${alvo.lider.matricula}`}</em>
-                  </span>
-                  {novo && (
-                    <button className="la-btn undo" onClick={() => setNovo(null)}>Desfazer</button>
-                  )}
+              {/* passo 1: as duas opções, e nada mais */}
+              {aba === null && (
+                <div className="md-opts">
+                  <button className="md-opt" onClick={() => { setAba("diretor"); setNovo(null); setErroTroca(""); }}>
+                    <span className="md-opt-ic"><UserIcon size={20} /></span>
+                    <span className="md-opt-tx"><b>Diretoria</b></span>
+                  </button>
+                  <button className="md-opt" onClick={() => { setAba("lider"); setNovoDir(null); setErroTroca(""); }}>
+                    <span className="md-opt-ic"><UserIcon size={20} /></span>
+                    <span className="md-opt-tx"><b>Líder direto</b></span>
+                  </button>
                 </div>
-              </div>
+              )}
 
-              {!novo && (
-                <div className="modal-section">
-                  <span className="sec-title">Novo líder <em>(busca em todas as áreas)</em></span>
+              {/* passo 2a: seletor de líder direto (busca) */}
+              {aba === "lider" && (
+                <>
                   <div className="lider-pick">
                     <span className="lp-ic"><SearchIcon size={14} /></span>
                     <input
                       ref={buscaRef}
-                      placeholder="Buscar pelo nome do novo líder..."
+                      placeholder="Buscar pelo nome..."
                       value={busca}
                       onChange={(e) => setBusca(e.target.value)}
                     />
                   </div>
                   <div className="lider-list ld-modal-lista">
                     {resultados.map((l) => (
-                      <button key={l.matricula} className="ll-item" onClick={() => setNovo(l)}>
+                      <button
+                        key={l.matricula}
+                        className={`ll-item ${novo?.matricula === l.matricula ? "sel" : ""}`}
+                        onClick={() => setNovo(novo?.matricula === l.matricula ? null : l)}
+                      >
                         <b>{l.nome}</b><em>{(l.cargo || "Cargo a definir")}{l.setor ? ` · ${l.setor}` : ""}</em>
                       </button>
                     ))}
                     {buscando && <div className="ll-vazio">Buscando...</div>}
                     {!buscando && resultados.length === 0 && (
-                      <div className="ll-vazio">{busca ? `Nenhuma pessoa encontrada para "${busca}"` : "Digite para buscar"}</div>
+                      <div className="ll-vazio">{busca ? "Nada encontrado" : "Digite para buscar"}</div>
                     )}
                   </div>
-                </div>
+                </>
               )}
 
-              {novo && (
-                <div className="sol-confirma">
-                  <b className="sol-titulo">Confirmar a troca</b>
-                  <ul className="sol-diffs">
-                    <li>
-                      <span className="sol-campo">Líder</span>
-                      <span className="sol-de">{alvo.lider.nome}</span>
-                      <span className="sol-seta">→</span>
-                      <span className="sol-para">{novo.nome}</span>
-                    </li>
-                  </ul>
-                  <p className="sol-texto" style={{ marginTop: 8 }}>
-                    <b>{alvo.lider.diretos}</b> colaborador(es) que respondem a {alvo.lider.nome} passam a
-                    responder a <b>{novo.nome}</b>
-                    {alvo.lider.externo
-                      ? (novo.setor === alvo.areaNome
-                        ? <>, e <b>{novo.nome}</b> passa a responder ao diretor {alvo.lider.nome}.</>
-                        : ".")
-                      : <>, e {alvo.lider.nome} passa a responder ao novo líder.</>}{" "}
-                    {novo.setor && novo.setor !== alvo.areaNome
-                      ? `O novo líder é de ${novo.setor} — entra como líder externo (padrão diretor).`
-                      : (!alvo.lider.externo && novo.setor === alvo.areaNome
-                        ? "Como o novo líder é da própria área, ele herda o diretor atual."
-                        : "")}
-                  </p>
-                </div>
+              {/* passo 2b: seletor de diretoria (lista de responsáveis) */}
+              {aba === "diretor" && (
+                alvo.semLiderInterno ? (
+                  <div className="ld-erro-box">Defina o líder direto antes de trocar a diretoria.</div>
+                ) : (
+                  <div className="lider-list ld-modal-lista">
+                    {(dados?.responsaveis || [])
+                      .filter((d) => d.matricula !== alvo.diretorMat && d.matricula !== alvo.lider.matricula)
+                      .map((d) => (
+                        <button
+                          key={d.matricula}
+                          className={`ll-item ${novoDir?.matricula === d.matricula ? "sel" : ""}`}
+                          onClick={() => setNovoDir(novoDir?.matricula === d.matricula ? null : d)}
+                        >
+                          <b>{d.nome}</b><em>{d.familia || d.cargo || "—"}{d.setor ? ` · ${d.setor}` : ""}</em>
+                        </button>
+                      ))}
+                  </div>
+                )
               )}
 
-              {erroTroca && <div className="modal-alert"><AlertIcon size={16} /><div><b>{erroTroca}</b></div></div>}
+              {erroTroca && <div className="ld-erro-box" style={{ marginTop: 10 }}>{erroTroca}</div>}
             </div>
 
-            <div className="modal-foot">
-              <button className="btn btn-neutral" onClick={fecharTroca}>Cancelar</button>
-              <div style={{ flex: 1 }} />
-              <button className="btn btn-primary" disabled={!novo || salvando} onClick={confirmarTroca}>
-                <span className="ic"><CheckIcon /></span>{salvando ? "Aplicando..." : "Aplicar troca"}
-              </button>
-            </div>
+            {/* rodapé só depois de escolher o que alterar */}
+            {aba !== null && (
+              <div className="modal-foot">
+                <button className="btn btn-neutral" onClick={() => { setAba(null); setNovo(null); setNovoDir(null); setErroTroca(""); }}>
+                  Voltar
+                </button>
+                <div style={{ flex: 1 }} />
+                <button
+                  className="btn btn-primary"
+                  disabled={salvando || (aba === "lider" ? !novo : (!novoDir || alvo.semLiderInterno))}
+                  onClick={confirmarTroca}
+                >
+                  <span className="ic"><CheckIcon /></span>{salvando ? "Aplicando..." : "Aplicar"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* ===== modal de perfil do líder (visão completa no organograma) ===== */}
-      {perfilMat && (
-        <div className="modal-overlay" onMouseDown={fecharPerfil}>
-          <div className="modal lp-modal" onMouseDown={(e) => e.stopPropagation()}>
-            <button className="modal-x" onClick={fecharPerfil} aria-label="Fechar"><CloseIcon size={16} /></button>
-
-            {perfilCarregando && <div className="modal-body"><div className="ar-vazio">Carregando perfil...</div></div>}
-            {!perfilCarregando && perfilErro && (
-              <div className="modal-body"><div className="modal-alert"><AlertIcon size={16} /><div><b>{perfilErro}</b></div></div></div>
-            )}
-
-            {!perfilCarregando && perfil && (
-              <>
-                <div className="modal-head">
-                  <div className="lp-ava" style={{ "--tone-line": perfil.cor || "var(--line)", "--tone-text": perfil.cor || "var(--ink-soft)" }}>
-                    <UserIcon size={28} />
-                  </div>
-                  <div>
-                    <h3>{perfil.nome}</h3>
-                    <p>
-                      {perfil.cargo || "Cargo a definir"}
-                      {perfil.familia ? ` · ${perfil.familia}${perfil.cod_var ? ` (${perfil.cod_var})` : ""}` : ""}
-                      {perfil.pj ? " · PJ" : ""}
-                    </p>
-                  </div>
+      {/* ===== modal de informações da área (clique no líder direto) ===== */}
+      {info && (
+        <div className="modal-overlay" onMouseDown={fecharInfo}>
+          <div className="modal ld-info-modal" onMouseDown={(e) => e.stopPropagation()}>
+            <button className="modal-x" onClick={fecharInfo} aria-label="Fechar"><CloseIcon size={16} /></button>
+            <div className="modal-head">
+              <div>
+                <h3>{info.areaNome}</h3>
+                <p>Hierarquia da área</p>
+              </div>
+            </div>
+            <div className="modal-body">
+              <div className="ld-escada">
+                <div className="ld-degrau">
+                  <span className="ld-degrau-rot">Diretoria</span>
+                  <b>{info.diretorNome || "— sem diretor"}</b>
                 </div>
-
-                <div className="modal-body">
-                  <div className="ro-grid" style={{ marginBottom: 14 }}>
-                    <div className="ro"><span>Matrícula</span><b>{perfil.matricula || "—"}</b></div>
-                    <div className="ro"><span>Área</span><b>{perfil.setor || "—"}</b></div>
-                    <div className="ro"><span>Situação</span><b>{perfil.situacao || "—"}</b></div>
-                    <div className="ro"><span>Lidera diretamente</span><b>{perfil.totalDiretos} pessoa(s)</b></div>
-                  </div>
-
-                  {/* cadeia de comando: da pessoa até o topo */}
-                  {perfil.cadeia?.length > 0 && (
-                    <div className="modal-section">
-                      <span className="sec-title">Responde a</span>
-                      <div className="lp-cadeia">
-                        {perfil.cadeia.map((p, i) => (
-                          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-                            {i > 0 && <span className="lp-seta">↑</span>}
-                            <span className="lp-chip">{p.nome}<em>{p.cargo || p.familia || ""}</em></span>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* áreas onde é o líder direto */}
-                  {perfil.lideraAreas?.length > 0 && (
-                    <div className="modal-section">
-                      <span className="sec-title">Líder da(s) área(s)</span>
-                      <div className="lp-tags">
-                        {perfil.lideraAreas.map((a) => (
-                          <span key={a.nome} className="lp-area-tag">{a.nome} <em>{a.pessoas}</em></span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* áreas sob gestão (como diretor responsável) */}
-                  {perfil.areasGeridas?.length > 0 && (
-                    <div className="modal-section">
-                      <span className="sec-title">Áreas sob sua gestão ({perfil.areasGeridas.length})</span>
-                      <div className="lp-geridas">
-                        {perfil.areasGeridas.map((a) => (
-                          <div key={a.nome} className="lp-gerida">
-                            <b>{a.nome}</b>
-                            <em>líder: {a.liderNome}</em>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* equipe direta */}
-                  {perfil.diretos?.length > 0 && (
-                    <div className="modal-section">
-                      <span className="sec-title">Equipe direta ({perfil.totalDiretos})</span>
-                      <div className="lp-equipe">
-                        {perfil.diretos.map((p) => (
-                          <div key={p.matricula || p.nome} className="lp-membro">
-                            <span className="lp-membro-ava"><UserIcon size={15} /></span>
-                            <span className="lp-membro-txt">
-                              <b>{p.nome}</b>
-                              <em>{p.cargo || "Cargo a definir"}{p.setor ? ` · ${p.setor}` : ""}</em>
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      {perfil.totalDiretos > perfil.diretos.length && (
-                        <p className="lp-mais">+ {perfil.totalDiretos - perfil.diretos.length} outro(s)</p>
-                      )}
-                    </div>
-                  )}
+                <div className="ld-degrau-liga">↑ responde a</div>
+                <div className="ld-degrau foco">
+                  <span className="ld-degrau-rot">Líder direto</span>
+                  <b>{info.liderNome}</b>
                 </div>
-
-                <div className="modal-foot">
-                  <div style={{ flex: 1 }} />
-                  <button className="btn btn-neutral" onClick={fecharPerfil}>Fechar</button>
+                <div className="ld-degrau-liga">↑ responde a</div>
+                <div className="ld-degrau">
+                  <span className="ld-degrau-rot">Colaboradores</span>
+                  <b>{info.pessoas} pessoas na diretoria</b>
                 </div>
-              </>
-            )}
+              </div>
+            </div>
+            <div className="modal-foot">
+              <div style={{ flex: 1 }} />
+              <button className="btn btn-neutral" onClick={fecharInfo}>Fechar</button>
+            </div>
           </div>
         </div>
       )}

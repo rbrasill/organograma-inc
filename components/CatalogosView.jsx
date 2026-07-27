@@ -48,7 +48,7 @@ const ABAS = [
     ],
     campos: [
       { k: "nome", label: "Nome", obrig: true },
-      { k: "codigo", label: "Cód. Cargo", auto: true },
+      { k: "codigo", label: "Código (nº do cargo no DP)", auto: true, dica: "vem do extrato do DP na importação" },
       { k: "nivelId", label: "Nível hierárquico", tipo: "nivel" },
     ],
     avisoExcluir: (it) => `${it.usos} colaborador(es) ficarão com "cargo a definir".`,

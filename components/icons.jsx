@@ -64,6 +64,29 @@ export function CakeIcon({ size = 16 }) {
   );
 }
 
+// prédio (sede/Rossi)
+export function BuildingIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round">
+      <rect x="4" y="3" width="12" height="18" rx="1.5" />
+      <path d="M16 8h4v13H4" />
+      <path d="M7.5 6.5h1.5M11 6.5h1.5M7.5 10h1.5M11 10h1.5M7.5 13.5h1.5M11 13.5h1.5" strokeLinecap="round" />
+      <path d="M9.5 21v-3.5h1.5V21" />
+    </svg>
+  );
+}
+
+// grupo de pessoas (demais colaboradores)
+export function UsersIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3.5 19c0-3 2.5-4.8 5.5-4.8s5.5 1.8 5.5 4.8" />
+      <path d="M16 5.2a3 3 0 0 1 0 5.6M17.5 14.4c2.2.5 3.9 2.1 3.9 4.6" />
+    </svg>
+  );
+}
+
 // organograma: um nó no topo ligado a dois abaixo (hierarquia)
 export function OrgIcon({ size = 15 }) {
   return (

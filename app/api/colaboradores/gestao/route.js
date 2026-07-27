@@ -13,12 +13,40 @@ import { getPool } from "@/lib/db";
 import { normalizar } from "@/data/ti";
 import { exigirNivel } from "@/lib/permissoes";
 import { NIVEL } from "@/lib/perfis";
+import { validarColaborador, mensagemValidacao, soDigitos } from "@/lib/validacao";
 
 export const dynamic = "force-dynamic";
+
+const erro400 = (m) => Response.json({ ok: false, erro: m }, { status: 400 });
 
 function erroResposta(e) {
   const msg = e?.codigo === "SEM_CONFIG" ? e.message : `Falha ao acessar o banco: ${e.message}`;
   return Response.json({ ok: false, erro: msg }, { status: 500 });
+}
+
+// Situação de todo cadastro NOVO: nasce "Ativo". Não vem da tela — é definido
+// aqui para o registro não poder entrar sem situação (ou com uma situação de
+// afastamento no primeiro dia).
+async function situacaoAtivoId(pool) {
+  const [[s]] = await pool.query(
+    `SELECT id FROM situacao
+      WHERE codigo_dp = 'A' OR nome_normalizado = 'ativo'
+      ORDER BY (codigo_dp = 'A') DESC LIMIT 1`
+  );
+  return s?.id || null;
+}
+
+// CPF é a identidade da pessoa: o login casa por ele e a importação do DP
+// deduplica por ele. Dois cadastros com o mesmo CPF são a mesma pessoa
+// duplicada — barra antes de gravar.
+async function cpfEmUso(pool, cpf, idAtual) {
+  if (!cpf) return null;
+  const cond = idAtual ? "cpf = ? AND id <> ?" : "cpf = ?";
+  const args = idAtual ? [cpf, idAtual] : [cpf];
+  const [[dup]] = await pool.query(
+    `SELECT nome, codigo_dp, ativo FROM colaborador WHERE ${cond} LIMIT 1`, args
+  );
+  return dup || null;
 }
 
 // nº de subordinados diretos ativos (para avisar ao desativar um líder)
@@ -191,11 +219,29 @@ export async function POST(req) {
     if (acao === "criar") {
       const campos = body.campos || {};
       const nome = (campos.nome || "").trim();
-      if (!nome) return erro400("Informe o nome do colaborador.");
       const tipo = normalizar(campos.tipo || "PJ").includes("clt") ? "CLT" : "PJ";
+
+      // régua cheia do cadastro novo (nome, CPF, cargo, área, regional,
+      // líder e data de admissão) + formato de CPF/e-mail/datas
+      const cpf = soDigitos(campos.cpf);
+      const val = validarColaborador({ ...campos, nome, cpf }, { novo: true });
+      if (!val.ok) return erro400(mensagemValidacao(val));
+
+      const dup = await cpfEmUso(pool, cpf, null);
+      if (dup) {
+        return erro400(
+          `O CPF informado já está cadastrado para ${dup.nome}` +
+          `${dup.codigo_dp ? ` (matrícula ${dup.codigo_dp})` : ""}` +
+          `${dup.ativo === 0 ? " — cadastro desativado, reative-o em vez de criar outro." : "."}`
+        );
+      }
 
       const vinc = await resolverEstruturais(pool, campos, null, null);
       if (vinc.erro) return erro400(vinc.erro);
+
+      // todo cadastro novo entra como Ativo (ignora o que vier da tela)
+      const situacaoId = await situacaoAtivoId(pool);
+      if (!situacaoId) return erro400('A situação "Ativo" não existe no catálogo — cadastre-a em Gerenciar → Catálogos → Situações antes de criar colaboradores.');
 
       let codigo = (campos.codigo || "").trim();
       if (!codigo) codigo = tipo === "PJ" ? await proximaMatriculaPJ(pool) : null;
@@ -214,15 +260,15 @@ export async function POST(req) {
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
         [
           novoId, codigo, nome, (campos.email || "").trim() || null, tipo,
-          String(campos.cpf || "").replace(/\D/g, "") || null, (campos.telefone || "").trim() || null,
+          cpf || null, (campos.telefone || "").trim() || null,
           dataOuNull(campos.dataNascimento), dataOuNull(campos.dataAdmissao),
           fk(campos.cargoId), vinc.nivelPessoal, fk(campos.setorId), fk(campos.localId),
-          fk(campos.regionalId), fk(campos.situacaoId), vinc.liderId,
+          fk(campos.regionalId), situacaoId, vinc.liderId,
         ]
       );
       await pool.query(
         "INSERT INTO colaborador_historico (id, colaborador_id, cargo_id, setor_id, local_id, situacao_id, lider_id, motivo) VALUES (?,?,?,?,?,?,?,'cadastro_manual')",
-        [randomUUID(), novoId, fk(campos.cargoId), fk(campos.setorId), fk(campos.localId), fk(campos.situacaoId), vinc.liderId]
+        [randomUUID(), novoId, fk(campos.cargoId), fk(campos.setorId), fk(campos.localId), situacaoId, vinc.liderId]
       );
       const criado = await carregarColaborador(pool, novoId);
       return Response.json({ ok: true, colaborador: criado });
@@ -309,7 +355,24 @@ export async function POST(req) {
     }
 
     const nome = (campos.nome || "").trim();
-    if (!nome) return Response.json({ ok: false, erro: "O nome não pode ficar em branco." }, { status: 400 });
+
+    // régua da edição: nome, cargo, área, local e situação não podem ficar em
+    // branco (nenhum ativo tem esses campos vazios hoje, então não trava o
+    // legado). CPF, regional, líder e datas seguem opcionais aqui — quando
+    // vierem preenchidos, ainda passam pela checagem de formato.
+    const val = validarColaborador({ ...campos, nome }, { novo: false });
+    if (!val.ok) return erro400(mensagemValidacao(val));
+
+    // CPF só é checado quando a tela envia o campo (a de edição geral não envia)
+    if (Object.prototype.hasOwnProperty.call(campos, "cpf")) {
+      const dup = await cpfEmUso(pool, soDigitos(campos.cpf), id);
+      if (dup) {
+        return erro400(
+          `O CPF informado já está cadastrado para ${dup.nome}` +
+          `${dup.codigo_dp ? ` (matrícula ${dup.codigo_dp})` : ""}.`
+        );
+      }
+    }
 
     const tipo = normalizar(campos.tipo || "").includes("pj") ? "PJ" : "CLT";
     const fk = (v) => (v ? v : null);

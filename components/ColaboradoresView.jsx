@@ -8,6 +8,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import HeroNav from "@/components/HeroNav";
 import {
+  OBRIGATORIOS_EDICAO, PENDENCIAS_EDICAO,
+  validarColaborador, mensagemValidacao, listarRotulos,
+} from "@/lib/validacao";
+import {
   UserIcon, CheckIcon, AlertIcon, ChevronIcon, SearchIcon, PencilIcon,
 } from "@/components/icons";
 
@@ -15,6 +19,13 @@ const CAMPOS_LABEL = {
   nome: "Nome", email: "E-mail", tipo: "Contratação", cargo: "Cargo",
   setor: "Área / Setor", local: "Local de trabalho", regional: "Regional",
   situacao: "Situação", lider: "Líder direto", nivel: "Nível do cargo",
+  dataNascimento: "Data de nascimento", dataAdmissao: "Data de admissão",
+};
+
+// "YYYY-MM-DD" → "DD/MM/AAAA" (para os diffs de confirmação)
+const dataBR = (iso) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "—";
 };
 
 // rótulo de um nível hierárquico: "14.E · Secretária"
@@ -49,6 +60,9 @@ export default function ColaboradoresView() {
   const [confirmando, setConfirmando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
+  // erro de FORMATO (e-mail, datas) só aparece depois de tentar salvar — não
+  // fica vermelho no meio da digitação. Campo obrigatório esvaziado avisa na hora.
+  const [tentou, setTentou] = useState(false);
 
   // picker de líder
   const [liderPicker, setLiderPicker] = useState(false);
@@ -137,7 +151,7 @@ export default function ColaboradoresView() {
   const selecionar = useCallback(async (id) => {
     setSelId(id);
     setErro(""); setConfirmando(false); setSalvo(false); setLiderPicker(false);
-    setConfirmandoDesativar(false); setMsgAtivo("");
+    setConfirmandoDesativar(false); setMsgAtivo(""); setTentou(false);
     setCarregandoDet(true); setForm(null); setOriginal(null);
     try {
       const r = await fetch(`/api/colaboradores/gestao?id=${encodeURIComponent(id)}`);
@@ -151,6 +165,8 @@ export default function ColaboradoresView() {
         nome: c.nome || "",
         email: c.email || "",
         cpf: c.cpf || "", // exibição apenas — não é enviado no salvar
+        dataNascimento: c.data_nascimento || "", // CLT: só visualização (vem do DP)
+        dataAdmissao: c.data_admissao || "",
         tipo: c.tipo_contratacao || "CLT",
         cargoId: c.cargo_id || "",
         setorId: c.setor_id || "",
@@ -169,6 +185,7 @@ export default function ColaboradoresView() {
         regional: c.regional || "", situacao: c.situacao || "",
         liderMatricula: c.lider_mat || "", liderNome: c.lider_nome || "",
         nivelId: nivelEfetivo,
+        dataNascimento: c.data_nascimento || "", dataAdmissao: c.data_admissao || "",
       });
     } catch (e) { setErro(e.message); }
     setCarregandoDet(false);
@@ -210,10 +227,55 @@ export default function ColaboradoresView() {
         de: rotuloNivel(nivelPorId(original.nivelId)) || "Sem nível",
         para: rotuloNivel(nivelPorId(form.nivelId)) || "Sem nível",
       });
+    // datas: editáveis só para PJ (CLT vem do DP) — só entram no diff quando PJ
+    if (form.tipo === "PJ") {
+      if ((form.dataNascimento || "") !== (original.dataNascimento || ""))
+        ms.push({ campo: "dataNascimento", de: dataBR(original.dataNascimento), para: dataBR(form.dataNascimento) });
+      if ((form.dataAdmissao || "") !== (original.dataAdmissao || ""))
+        ms.push({ campo: "dataAdmissao", de: dataBR(original.dataAdmissao), para: dataBR(form.dataAdmissao) });
+    }
     return ms;
   }, [form, original, nomeDe, nivelPorId]);
 
   function set(campo, valor) { setForm((f) => ({ ...f, [campo]: valor })); setSalvo(false); }
+
+  // ===== obrigatoriedade (mesma régua da API, @/lib/validacao) =====
+  // Só valida o que ESTA tela edita: CPF e, para CLT, as datas vêm do DP e são
+  // somente visualização — não faz sentido travar o save por legado que a tela
+  // nem altera. Faltou algo obrigatório → bloqueia; o resto vira pendência.
+  const validacao = useMemo(() => {
+    if (!form) return null;
+    return validarColaborador({
+      ...form,
+      cpf: "",
+      dataNascimento: form.tipo === "PJ" ? form.dataNascimento : "",
+      dataAdmissao: form.tipo === "PJ" ? form.dataAdmissao : "",
+    }, { novo: false });
+  }, [form]);
+
+  const problema = useCallback((campo) => {
+    if (!validacao) return "";
+    // campo obrigatório esvaziado: avisa na hora (o usuário acabou de apagar)
+    if (validacao.faltantes.includes(campo)) return "obrigatório";
+    return tentou ? (validacao.erros[campo] || "") : "";
+  }, [validacao, tentou]);
+
+  const rot = (texto, campo, extra = null) => (
+    <span>
+      {texto}
+      {OBRIGATORIOS_EDICAO.includes(campo) && <em className="fld-obrig" title="Campo obrigatório"> *</em>}
+      {extra}
+      {problema(campo) && <em className="fld-erro"> · {problema(campo)}</em>}
+    </span>
+  );
+  const classe = (campo) => (problema(campo) ? "input-invalido" : "");
+
+  // pendências: cadastro incompleto, mas não impedem salvar (vieram assim do DP)
+  const pendencias = useMemo(() => {
+    if (!form) return [];
+    const valor = { cpf: form.cpf, regionalId: form.regionalId, liderMatricula: form.liderMatricula, dataAdmissao: form.dataAdmissao };
+    return PENDENCIAS_EDICAO.filter((c) => String(valor[c] ?? "").trim() === "");
+  }, [form]);
 
   function escolherLider(res) {
     setForm((f) => ({ ...f, liderMatricula: res ? res.matricula : "", liderNome: res ? res.nome : "" }));
@@ -221,11 +283,16 @@ export default function ColaboradoresView() {
   }
 
   async function salvar() {
+    // trava de segurança: a API aplica a mesma régua e recusaria o payload
+    if (validacao && !validacao.ok) {
+      setErro(mensagemValidacao(validacao)); setConfirmando(false); return;
+    }
     setSalvando(true); setErro("");
     try {
-      // CPF é somente visualização nesta tela: sai do payload para a API
-      // preservar o valor gravado (ela só atualiza cpf quando o campo vem).
-      const { cpf: _cpf, ...campos } = form;
+      // CPF nunca é enviado (só visualização). Datas só vão no payload para
+      // PJ — para CLT elas vêm do DP e a API preserva o que não recebe.
+      const { cpf: _cpf, dataNascimento, dataAdmissao, ...campos } = form;
+      if (form.tipo === "PJ") { campos.dataNascimento = dataNascimento; campos.dataAdmissao = dataAdmissao; }
       const r = await fetch("/api/colaboradores/gestao", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: selId, campos }),
@@ -241,7 +308,10 @@ export default function ColaboradoresView() {
         regional: c.regional || "", situacao: c.situacao || "",
         liderMatricula: c.lider_mat || "", liderNome: c.lider_nome || "",
         nivelId: c.nivel_pessoal_id || c.cargo_nivel_id || "",
+        dataNascimento: c.data_nascimento || "", dataAdmissao: c.data_admissao || "",
       });
+      // reflete no formulário as datas efetivamente gravadas
+      setForm((f) => f ? { ...f, dataNascimento: c.data_nascimento || "", dataAdmissao: c.data_admissao || "" } : f);
       setResultados((rs) => rs.map((x) => (x.id === selId ? { ...x, nome: c.nome, cargo: c.cargo, setor: c.setor } : x)));
       setConfirmando(false); setSalvo(true);
     } catch (e) { setErro(`Falha ao salvar: ${e.message}`); }
@@ -336,7 +406,8 @@ export default function ColaboradoresView() {
           </div>
         </aside>
 
-        {/* DETALHE / EDIÇÃO */}
+        {/* DETALHE / EDIÇÃO + zona de perigo (cards empilhados) */}
+        <div className="sol-coluna">
         <section className="sol-detalhe">
           {!selId && <div className="sol-info grande">Selecione um colaborador à esquerda para editar.</div>}
           {selId && carregandoDet && <div className="sol-info grande">Carregando dados...</div>}
@@ -366,17 +437,26 @@ export default function ColaboradoresView() {
               {salvo && <div className="modal-note sol-ok"><b>Alterações salvas no banco.</b></div>}
               {msgAtivo && <div className="modal-note sol-ok"><b>{msgAtivo}</b></div>}
 
+              {/* cadastro incompleto: informa sem impedir o save (esses campos
+                  vieram em branco do extrato do DP em parte da base) */}
+              {form.ativo !== 0 && pendencias.length > 0 && (
+                <div className="modal-note col-pendencias">
+                  <b>Cadastro incompleto — falta {listarRotulos(pendencias)}.</b>{" "}
+                  Não impede salvar, mas vale completar quando o dado estiver disponível.
+                </div>
+              )}
+
               {/* desativado = somente visualização: o fieldset desabilita
                   todos os campos e botões internos (inclusive trocar líder) */}
               <fieldset className="col-form" disabled={form.ativo === 0}>
                 <label className="fld">
-                  <span>Nome</span>
-                  <input value={form.nome} onChange={(e) => set("nome", e.target.value)} />
+                  {rot("Nome", "nome")}
+                  <input value={form.nome} className={classe("nome")} onChange={(e) => set("nome", e.target.value)} />
                 </label>
                 <div className="col-grid2">
                   <label className="fld">
-                    <span>E-mail corporativo</span>
-                    <input value={form.email} placeholder="nome@meuinc.com.br" onChange={(e) => set("email", e.target.value)} />
+                    {rot("E-mail corporativo", "email")}
+                    <input value={form.email} className={classe("email")} placeholder="nome@meuinc.com.br" onChange={(e) => set("email", e.target.value)} />
                   </label>
                   <label className="fld">
                     <span>CPF <em className="ct-ex">· somente visualização</em></span>
@@ -390,6 +470,28 @@ export default function ColaboradoresView() {
                 </div>
                 <div className="col-grid2">
                   <label className="fld">
+                    <span>Data de nascimento{form.tipo === "CLT" ? <em className="ct-ex"> · vem do DP</em> : null}</span>
+                    <input
+                      type="date"
+                      value={form.dataNascimento}
+                      disabled={form.tipo === "CLT"}
+                      title={form.tipo === "CLT" ? "Vem da importação por Excel (DP) e não é editável para CLT." : ""}
+                      onChange={(e) => set("dataNascimento", e.target.value)}
+                    />
+                  </label>
+                  <label className="fld">
+                    <span>Data de admissão{form.tipo === "CLT" ? <em className="ct-ex"> · vem do DP</em> : null}</span>
+                    <input
+                      type="date"
+                      value={form.dataAdmissao}
+                      disabled={form.tipo === "CLT"}
+                      title={form.tipo === "CLT" ? "Vem da importação por Excel (DP) e não é editável para CLT." : ""}
+                      onChange={(e) => set("dataAdmissao", e.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="col-grid2">
+                  <label className="fld">
                     <span>Tipo de contratação</span>
                     <select value={form.tipo} onChange={(e) => set("tipo", e.target.value)}>
                       <option value="CLT">CLT</option>
@@ -397,16 +499,16 @@ export default function ColaboradoresView() {
                     </select>
                   </label>
                   <label className="fld">
-                    <span>Situação</span>
-                    <select value={form.situacaoId} onChange={(e) => set("situacaoId", e.target.value)}>
+                    {rot("Situação", "situacaoId")}
+                    <select value={form.situacaoId} className={classe("situacaoId")} onChange={(e) => set("situacaoId", e.target.value)}>
                       <option value="">— selecione —</option>
                       {(listas?.situacoes || []).map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
                     </select>
                   </label>
                 </div>
                 <label className="fld">
-                  <span>Cargo</span>
-                  <select value={form.cargoId} onChange={(e) => trocaCargo(e.target.value)}>
+                  {rot("Cargo", "cargoId")}
+                  <select value={form.cargoId} className={classe("cargoId")} onChange={(e) => trocaCargo(e.target.value)}>
                     <option value="">— selecione —</option>
                     {(listas?.cargos || []).map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                   </select>
@@ -454,8 +556,8 @@ export default function ColaboradoresView() {
                 })()}
                 <div className="col-grid2">
                   <label className="fld">
-                    <span>Área / Setor</span>
-                    <select value={form.setorId} onChange={(e) => set("setorId", e.target.value)}>
+                    {rot("Área / Setor", "setorId")}
+                    <select value={form.setorId} className={classe("setorId")} onChange={(e) => set("setorId", e.target.value)}>
                       <option value="">— selecione —</option>
                       {(listas?.setores || []).map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
                     </select>
@@ -469,8 +571,8 @@ export default function ColaboradoresView() {
                   </label>
                 </div>
                 <label className="fld">
-                  <span>Local de trabalho</span>
-                  <select value={form.localId} onChange={(e) => set("localId", e.target.value)}>
+                  {rot("Local de trabalho", "localId")}
+                  <select value={form.localId} className={classe("localId")} onChange={(e) => set("localId", e.target.value)}>
                     <option value="">— selecione —</option>
                     {(listas?.locais || []).map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
                   </select>
@@ -536,58 +638,13 @@ export default function ColaboradoresView() {
                 </div>
               )}
 
-              {/* zona de ativação: desativar (arquivar) ou reativar */}
-              {!confirmando && (
-                <div className="col-perigo">
-                  {form.ativo === 0 ? (
-                    <div className="cp-linha">
-                      <div className="cp-txt">
-                        <b>Reativar colaborador</b>
-                        <em>Volta a aparecer no organograma e na busca. Entra sem líder — defina depois se precisar.</em>
-                      </div>
-                      <button className="btn btn-neutral" disabled={processandoAtivo} onClick={reativar}>
-                        {processandoAtivo ? "Reativando..." : "Reativar"}
-                      </button>
-                    </div>
-                  ) : confirmandoDesativar ? (
-                    <div className="cp-confirma">
-                      <b className="cp-tit"><AlertIcon size={14} /> Desativar {original?.nome || form.nome}?</b>
-                      <p className="sol-texto">
-                        O colaborador é <b>arquivado</b> (sai do organograma, das contagens e da busca), mas o
-                        registro e o histórico são preservados — dá para reativar depois.
-                        {form.subordinados > 0 && (
-                          <> Os <b>{form.subordinados}</b> subordinado(s) diretos passam a responder ao
-                          líder acima ({form.liderNome || "sem líder / viram topo da área"}).</>
-                        )}
-                      </p>
-                      <div className="cp-acoes">
-                        <button className="btn btn-neutral btn-sm" onClick={() => setConfirmandoDesativar(false)}>Cancelar</button>
-                        <button className="btn btn-ghost btn-sm" disabled={processandoAtivo} onClick={desativar}>
-                          {processandoAtivo ? "Desativando..." : "Confirmar desativação"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="cp-linha">
-                      <div className="cp-txt">
-                        <b>Desativar colaborador</b>
-                        <em>Para quem saiu da empresa. Arquiva sem apagar — reversível.</em>
-                      </div>
-                      <button className="btn btn-ghost btn-sm" onClick={() => { setErro(""); setMsgAtivo(""); setConfirmandoDesativar(true); }}>
-                        Desativar
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
               {form.ativo !== 0 && (
               <div className="col-foot">
                 {confirmando ? (
                   <>
                     <button className="btn btn-neutral" onClick={() => setConfirmando(false)}>Voltar</button>
                     <div style={{ flex: 1 }} />
-                    <button className="btn btn-primary" disabled={salvando || mudancas.length === 0} onClick={salvar}>
+                    <button className="btn btn-primary" disabled={salvando || mudancas.length === 0 || !validacao?.ok} onClick={salvar}>
                       <span className="ic"><CheckIcon /></span>{salvando ? "Salvando..." : "Confirmar e salvar"}
                     </button>
                   </>
@@ -598,7 +655,12 @@ export default function ColaboradoresView() {
                       className="btn btn-primary"
                       disabled={mudancas.length === 0}
                       title={mudancas.length === 0 ? "Nenhuma alteração feita" : ""}
-                      onClick={() => { setErro(""); setConfirmando(true); }}
+                      onClick={() => {
+                        setErro(""); setTentou(true);
+                        // mostra o que falta em vez de abrir a confirmação
+                        if (!validacao?.ok) { setErro(mensagemValidacao(validacao)); return; }
+                        setConfirmando(true);
+                      }}
                     >
                       <span className="ic"><CheckIcon /></span>Salvar alterações{mudancas.length ? ` (${mudancas.length})` : ""}
                     </button>
@@ -609,6 +671,58 @@ export default function ColaboradoresView() {
             </>
           )}
         </section>
+
+        {/* ZONA DE PERIGO — card separado, longe do "Salvar alterações", para
+            desativar não ficar a um clique de distância do save. Fica oculta
+            enquanto a confirmação das alterações está aberta. */}
+        {selId && !carregandoDet && form && !confirmando && (
+          <section className={`sol-perigo ${form.ativo === 0 ? "inativo" : ""}`}>
+            <b className="sol-perigo-tit">
+              <AlertIcon size={13} />
+              {form.ativo === 0 ? "Status do cadastro" : "Zona de perigo"}
+            </b>
+            {form.ativo === 0 ? (
+              <div className="cp-linha">
+                <div className="cp-txt">
+                  <b>Reativar colaborador</b>
+                  <em>Volta a aparecer no organograma e na busca. Entra sem líder — defina depois se precisar.</em>
+                </div>
+                <button className="btn btn-neutral" disabled={processandoAtivo} onClick={reativar}>
+                  {processandoAtivo ? "Reativando..." : "Reativar"}
+                </button>
+              </div>
+            ) : confirmandoDesativar ? (
+              <div className="cp-confirma">
+                <b className="cp-tit"><AlertIcon size={14} /> Desativar {original?.nome || form.nome}?</b>
+                <p className="sol-texto">
+                  O colaborador é <b>arquivado</b> (sai do organograma, das contagens e da busca), mas o
+                  registro e o histórico são preservados — dá para reativar depois.
+                  {form.subordinados > 0 && (
+                    <> Os <b>{form.subordinados}</b> subordinado(s) diretos passam a responder ao
+                    líder acima ({form.liderNome || "sem líder / viram topo da área"}).</>
+                  )}
+                </p>
+                <div className="cp-acoes">
+                  <button className="btn btn-neutral btn-sm" onClick={() => setConfirmandoDesativar(false)}>Cancelar</button>
+                  <button className="btn btn-ghost btn-sm" disabled={processandoAtivo} onClick={desativar}>
+                    {processandoAtivo ? "Desativando..." : "Confirmar desativação"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="cp-linha">
+                <div className="cp-txt">
+                  <b>Desativar colaborador</b>
+                  <em>Para quem saiu da empresa. Arquiva sem apagar — reversível.</em>
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setErro(""); setMsgAtivo(""); setConfirmandoDesativar(true); }}>
+                  Desativar
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+        </div>
       </div>
     </div>
   );

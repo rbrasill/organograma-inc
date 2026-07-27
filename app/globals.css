@@ -68,9 +68,13 @@ main{padding:20px 24px 24px}
 .hc-badge{font-style:normal;font-size:10px;font-weight:800;background:#fff;color:var(--inc);border-radius:999px;padding:1px 6px;line-height:1.4}
 @media (max-width:820px){ .hero-txt h1{font-size:20px} }
 
-.controls-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+/* barra em uma linha só (sem quebrar): seletores e cartões ficam no tamanho
+   natural; a busca é o item flexível que encolhe para caber o resto */
+.controls-bar{display:flex;align-items:center;gap:12px;flex-wrap:nowrap;margin-bottom:16px}
 .select,.search{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--line);padding:9px 13px;border-radius:12px;box-shadow:var(--shadow-soft);font-size:13px;color:var(--ink-soft);font-weight:500;position:relative}
-.search input{border:0;outline:0;font:inherit;color:var(--ink);background:transparent;width:210px}
+.select{flex:0 0 auto}
+.search{flex:1 1 auto;min-width:120px}
+.search input{border:0;outline:0;font:inherit;color:var(--ink);background:transparent;width:100%;min-width:0}
 .select svg,.search svg{color:var(--ink-faint)}
 .select b{color:var(--ink);font-weight:600}
 
@@ -99,7 +103,22 @@ main{padding:20px 24px 24px}
 .title-wrap h2{margin:0;font-size:27px;font-weight:800;letter-spacing:-.02em;color:var(--brand)}
 .subline{margin:8px 0 0;font-size:13px;color:var(--ink-soft);font-weight:500}
 .subline b{color:var(--ink)}
-.actions{display:flex;gap:9px;align-items:center}
+.actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+/* cartões de total (rosa/branco) — Sede (Rossi), Demais locais e Total geral.
+   Ficam à direita do board-head (title | ações | totais via space-between). */
+/* totais na barra de controles — à direita, na mesma linha dos filtros;
+   estilo clean das referências: cartão claro, ícone teal em quadradinho
+   branco com sombra suave (igual ao tile "SEC Filings") */
+.org-stats{display:flex;gap:8px;flex-wrap:nowrap;margin-left:auto;flex:0 0 auto}
+.org-stat{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 12px 6px 6px;box-shadow:var(--shadow-soft);white-space:nowrap}
+.org-stat .os-ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none;background:#fff;color:#0e7490;box-shadow:0 4px 10px -4px rgba(14,116,144,.35),inset 0 0 0 1px #e2eef2}
+.org-stat .os-txt{display:flex;flex-direction:column;line-height:1.12}
+.org-stat .os-txt b{font-size:16px;font-weight:800;color:var(--ink)}
+.org-stat .os-txt em{font-style:normal;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-faint)}
+/* cartão do total geral — leve destaque azul-teal, como o badge da data */
+.org-stat.total{background:#e8f4fb;border-color:#cfe8f6}
+.org-stat.total .os-ic{background:linear-gradient(150deg,#22b3c9,#0e7490);color:#fff;box-shadow:0 4px 10px -4px rgba(14,116,144,.5)}
+.org-stat.total .os-txt em{color:#0e7490}
 .btn{border:0;cursor:pointer;font:inherit;font-weight:600;font-size:13px;border-radius:999px;padding:10px 16px;display:inline-flex;align-items:center;gap:9px;transition:transform .5s var(--ease),box-shadow .5s var(--ease),background .3s var(--ease)}
 .btn:active{transform:scale(.97)}
 .btn .ic{width:22px;height:22px;border-radius:999px;display:grid;place-items:center;transition:transform .5s var(--ease)}
@@ -234,9 +253,18 @@ main{padding:20px 24px 24px}
 .fld input{border:1px solid var(--line);border-radius:11px;padding:9px 12px;font:inherit;font-size:13.5px;color:var(--ink);outline:none;transition:border-color .2s,box-shadow .2s}
 .fld input:focus{border-color:var(--inc);box-shadow:0 0 0 3px rgba(255,83,15,.12)}
 /* campo com valor inválido (ex.: CPF que não passa na validação) */
-.fld input.input-invalido{border-color:#e5484d;background:#fdf3f2}
-.fld input.input-invalido:focus{border-color:#e5484d;box-shadow:0 0 0 3px rgba(229,72,77,.14)}
+.fld input.input-invalido,.fld select.input-invalido{border-color:#e5484d;background:#fdf3f2}
+.fld input.input-invalido:focus,.fld select.input-invalido:focus{border-color:#e5484d;box-shadow:0 0 0 3px rgba(229,72,77,.14)}
 .fld-erro{font-style:normal;font-weight:700;color:#c62828}
+/* marcador de campo obrigatório no rótulo (Nome *) */
+.fld-obrig{font-style:normal;font-weight:800;color:#e5484d}
+/* card do líder quando o vínculo é obrigatório e está vazio */
+.campo-invalido{border-color:#e5484d !important;background:#fdf3f2}
+/* nota "campos com * são obrigatórios" no topo do cadastro novo */
+.col-obrig-nota{margin:0 0 10px;font-size:12px;line-height:1.5;color:var(--ink-soft)}
+/* cadastro incompleto (pendência informativa, não bloqueia salvar) */
+.col-pendencias{background:#fff8ee;border:1px solid #ffe3b3;color:#8a5a00}
+.col-pendencias b{color:#8a5a00}
 /* somente visualização (ex.: CPF) e campos dentro de fieldset desabilitado */
 .fld input:disabled,.fld select:disabled{background:#f2f5fa;color:var(--ink-soft);cursor:not-allowed}
 .ro-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -286,6 +314,28 @@ main{padding:20px 24px 24px}
    empurra o conteúdo e nunca fica cortado/inacessível */
 .lider-pop{margin-top:8px;background:#fff;border:1.5px solid #ffd3b5;border-radius:14px;box-shadow:0 10px 28px -14px rgba(255,83,15,.25);padding:8px;animation:pop .25s var(--ease)}
 .lp-hint{margin-top:6px;padding:0 4px 2px;font-size:11px;color:var(--ink-faint);font-weight:500}
+/* abas do modal de Diretorias: trocar o líder da área ou a diretoria dela */
+/* área sem líder interno: anomalia que a tela denuncia no card */
+.ld-tag-sem{display:inline-block;background:#fdf3f2;border:1px solid #f6cfcb;color:#b42318;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:800;letter-spacing:.02em}
+/* rótulo do papel dentro do card (LÍDER DIRETO) */
+.ld-papel-rot{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint)}
+/* modais de Diretorias: um pouco mais estreitos que o padrão */
+.ld-alt-modal,.ld-info-modal{max-width:440px}
+/* caixa de erro nos modais de Diretorias */
+.ld-erro-box{background:#fdf3f2;border:1px solid #f6cfcb;border-radius:10px;padding:9px 11px;font-size:12px;font-weight:600;color:#b42318}
+/* modal Alterar: as duas opções (líder direto / diretoria) */
+.md-opts{display:flex;flex-direction:column;gap:10px}
+.md-opt{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:12px;padding:15px 16px;font:inherit;cursor:pointer;transition:border-color .15s,background .15s}
+.md-opt:hover{border-color:var(--inc);background:var(--inc-soft)}
+.md-opt-ic{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:var(--inc-soft);color:var(--inc);flex:0 0 auto}
+.md-opt-tx b{font-size:14px;font-weight:700;color:var(--ink)}
+/* modal de informações: hierarquia da área com setas */
+.ld-escada{margin:2px 0}
+.ld-degrau{display:flex;flex-direction:column;gap:1px;background:#f7f9fd;border:1px solid var(--line-soft);border-radius:11px;padding:10px 13px}
+.ld-degrau.foco{background:var(--inc-soft);border-color:var(--inc-line)}
+.ld-degrau-rot{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint)}
+.ld-degrau b{font-size:13.5px;font-weight:700;color:var(--ink)}
+.ld-degrau-liga{padding:4px 0 4px 13px;font-size:10.5px;font-weight:600;color:var(--ink-faint)}
 .lider-pick{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:11px;padding:9px 11px;background:#fbfcfe}
 .lider-pick .lp-ic{color:var(--ink-faint);display:flex}
 .lider-pick input{border:0;outline:0;font:inherit;font-size:13px;width:100%;color:var(--ink);background:transparent}
@@ -298,7 +348,7 @@ main{padding:20px 24px 24px}
 .ll-vazio{padding:12px 10px;font-size:12px;color:var(--ink-faint);text-align:center}
 
 /* seletor de área (dados do banco) */
-.area-select{border:0;outline:0;font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:transparent;cursor:pointer;max-width:230px}
+.area-select{border:0;outline:0;font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:transparent;cursor:pointer;max-width:170px}
 .area-select:disabled{color:var(--ink-faint);cursor:default}
 
 /* estados do viewport (carregando / vazio / erro do banco) */
@@ -469,6 +519,13 @@ main{padding:20px 24px 24px}
 .col-arquivado b{color:#8a2b21}
 /* zona de ativar/desativar */
 .col-perigo{margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)}
+/* coluna direita do board: card principal + zona de perigo empilhados */
+.sol-coluna{display:flex;flex-direction:column;gap:14px;min-width:0}
+/* zona de perigo em card próprio — ações destrutivas fora do alcance do Salvar */
+.sol-perigo{background:var(--panel);border:1px solid #f6cfcb;border-radius:18px;padding:15px 22px 17px;box-shadow:var(--shadow-soft)}
+.sol-perigo.inativo{border-color:var(--line)}
+.sol-perigo-tit{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#b42318;margin-bottom:11px}
+.sol-perigo.inativo .sol-perigo-tit{color:var(--ink-soft)}
 .cp-linha{display:flex;align-items:center;gap:14px}
 .cp-txt{display:flex;flex-direction:column;flex:1;min-width:0}
 .cp-txt b{font-size:13px;font-weight:700;color:var(--ink)}

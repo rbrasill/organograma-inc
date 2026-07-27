@@ -10,7 +10,7 @@
 import { randomUUID } from "crypto";
 import { getPool } from "@/lib/db";
 import { normalizar } from "@/data/ti";
-import { localComCodigo, normalizarCodigoLocal, cargoNormalizado } from "@/lib/importacao";
+import { localComCodigo, normalizarCodigoLocal, cargoNormalizado, normalizarCodigoCargo, familiaDoCargo } from "@/lib/importacao";
 import { exigirNivel } from "@/lib/permissoes";
 import { NIVEL } from "@/lib/perfis";
 
@@ -27,17 +27,24 @@ export async function GET() {
   if (bloqueio) return bloqueio;
   try {
     const pool = getPool();
-    // só CLT: PJ nunca entra na comparação nem na lista de arquivamento
+    // só CLT: PJ nunca entra na comparação nem na lista de arquivamento.
+    // A identidade é o CPF (a chapa pode mudar no DP) — a prévia usa os pares
+    // cpf+matrícula para calcular novos × atualizados × a arquivar.
     const [colabs] = await pool.query(
-      "SELECT codigo_dp FROM colaborador WHERE codigo_dp IS NOT NULL AND ativo = 1 AND tipo_contratacao = 'CLT'"
+      "SELECT cpf, codigo_dp FROM colaborador WHERE ativo = 1 AND tipo_contratacao = 'CLT'"
     );
     const [sits] = await pool.query("SELECT nome, nome_normalizado, codigo_dp FROM situacao");
     const [setores] = await pool.query("SELECT nome_normalizado, codigo_dp FROM setor");
+    const [cargos] = await pool.query("SELECT codigo_cargo_dp, nome, nome_normalizado FROM cargo");
+    const [locais] = await pool.query("SELECT codigo_dp, nome, nome_normalizado FROM local_trabalho");
     return Response.json({
       ok: true,
-      matriculas: colabs.map((c) => c.codigo_dp),
+      clt: colabs.map((c) => ({ cpf: c.cpf || "", matricula: c.codigo_dp || "" })),
+      matriculas: colabs.map((c) => c.codigo_dp).filter(Boolean), // validação de líder (arquivos v2)
       situacoes: sits.map((s) => ({ nome: s.nome, normalizado: s.nome_normalizado, codigo: s.codigo_dp })),
       setores: setores.map((s) => ({ normalizado: s.nome_normalizado, codigo: s.codigo_dp })),
+      cargos: cargos.map((c) => ({ codigo: c.codigo_cargo_dp, nome: c.nome, normalizado: c.nome_normalizado })),
+      locais: locais.map((l) => ({ codigo: l.codigo_dp, nome: l.nome, normalizado: l.nome_normalizado })),
     });
   } catch (e) {
     return erroResposta(e);
@@ -84,9 +91,9 @@ export async function POST(req) {
       const [setRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado FROM setor");
       const [locRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado FROM local_trabalho");
       const [sitRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado FROM situacao");
-      const [carRows] = await conn.query("SELECT id, nome_normalizado FROM cargo");
+      const [carRows] = await conn.query("SELECT id, codigo_cargo_dp, nome, nome_normalizado FROM cargo");
       const [regRows] = await conn.query("SELECT id, nome_normalizado FROM regional");
-      const [nhRows]  = await conn.query("SELECT id, codigo_nh FROM nivel_hierarquico");
+      const [nhRows]  = await conn.query("SELECT id, codigo_nh, familia FROM nivel_hierarquico");
 
       const setCod = new Map(), setNome = new Map();
       setRows.forEach((r) => { if (r.codigo_dp) setCod.set(r.codigo_dp, r.id); setNome.set(r.nome_normalizado, r.id); });
@@ -94,9 +101,16 @@ export async function POST(req) {
       locRows.forEach((r) => { if (r.codigo_dp) locCod.set(r.codigo_dp, r.id); locNome.set(r.nome_normalizado, r.id); });
       const sitCod = new Map(), sitNome = new Map();
       sitRows.forEach((r) => { if (r.codigo_dp) sitCod.set(String(r.codigo_dp).toLowerCase(), r.id); sitNome.set(r.nome_normalizado, r.id); });
+      // CARGO: o CÓDIGO do DP é a identidade (mig. 10); nome é fallback
       const carNome = new Map(carRows.map((r) => [r.nome_normalizado, r.id]));
+      const carCod = new Map(); // código normalizado -> { id, nome, norm }
+      carRows.forEach((r) => {
+        const k = normalizarCodigoCargo(r.codigo_cargo_dp);
+        if (k) carCod.set(k, { id: r.id, nome: r.nome, norm: r.nome_normalizado });
+      });
       const regNome = new Map(regRows.map((r) => [r.nome_normalizado, r.id]));
       const nhId = new Map(nhRows.map((r) => [r.codigo_nh, r.id]));
+      const familias = nhRows.filter((r) => r.familia); // p/ nível automático de cargo novo
 
       // local no formato novo do DP ("472 - Reserva JK"): deriva o código do
       // DP do prefixo quando a coluna de código não veio, e guarda o nome
@@ -130,11 +144,45 @@ export async function POST(req) {
           novoLoc.push([id, l.codigoLocal || null, nome, norm]);
           if (l.codigoLocal) locCod.set(l.codigoLocal, id); locNome.set(norm, id);
         }
-        // cargo casa por nome com alias do DP (grafias abreviadas → canônico)
+        // CARGO — identidade pelo código do DP (mig. 10):
+        //  * código existe no catálogo + nome diverge → RENOMEIA (o DP manda
+        //    no nome), a menos que o nome novo colida com outro cargo;
+        //  * código não existe + nome existe → cargo legado ADOTA o código;
+        //  * código não existe + nome não existe → CRIA, já com o nível
+        //    assimilado pela família do nome (prefixo mais longo);
+        //  * sem código (arquivos antigos) → fallback por nome, como antes.
         const cNorm = l.cargo ? cargoNormalizado(l.cargo) : null;
-        if (cNorm && !carNome.has(cNorm)) {
-          const id = randomUUID(); const nivelId = l.codigoNH ? (nhId.get(l.codigoNH) || null) : null;
-          novoCar.push([id, l.codigoCargo || null, l.cargo.trim().replace(/\s+/g, " "), cNorm, nivelId]);
+        const cCod = normalizarCodigoCargo(l.codigoCargo);
+        const nomeLimpo = l.cargo ? l.cargo.trim().replace(/\s+/g, " ") : "";
+        if (cCod && cNorm) {
+          const atual = carCod.get(cCod);
+          if (atual) {
+            if (atual.nome !== nomeLimpo) {
+              const donoNome = carNome.get(cNorm);
+              if (donoNome && donoNome !== atual.id) {
+                l.motivos = [...(l.motivos || []), `Cargo cód. ${l.codigoCargo}: rename para "${nomeLimpo}" colidiria com outro cargo — nome atual mantido`];
+              } else {
+                await conn.query("UPDATE cargo SET nome = ?, nome_normalizado = ? WHERE id = ?", [nomeLimpo, cNorm, atual.id]);
+                carNome.delete(atual.norm);
+                carNome.set(cNorm, atual.id);
+                carCod.set(cCod, { id: atual.id, nome: nomeLimpo, norm: cNorm });
+              }
+            }
+          } else if (carNome.has(cNorm)) {
+            const id = carNome.get(cNorm); // cargo legado sem código: adota
+            await conn.query("UPDATE cargo SET codigo_cargo_dp = ? WHERE id = ?", [l.codigoCargo.trim(), id]);
+            carCod.set(cCod, { id, nome: nomeLimpo, norm: cNorm });
+          } else {
+            const id = randomUUID();
+            const nivelId = (l.codigoNH && nhId.get(l.codigoNH)) || familiaDoCargo(nomeLimpo, familias)?.id || null;
+            novoCar.push([id, l.codigoCargo.trim(), nomeLimpo, cNorm, nivelId]);
+            carNome.set(cNorm, id);
+            carCod.set(cCod, { id, nome: nomeLimpo, norm: cNorm });
+          }
+        } else if (cNorm && !carNome.has(cNorm)) {
+          const id = randomUUID();
+          const nivelId = (l.codigoNH && nhId.get(l.codigoNH)) || familiaDoCargo(nomeLimpo, familias)?.id || null;
+          novoCar.push([id, null, nomeLimpo, cNorm, nivelId]);
           carNome.set(cNorm, id);
         }
         const rNorm = l.regional ? normalizar(l.regional) : null;
@@ -149,16 +197,31 @@ export async function POST(req) {
       if (novoCar.length) await bulkInsert(conn, "INSERT INTO cargo (id, codigo_cargo_dp, nome, nome_normalizado, nivel_id) VALUES ?", novoCar);
       if (novoReg.length) await bulkInsert(conn, "INSERT INTO regional (id, nome, nome_normalizado) VALUES ?", novoReg);
 
-      const matriculas = linhas.map((l) => l.matricula);
+      // IDENTIDADE PELO CPF: a chapa pode mudar no DP; o CPF nunca. O lookup
+      // vem ordenado do "melhor" candidato para o pior (ativo primeiro, depois
+      // admissão mais recente) — com CPF duplicado no banco (recontratação),
+      // o primeiro da ordem é o que recebe a atualização.
+      const cpfs = linhas.map((l) => l.cpf).filter(Boolean);
       const [ex] = await conn.query(
         `SELECT id, codigo_dp, nome, cpf, cargo_id, setor_id, local_id, regional_id, situacao_id,
                 tipo_contratacao, ativo,
                 DATE_FORMAT(data_nascimento, '%Y-%m-%d') AS data_nascimento,
                 DATE_FORMAT(data_admissao, '%Y-%m-%d') AS data_admissao
-           FROM colaborador WHERE codigo_dp IN (?)`,
-        [matriculas]
+           FROM colaborador WHERE cpf IN (?)
+          ORDER BY ativo DESC, data_admissao DESC, criado_em DESC`,
+        [cpfs.length ? cpfs : [""]]
       );
-      const exMap = new Map(ex.map((c) => [c.codigo_dp, c]));
+      const exMap = new Map();
+      for (const c of ex) if (!exMap.has(c.cpf)) exMap.set(c.cpf, c);
+
+      // dono atual de cada CHAPA do lote (para a troca de chapa não colidir
+      // com a UNIQUE quando a chapa pertencer a OUTRO CPF)
+      const matriculas = linhas.map((l) => l.matricula).filter(Boolean);
+      const [donos] = await conn.query(
+        "SELECT id, codigo_dp, cpf FROM colaborador WHERE codigo_dp IN (?)",
+        [matriculas.length ? matriculas : [""]]
+      );
+      const chapaDono = new Map(donos.map((d) => [d.codigo_dp, d]));
 
       const novos = [], hist = [], itens = [];
       let inseridos = 0, atualizados = 0;
@@ -168,7 +231,9 @@ export async function POST(req) {
         const setorId = (l.codigoSetor && setCod.get(l.codigoSetor)) || (l.setor && setNome.get(normalizar(l.setor))) || null;
         const localId = (l.codigoLocal && locCod.get(l.codigoLocal)) || (l.local && locNome.get(normalizar(l.local))) || null;
         const sitId   = (l.codigoSituacao && sitCod.get(String(l.codigoSituacao).toLowerCase())) || (l.situacao && sitNome.get(normalizar(l.situacao))) || null;
-        const cargoId = l.cargo ? carNome.get(cargoNormalizado(l.cargo)) || null : null;
+        const cargoId =
+          (normalizarCodigoCargo(l.codigoCargo) && carCod.get(normalizarCodigoCargo(l.codigoCargo))?.id) ||
+          (l.cargo ? carNome.get(cargoNormalizado(l.cargo)) || null : null);
         const regId   = l.regional ? regNome.get(normalizar(l.regional)) || null : null;
         // tipo de contratação: coluna explícita da v2; fallback = prefixo "PJ"
         const tipo = l.tipo
@@ -182,27 +247,37 @@ export async function POST(req) {
         const nasc = l.dataNascimento || null; // já em ISO (cliente valida)
         const adm = l.dataAdmissao || null;
 
-        const cur = exMap.get(l.matricula);
+        const cur = cpfNovo ? exMap.get(cpfNovo) : null; // identidade é o CPF
         if (cur) {
+          // CHAPA pode ter mudado no DP — atualiza, exceto se a chapa nova já
+          // pertence a OUTRO CPF (colisão de UNIQUE: mantém a atual e registra)
+          const dono = l.matricula ? chapaDono.get(l.matricula) : null;
+          let chapaNova = l.matricula || null;
+          if (chapaNova && dono && dono.id !== cur.id) {
+            chapaNova = null; // conflito: não troca
+            l.motivos = [...(l.motivos || []), `Chapa ${l.matricula} já pertence a outro CPF — chapa atual mantida`];
+            l.status = l.status === "ok" ? "alerta" : l.status;
+          }
           // "mudou" só quando o arquivo TRAZ um valor e ele difere do atual
           const diff = (novo, atual) => novo !== null && novo !== undefined && novo !== "" && novo !== atual;
           const mudou =
-            diff(l.nome, cur.nome) || diff(cargoId, cur.cargo_id) || diff(setorId, cur.setor_id) ||
+            diff(l.nome, cur.nome) || diff(chapaNova, cur.codigo_dp) ||
+            diff(cargoId, cur.cargo_id) || diff(setorId, cur.setor_id) ||
             diff(localId, cur.local_id) || diff(regId, cur.regional_id) || diff(sitId, cur.situacao_id) ||
-            cur.ativo !== 1 || diff(cpfNovo, cur.cpf) ||
+            cur.ativo !== 1 ||
             diff(nasc, cur.data_nascimento) || diff(adm, cur.data_admissao);
           if (mudou) {
-            // tipo_contratacao NUNCA é alterado em registro existente (regra 4)
+            // tipo_contratacao e CPF NUNCA mudam em registro existente
             await conn.query(
               `UPDATE colaborador SET
-                 nome = COALESCE(?, nome), cpf = COALESCE(?, cpf),
+                 codigo_dp = COALESCE(?, codigo_dp), nome = COALESCE(?, nome),
                  data_nascimento = COALESCE(?, data_nascimento),
                  data_admissao = COALESCE(?, data_admissao),
                  cargo_id = COALESCE(?, cargo_id), setor_id = COALESCE(?, setor_id),
                  local_id = COALESCE(?, local_id), regional_id = COALESCE(?, regional_id),
                  situacao_id = COALESCE(?, situacao_id), ativo = 1
                WHERE id = ?`,
-              [l.nome || null, cpfNovo, nasc, adm, cargoId, setorId, localId, regId, sitId, cur.id]
+              [chapaNova, l.nome || null, nasc, adm, cargoId, setorId, localId, regId, sitId, cur.id]
             );
             await conn.query(
               "UPDATE colaborador_historico SET data_fim = NOW() WHERE colaborador_id = ? AND data_fim IS NULL",
@@ -211,11 +286,23 @@ export async function POST(req) {
             hist.push([randomUUID(), cur.id, cargoId ?? cur.cargo_id, setorId ?? cur.setor_id, localId ?? cur.local_id, sitId ?? cur.situacao_id, "importacao"]);
             atualizados++;
           }
+          // a chapa que este registro passa a usar fica reservada para ele
+          if (chapaNova) chapaDono.set(chapaNova, { id: cur.id, cpf: cpfNovo });
         } else {
-          const nid = randomUUID();
-          novos.push([nid, l.matricula, l.nome, cpfNovo, nasc, adm, tipo, cargoId, setorId, localId, regId, sitId, 1]);
-          hist.push([randomUUID(), nid, cargoId, setorId, localId, sitId, "importacao"]);
-          inseridos++;
+          // NOVO colaborador — se a chapa já pertence a outro CPF, a linha é
+          // pulada com erro (inserir colidiria com a UNIQUE da matrícula)
+          const dono = l.matricula ? chapaDono.get(l.matricula) : null;
+          if (dono) {
+            l.status = "erro";
+            l.motivos = [...(l.motivos || []), `Chapa ${l.matricula} já pertence a outro CPF — linha não importada`];
+          } else {
+            const nid = randomUUID();
+            novos.push([nid, l.matricula, l.nome, cpfNovo, nasc, adm, tipo, cargoId, setorId, localId, regId, sitId, 1]);
+            hist.push([randomUUID(), nid, cargoId, setorId, localId, sitId, "importacao"]);
+            if (l.matricula) chapaDono.set(l.matricula, { id: nid, cpf: cpfNovo });
+            if (cpfNovo) exMap.set(cpfNovo, { id: nid, codigo_dp: l.matricula }); // linha repetida no lote não duplica
+            inseridos++;
+          }
         }
         itens.push([
           randomUUID(), importacaoId, l.linha, JSON.stringify(l),
@@ -234,11 +321,11 @@ export async function POST(req) {
       return Response.json({ ok: true, inseridos, atualizados });
     }
 
-    // ---- finalizar: resolve líderes + arquivamento (poucas queries) ----
+    // ---- finalizar: resolve líderes + arquivamento por CPF (poucas queries) ----
     if (acao === "finalizar") {
       // temLider=false (extrato v3, sem coluna de líder): a importação NÃO
       // mexe em nenhum lider_id — a árvore é gerida dentro do portal.
-      const { importacaoId, matriculasArquivo = [], liderPares = [], erros = [], temLider = true } = body;
+      const { importacaoId, cpfsArquivo = [], liderPares = [], erros = [], temLider = true } = body;
       conn = await pool.getConnection();
       await conn.beginTransaction();
 
@@ -254,17 +341,17 @@ export async function POST(req) {
 
       await conn.query("DROP TEMPORARY TABLE IF EXISTS _imp_file");
       await conn.query("DROP TEMPORARY TABLE IF EXISTS _imp_lider");
-      await conn.query("CREATE TEMPORARY TABLE _imp_file (m VARCHAR(40) PRIMARY KEY)");
+      await conn.query("CREATE TEMPORARY TABLE _imp_file (cpf VARCHAR(11) PRIMARY KEY)");
       await conn.query("CREATE TEMPORARY TABLE _imp_lider (m VARCHAR(40), l VARCHAR(40), KEY(m), KEY(l))");
 
-      if (matriculasArquivo.length)
-        await bulkInsert(conn, "INSERT IGNORE INTO _imp_file (m) VALUES ?",
-          matriculasArquivo.map((m) => [m]));
+      if (cpfsArquivo.length)
+        await bulkInsert(conn, "INSERT IGNORE INTO _imp_file (cpf) VALUES ?",
+          cpfsArquivo.map((c) => [String(c).replace(/\D/g, "")]).filter((c) => c[0]));
       if (liderPares.length)
         await bulkInsert(conn, "INSERT INTO _imp_lider (m, l) VALUES ?", liderPares);
 
       if (temLider) {
-        // define o líder de quem tem par válido
+        // define o líder de quem tem par válido (pares por matrícula — v2)
         await conn.query(
           `UPDATE colaborador c
              JOIN _imp_lider t ON t.m = c.codigo_dp
@@ -274,28 +361,41 @@ export async function POST(req) {
         // quem veio no arquivo mas sem par válido → sem líder (raiz)
         await conn.query(
           `UPDATE colaborador c
-             JOIN _imp_file f ON f.m = c.codigo_dp
+             JOIN _imp_file f ON f.cpf = c.cpf
              LEFT JOIN _imp_lider t ON t.m = c.codigo_dp
               SET c.lider_id = NULL
             WHERE t.m IS NULL`
         );
       }
-      // arquivamento: CLT ativo que não veio no arquivo. PJ NUNCA é
-      // arquivado por importação (gestão exclusiva pelo menu PJ).
+      // arquivamento POR CPF: CLT ativo cujo CPF não veio no arquivo (inclui
+      // quem está sem CPF no banco — invisível para o extrato do DP).
+      // PJ NUNCA é arquivado por importação (gestão exclusiva pelo menu PJ).
       const [arq] = await conn.query(
         `UPDATE colaborador c
-           LEFT JOIN _imp_file f ON f.m = c.codigo_dp
+           LEFT JOIN _imp_file f ON f.cpf = c.cpf
             SET c.ativo = 0
-          WHERE c.ativo = 1 AND f.m IS NULL AND c.codigo_dp IS NOT NULL
+          WHERE c.ativo = 1 AND f.cpf IS NULL
             AND c.tipo_contratacao = 'CLT'`
       );
+      // colapso de duplicatas: se o MESMO CPF tem mais de um registro CLT
+      // ativo (recontratação com chapa nova), fica só o vínculo de admissão
+      // mais recente — o mesmo desempate do login. Os demais são arquivados.
+      const [dup] = await conn.query(
+        `UPDATE colaborador c
+           JOIN colaborador d
+             ON d.cpf = c.cpf AND d.id <> c.id
+            AND d.ativo = 1 AND d.tipo_contratacao = 'CLT'
+            AND (d.data_admissao > c.data_admissao
+                 OR (d.data_admissao <=> c.data_admissao AND d.criado_em > c.criado_em))
+            SET c.ativo = 0
+          WHERE c.ativo = 1 AND c.tipo_contratacao = 'CLT' AND c.cpf IS NOT NULL`
+      );
+      // invariante: registro arquivado não mantém histórico em aberto
       await conn.query(
         `UPDATE colaborador_historico h
            JOIN colaborador c ON c.id = h.colaborador_id
-           LEFT JOIN _imp_file f ON f.m = c.codigo_dp
             SET h.data_fim = NOW()
-          WHERE h.data_fim IS NULL AND c.ativo = 0 AND f.m IS NULL AND c.codigo_dp IS NOT NULL
-            AND c.tipo_contratacao = 'CLT'`
+          WHERE h.data_fim IS NULL AND c.ativo = 0`
       );
 
       await conn.query("DROP TEMPORARY TABLE IF EXISTS _imp_file");
@@ -303,7 +403,10 @@ export async function POST(req) {
       await conn.query("UPDATE importacao SET status = 'confirmado' WHERE id = ?", [importacaoId]);
       await conn.commit();
 
-      return Response.json({ ok: true, arquivados: arq.affectedRows || 0 });
+      return Response.json({
+        ok: true,
+        arquivados: (arq.affectedRows || 0) + (dup.affectedRows || 0),
+      });
     }
 
     return Response.json({ ok: false, erro: "Ação desconhecida." }, { status: 400 });

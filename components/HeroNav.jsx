@@ -3,7 +3,7 @@
 // Cabeçalho global do portal ("hero"): gradiente da marca + logo oficial INC
 // + menu de funcionalidades em cards — o MESMO em todas as páginas.
 // Os cards aparecem conforme o PERFIL da sessão (nivelMin de cada item):
-//   PADRÃO vê só o organograma (nenhum card) · COLABORADOR ganha Líderes ·
+//   PADRÃO vê só o organograma (nenhum card) · COLABORADOR ganha Diretorias ·
 //   GESTOR ganha Exportar · ADMIN vê tudo (+ Acessos).
 // O card da página atual fica destacado. Na home, Importar abre o modal
 // direto (via onAcao); nas demais páginas esse card navega para a home com
@@ -22,7 +22,7 @@ const ITENS = [
   { key: "solicitacoes", href: "/solicitacoes", label: "Solicitações", Icon: InboxIcon, title: "Solicitações de ajuste recebidas pelo RH", nivelMin: NIVEL.ADMIN },
   { key: "colaboradores", href: "/colaboradores", label: "Editar colaboradores", Icon: PencilIcon, title: "Localizar e editar dados de colaboradores", nivelMin: NIVEL.ADMIN },
   { key: "pj", href: "/pj", label: "Colaboradores PJ", Icon: BriefcaseIcon, title: "Gerenciar prestadores PJ: cadastrar, editar, status, excluir", nivelMin: NIVEL.ADMIN },
-  { key: "lideres", href: "/lideres", label: "Líderes por área", Icon: UserIcon, title: "Diretores, áreas e líderes por área", nivelMin: NIVEL.COLABORADOR },
+  { key: "lideres", href: "/lideres", label: "Diretorias", Icon: UserIcon, title: "Diretorias, suas áreas e o líder de cada área", nivelMin: NIVEL.COLABORADOR },
   { key: "importar", href: "/?abrir=importar", label: "Importar Excel", Icon: UploadIcon, title: "Subir a base oficial por Excel", acao: true, nivelMin: NIVEL.ADMIN },
   { key: "exportar", href: "/api/colaboradores/exportar", label: "Exportar base", Icon: DownloadIcon, title: "Baixar toda a base em Excel", download: true, nivelMin: NIVEL.GESTOR },
   { key: "catalogos", href: "/catalogos", label: "Catálogos", Icon: GridIcon, title: "Cargos, níveis, locais, regionais e situações", nivelMin: NIVEL.ADMIN },

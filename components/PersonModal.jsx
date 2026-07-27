@@ -3,16 +3,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { nivelDe, NIVEIS, inconsistenciasDe, CARGOS, AREAS, LOCAIS, normalizar } from "@/data/ti";
 import { NIVEL as PERFIL } from "@/lib/perfis";
-import { dataBR, idade, tempoDeEmpresa } from "@/lib/datas";
+import { dataBR, tempoDeEmpresa } from "@/lib/datas";
 import { UserIcon, CloseIcon, AlertIcon, SearchIcon, ChevronIcon, CheckIcon, CakeIcon } from "@/components/icons";
 
 // Edição direta (aplica na hora, só ADMIN): nome, e-mail, local.
-// Estruturais (exigem "Solicitar ajuste", perfil COLABORADOR+): cargo, área, líder.
+// Estruturais (cargo, área, líder): para GESTOR/COLABORADOR vão por
+// "Solicitar ajuste" (aprovação do RH); para ADMIN o próprio Salvar aplica
+// tudo direto no banco, sem passar pela fila de solicitações.
 // Situação: somente leitura — gerenciada pelo RH/DP, não editável aqui.
 // nivelAcesso: nível do perfil da sessão (lib/perfis) — esconde os botões
 // acima do nível; as APIs revalidam no servidor.
 // listas: dropdowns vindos do banco (via API); mock só como fallback.
 export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, nivelAcesso = 0, onClose, onSalvar }) {
+  const ehAdmin = nivelAcesso >= PERFIL.ADMIN;
   const CARGOS_OPCOES = listas?.cargos?.length ? listas.cargos : CARGOS;
   const AREAS_OPCOES = listas?.areas?.length ? listas.areas : AREAS;
   const LOCAIS_OPCOES = listas?.locais?.length ? listas.locais : LOCAIS;
@@ -134,19 +137,22 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
     setLiderBusca("");
   }
 
-  // Salvar (edição direta): PERSISTE no banco nome, e-mail e local — os
-  // campos estruturais seguem por "Solicitar ajuste".
+  // Salvar (edição direta): PERSISTE no banco nome, e-mail e local. Para
+  // ADMIN, as mudanças estruturais (cargo/área/líder) vão junto e são
+  // aplicadas na hora, sem passar pela aprovação do RH.
   async function salvar() {
     setSalvando(true); setErroSalvar("");
+    const estruturais = ehAdmin ? mudancas : [];
     try {
       const r = await fetch("/api/colaboradores/edicao-direta", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ matricula: pessoa.id, nome, email, local }),
+        body: JSON.stringify({ matricula: pessoa.id, nome, email, local, mudancas: estruturais }),
       });
       const txt = await r.text();
       let j; try { j = JSON.parse(txt); } catch { j = { ok: false, erro: `Servidor respondeu ${r.status}.` }; }
       if (!j.ok) { setErroSalvar(j.erro || "Falha ao salvar."); setSalvando(false); return; }
-      onSalvar({ ...pessoa, nome, local, email });
+      // com mudança estrutural a árvore muda de desenho — pede recarga da área
+      onSalvar({ ...pessoa, nome, local, email }, { recarregar: estruturais.length > 0 });
       onClose();
     } catch (e) {
       setErroSalvar(`Falha ao salvar: ${e.message}`);
@@ -250,10 +256,7 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
           {pessoa.nascimento && (
             <div className="ro">
               <span>Aniversário</span>
-              <b className="ro-cake">
-                <CakeIcon size={16} /> {dataBR(pessoa.nascimento)}
-                {idade(pessoa.nascimento) != null && <em className="ro-sub"> · {idade(pessoa.nascimento)} anos</em>}
-              </b>
+              <b className="ro-cake"><CakeIcon size={16} /> {dataBR(pessoa.nascimento)}</b>
             </div>
           )}
           {pessoa.admissao && (
@@ -287,7 +290,7 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
         </div>
 
         <div className="modal-section">
-          <span className="sec-title">Dados estruturais <em>(exigem solicitação de ajuste)</em></span>
+          <span className="sec-title">Dados estruturais <em>{ehAdmin ? "(aplica na hora ao salvar)" : "(exigem solicitação de ajuste)"}</em></span>
           <label className="fld">
             <span>Cargo</span>
             <select value={cargo} onChange={(e) => setCargo(e.target.value)}>
@@ -324,7 +327,7 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
             {mudouLider && (
               <div className="lider-troca-nota">
                 Novo líder selecionado — líder atual: <b>{liderOriginalNome || "Sem líder (topo)"}</b>.
-                A troca só é aplicada após aprovação do RH.
+                {ehAdmin ? " A troca é aplicada ao clicar em Salvar." : " A troca só é aplicada após aprovação do RH."}
               </div>
             )}
 
@@ -403,16 +406,17 @@ export default function PersonModal({ pessoa, pessoas, byId, listas, areaAtual, 
             </>
           ) : (
             <>
-              {nivelAcesso >= PERFIL.COLABORADOR && (
+              {!ehAdmin && nivelAcesso >= PERFIL.COLABORADOR && (
                 <button className="btn btn-ghost" onClick={abrirConfirmacao} disabled={solEnviada}>
                   Solicitar ajuste{mudancas.length ? ` (${mudancas.length})` : ""}
                 </button>
               )}
               <div style={{ flex: 1 }} />
               <button className="btn btn-neutral" onClick={onClose}>{solEnviada ? "Fechar" : "Cancelar"}</button>
-              {nivelAcesso >= PERFIL.ADMIN && (
+              {ehAdmin && (
                 <button className="btn btn-primary" onClick={salvar} disabled={salvando}>
-                  {salvando ? "Salvando..." : "Salvar"}
+                  {salvando ? "Salvando..." : mudancas.length === 0 ? "Salvar"
+                    : `Salvar (${mudancas.length} ${mudancas.length > 1 ? "ajustes estruturais" : "ajuste estrutural"})`}
                 </button>
               )}
             </>

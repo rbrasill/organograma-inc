@@ -6,7 +6,7 @@
 
 import { useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { extrairLinhas, validarLinhas } from "@/lib/importacao";
+import { extrairLinhas, validarLinhas, cargoNormalizado, normalizarCodigoCargo } from "@/lib/importacao";
 import { normalizar } from "@/data/ti";
 import { CloseIcon, AlertIcon, CheckIcon, UploadIcon, DownloadIcon } from "@/components/icons";
 
@@ -50,21 +50,30 @@ export default function ImportModal({ onClose }) {
       const { erro, linhas, colunas } = extrairLinhas(matriz);
       if (erro) { setErroGeral(erro); setEtapa("selecao"); return; }
 
-      // dados do banco para a prévia (novos x atualizados x arquivados)
+      // dados do banco para a prévia (novos x atualizados x arquivados).
+      // A identidade é o CPF: a chapa pode mudar no DP, o CPF nunca.
+      let cpfsBanco = new Set();
+      let cltBanco = [];
       let matriculasBanco = new Set();
       let situacoesValidas = null;
       let situacoesCodigos = null;
       let setoresNome = null, setoresCod = null;
+      let cargosBanco = null; // [{ codigo, nome, normalizado }]
+      let locaisBanco = null; // idem
       let avisoBanco = "";
       try {
         const r = await fetch("/api/importacao");
         const j = await r.json();
         if (j.ok) {
+          cltBanco = j.clt || [];
+          cpfsBanco = new Set(cltBanco.map((c) => c.cpf).filter(Boolean));
           matriculasBanco = new Set(j.matriculas);
           situacoesValidas = new Set(j.situacoes.map((s) => s.normalizado));
           situacoesCodigos = new Set(j.situacoes.map((s) => (s.codigo || "").toLowerCase()).filter(Boolean));
           setoresNome = new Set((j.setores || []).map((s) => s.normalizado));
           setoresCod = new Set((j.setores || []).map((s) => s.codigo).filter(Boolean));
+          cargosBanco = j.cargos || [];
+          locaisBanco = j.locais || [];
         } else {
           avisoBanco = j.erro || "Banco indisponível — prévia sem comparação com a base atual.";
         }
@@ -72,9 +81,12 @@ export default function ImportModal({ onClose }) {
         avisoBanco = "Banco indisponível — prévia sem comparação com a base atual.";
       }
 
-      const { anotadas, resumo } = validarLinhas(linhas, { matriculasBanco, situacoesValidas, situacoesCodigos, colunas });
-      const noArquivo = new Set(anotadas.filter((l) => l.status !== "erro").map((l) => l.matricula));
-      const arquivar = [...matriculasBanco].filter((m) => !noArquivo.has(m));
+      const { anotadas, resumo } = validarLinhas(linhas, { cpfsBanco, matriculasBanco, situacoesValidas, situacoesCodigos, colunas });
+      // a arquivar: CLT ativo do banco cujo CPF não veio no arquivo
+      const cpfsArquivo = new Set(anotadas.filter((l) => l.status !== "erro").map((l) => l.cpf).filter(Boolean));
+      const arquivar = cltBanco
+        .filter((c) => !c.cpf || !cpfsArquivo.has(c.cpf))
+        .map((c) => c.matricula || c.cpf);
 
       // áreas do arquivo que ainda não existem no banco (por código ou nome) —
       // destaque para o RH conferir typos antes de gravar
@@ -92,9 +104,51 @@ export default function ImportModal({ onClose }) {
         areasNovas = [...vistas.values()];
       }
 
+      // CARGOS (identidade pelo código do DP): o que a gravação vai criar e
+      // o que vai renomear — transparência antes de confirmar
+      let cargosNovos = [], cargosRenomeados = [];
+      if (cargosBanco) {
+        const porCod = new Map(), porNome = new Map();
+        cargosBanco.forEach((c) => {
+          const k = normalizarCodigoCargo(c.codigo);
+          if (k) porCod.set(k, c);
+          porNome.set(c.normalizado, c);
+        });
+        const vistos = new Set();
+        anotadas.forEach((l) => {
+          if (l.status === "erro" || !l.cargo) return;
+          const cod = normalizarCodigoCargo(l.codigoCargo);
+          if (!cod || vistos.has(cod)) return;
+          vistos.add(cod);
+          const nomeLimpo = l.cargo.trim().replace(/\s+/g, " ");
+          const atual = porCod.get(cod);
+          if (!atual) {
+            if (!porNome.has(cargoNormalizado(l.cargo))) cargosNovos.push(`${l.codigoCargo} · ${nomeLimpo}`);
+          } else if (atual.nome !== nomeLimpo) {
+            cargosRenomeados.push(`${l.codigoCargo}: "${atual.nome}" → "${nomeLimpo}"`);
+          }
+        });
+      }
+
+      // LOCAIS (obras) novos: código do prefixo não existe no catálogo —
+      // acontece quando uma obra nova começa no DP; serão criados na gravação
+      let locaisNovos = [];
+      if (locaisBanco) {
+        const codsBanco = new Set(locaisBanco.map((x) => String(x.codigo || "").trim()).filter(Boolean));
+        const vistos = new Set();
+        anotadas.forEach((l) => {
+          if (l.status === "erro") return;
+          const cod = (l.codigoLocal || "").trim();
+          if (!cod || codsBanco.has(cod) || vistos.has(cod)) return;
+          vistos.add(cod);
+          const nome = String(l.local || "").replace(/^\d+\s*-\s*/, "").trim() || cod;
+          locaisNovos.push(`${cod} · ${nome}`);
+        });
+      }
+
       // o extrato v3 NÃO tem coluna de líder: nesse caso a importação não
       // mexe nos líderes existentes (a árvore é gerida dentro do portal)
-      setPrevia({ anotadas, resumo, arquivar, avisoBanco, areasNovas, temLider: colunas.matriculaLider !== undefined });
+      setPrevia({ anotadas, resumo, arquivar, avisoBanco, areasNovas, cargosNovos, cargosRenomeados, locaisNovos, temLider: colunas.matriculaLider !== undefined });
       setEtapa("previa");
     } catch (e) {
       setErroGeral(`Não consegui ler o arquivo: ${e.message}`);
@@ -142,7 +196,7 @@ export default function ImportModal({ onClose }) {
 
       const fin = await postJSON({
         acao: "finalizar", importacaoId,
-        matriculasArquivo: validas.map((l) => l.matricula),
+        cpfsArquivo: validas.map((l) => l.cpf).filter(Boolean),
         temLider: previa.temLider, // arquivo sem coluna de líder → não mexe na árvore
         liderPares: validas.filter((l) => l.liderValido).map((l) => [l.matricula, l.liderValido]),
         erros: comErro.map(empacota),
@@ -173,7 +227,7 @@ export default function ImportModal({ onClose }) {
           <div className="imp-ico"><UploadIcon size={22} /></div>
           <div>
             <h3>Importar base por Excel</h3>
-            <p>Extrato do DP (CHAPA, CPF, datas, cargo, situação, local) · CLT que sai do arquivo é arquivado · PJ e árvore de líderes não são afetados</p>
+            <p>Identificação pelo CPF (a chapa pode mudar) · CLT cujo CPF sai do arquivo é arquivado · PJ e árvore de líderes não são afetados</p>
           </div>
         </div>
 
@@ -275,6 +329,30 @@ export default function ImportModal({ onClose }) {
                   <b><AlertIcon size={13} /> Áreas novas que serão criadas ({previa.areasNovas.length}):</b>
                   <span>{previa.areasNovas.join(" · ")}</span>
                   <em>Confira se não é um nome digitado diferente de uma área existente. Se for, corrija o Excel antes de gravar — o nome oficial das áreas se edita em Catálogos → Áreas.</em>
+                </div>
+              )}
+
+              {previa.locaisNovos?.length > 0 && (
+                <div className="imp-areas-novas">
+                  <b><AlertIcon size={13} /> Locais novos que serão criados ({previa.locaisNovos.length}):</b>
+                  <span>{previa.locaisNovos.join(" · ")}</span>
+                  <em>Obra nova no DP entra automaticamente com o código do prefixo. Depois, vincule as áreas dela em Catálogos → Áreas (local vinculado).</em>
+                </div>
+              )}
+
+              {previa.cargosNovos?.length > 0 && (
+                <div className="imp-areas-novas">
+                  <b><AlertIcon size={13} /> Cargos novos que serão criados ({previa.cargosNovos.length}):</b>
+                  <span>{previa.cargosNovos.join(" · ")}</span>
+                  <em>Entram já vinculados ao nível pela família do nome; sem família reconhecível, classifique depois em Catálogos → Cargos.</em>
+                </div>
+              )}
+
+              {previa.cargosRenomeados?.length > 0 && (
+                <div className="imp-areas-novas">
+                  <b><AlertIcon size={13} /> Cargos que serão renomeados pelo DP ({previa.cargosRenomeados.length}):</b>
+                  <span>{previa.cargosRenomeados.join(" · ")}</span>
+                  <em>O código identifica o cargo e o nome do extrato do DP passa a valer no catálogo e no organograma.</em>
                 </div>
               )}
 
