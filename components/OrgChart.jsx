@@ -219,6 +219,9 @@ export default function OrgChart() {
   const [liderAreaAlvo, setLiderAreaAlvo] = useState(null); // card do líder externo aberto
   const [baixando, setBaixando] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  // validação do organograma da área: { validadoEm, atual } (hash comparado no servidor)
+  const [validacao, setValidacao] = useState(null);
+  const [validando, setValidando] = useState(false);
   const boxRef = useRef(null);
   const viewportRef = useRef(null);
   const treeRef = useRef(null);
@@ -257,6 +260,31 @@ export default function OrgChart() {
     if (abrir === "importar") setShowImport(true);
     if (abrir) window.history.replaceState(null, "", "/");
   }, []);
+
+  // status da validação da área selecionada (pendente/validado + data)
+  useEffect(() => {
+    if (!areaId) { setValidacao(null); return; }
+    let ativo = true;
+    fetch(`/api/organograma/validacao?area=${encodeURIComponent(areaId)}`)
+      .then((r) => r.json())
+      .then((j) => { if (ativo) setValidacao(j.ok ? j : null); })
+      .catch(() => { if (ativo) setValidacao(null); });
+    return () => { ativo = false; };
+  }, [areaId, pessoas]); // pessoas: revalida o status após edições na tela
+
+  async function validarOrganograma() {
+    if (!areaId || validando) return;
+    setValidando(true);
+    try {
+      const r = await fetch("/api/organograma/validacao", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ areaId }),
+      });
+      const j = await r.json();
+      if (j.ok) setValidacao(j);
+    } catch { /* silencioso: o botão continua laranja */ }
+    setValidando(false);
+  }
 
   const nomeArea = setores.find((s) => s.id === areaId)?.nome || "—";
   const nomeLocal = locais.find((l) => l.id === localId)?.nome || "—";
@@ -623,7 +651,8 @@ export default function OrgChart() {
               <h2>{escopoNome || "Selecione uma área ou local"}</h2>
               {areaId ? (
                 <p className="subline">
-                  {totalArea} pessoas &nbsp;·&nbsp; Líder da área: <b>{liderArea}</b> &nbsp;·&nbsp; Última validação: <b>pendente</b>
+                  {totalArea} pessoas &nbsp;·&nbsp; Líder da área: <b>{liderArea}</b> &nbsp;·&nbsp; Última validação:{" "}
+                  <b>{validacao?.atual && validacao?.validadoEm ? validacao.validadoEm : "pendente"}</b>
                 </p>
               ) : localId ? (
                 <p className="subline">
@@ -647,8 +676,22 @@ export default function OrgChart() {
                   {baixando ? "Gerando imagem..." : "Baixar imagem"}
                 </button>
               )}
-              {sessao.nivel >= NIVEL.ADMIN && (
-                <button className="btn btn-primary"><span className="ic"><CheckIcon /></span>Validar organograma</button>
+              {sessao.nivel >= NIVEL.GESTOR && areaId && (
+                validacao?.atual ? (
+                  <button className="btn btn-validado" disabled title={`Organograma validado em ${validacao.validadoEm}`}>
+                    <span className="ic"><CheckIcon /></span>Organograma validado
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-atencao"
+                    disabled={validando}
+                    title="A estrutura mudou desde a última validação (ou nunca foi validada) — confirme que o organograma reflete a realidade"
+                    onClick={validarOrganograma}
+                  >
+                    <span className="ic"><AlertIcon size={14} /></span>
+                    {validando ? "Validando..." : "Validar organograma"}
+                  </button>
+                )
               )}
               <button
                 className={`icon-btn ${fullscreen ? "on" : ""}`}

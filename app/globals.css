@@ -126,6 +126,13 @@ main{padding:20px 24px 24px}
 .btn-primary .ic{background:rgba(255,255,255,.22)}
 .btn-primary:hover .ic{transform:translateX(1px)}
 .btn-ghost{background:#fff;color:#b42318;border:1px solid #f4d5d1;box-shadow:var(--shadow-soft)}
+/* validação do organograma: laranja destacado = pendente (ação); verde = validado */
+.btn-atencao{background:linear-gradient(145deg,#f97316,var(--inc));color:#fff;box-shadow:0 10px 22px -12px rgba(241,96,33,.9)}
+.btn-atencao .ic{background:rgba(255,255,255,.22)}
+.btn-atencao:disabled{opacity:.6;cursor:wait}
+.btn-validado{background:linear-gradient(145deg,#16a34a,#12894b);color:#fff;box-shadow:0 10px 22px -12px rgba(22,163,74,.9);cursor:default}
+.btn-validado .ic{background:rgba(255,255,255,.22)}
+.btn-validado:disabled{opacity:1}
 .btn-ghost .ic{background:#fdecea}
 .btn-neutral{background:#eef1f7;color:var(--ink-soft)}
 .icon-btn{width:38px;height:38px;border-radius:11px;background:#fff;border:1px solid var(--line);color:var(--ink-soft);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow-soft);transition:transform .4s var(--ease),color .3s}
