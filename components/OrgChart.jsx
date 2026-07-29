@@ -128,6 +128,17 @@ function fileirasDeFolhas(leaves) {
   return fileiras;
 }
 
+// modo "liderança direta": as folhas quebram em blocos de até 5 APENAS pela
+// contagem (sem agrupar por nível) — quem pende de alguém é subordinado
+// direto dele, e irmãos ficam na mesma linha independentemente do nível.
+function fileirasDiretas(leaves) {
+  const fileiras = [];
+  for (let i = 0; i < leaves.length; i += MAX_POR_FILEIRA) {
+    fileiras.push(leaves.slice(i, i + MAX_POR_FILEIRA));
+  }
+  return fileiras;
+}
+
 function TreeNode({ node, rest, deg = 0 }) {
   const collapsed = rest.collapsedSet.has(node.id);
 
@@ -141,8 +152,9 @@ function TreeNode({ node, rest, deg = 0 }) {
   const hasKids = kids.length > 0;
   const branches = kids.filter((c) => (c.children || []).length > 0);
   const leaves = kids.filter((c) => (c.children || []).length === 0);
-  const fileiras = fileirasDeFolhas(leaves);
-  const degDe = degrausDe(kids);
+  const direto = rest.visao === "lider";
+  const fileiras = direto ? fileirasDiretas(leaves) : fileirasDeFolhas(leaves);
+  const degDe = direto ? () => 0 : degrausDe(kids);
 
   return (
     <li style={{ "--deg": `${deg}px` }}>
@@ -222,6 +234,16 @@ export default function OrgChart() {
   // validação do organograma da área: { validadoEm, atual } (hash comparado no servidor)
   const [validacao, setValidacao] = useState(null);
   const [validando, setValidando] = useState(false);
+  // visão da árvore: "nivel" (degraus/fileiras por nível) ou "lider"
+  // (liderança direta: liderados na mesma linha). Preferência por navegador.
+  const [visao, setVisao] = useState("nivel");
+  useEffect(() => {
+    try { const v = localStorage.getItem("org_visao"); if (v === "lider") setVisao("lider"); } catch {}
+  }, []);
+  function trocarVisao(v) {
+    setVisao(v);
+    try { localStorage.setItem("org_visao", v); } catch {}
+  }
   const boxRef = useRef(null);
   const viewportRef = useRef(null);
   const treeRef = useRef(null);
@@ -523,7 +545,7 @@ export default function OrgChart() {
   // card do líder externo abre o modal da ÁREA (troca em massa);
   // os demais abrem o modal normal do colaborador
   const rest = {
-    byId, collapsedSet, onToggle, highlightId,
+    byId, collapsedSet, onToggle, highlightId, visao,
     // nó externo (líder de outra área) abre a TROCA de líder — só ADMIN
     onOpen: (n) => (n.externo ? (sessao.nivel >= NIVEL.ADMIN && setLiderAreaAlvo(n)) : setOpenId(n.id)),
   };
@@ -665,6 +687,18 @@ export default function OrgChart() {
               )}
             </div>
             <div className="actions">
+              {areaId && (
+                <div className="org-visao" title="Como desenhar a árvore: por nível hierárquico (degraus) ou por liderança direta (liderados na mesma linha)">
+                  <button
+                    className={`ov-btn ${visao === "nivel" ? "sel" : ""}`}
+                    onClick={() => trocarVisao("nivel")}
+                  >Nível hierárquico</button>
+                  <button
+                    className={`ov-btn ${visao === "lider" ? "sel" : ""}`}
+                    onClick={() => trocarVisao("lider")}
+                  >Liderança direta</button>
+                </div>
+              )}
               {sessao.nivel >= NIVEL.COLABORADOR && (
                 <button
                   className="btn btn-ghost btn-baixar"
@@ -741,11 +775,11 @@ export default function OrgChart() {
               </div>
             )}
 
-            <div className="tree" ref={treeRef} style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}>
+            <div className={`tree ${visao === "lider" ? "visao-lider" : ""}`} ref={treeRef} style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}>
               {roots.length > 0 && (
                 <ul>
                   {rootsOrdenadas.map((r) => (
-                    <TreeNode key={r.id} node={r} rest={rest} deg={degrausDe(rootsOrdenadas)(r)} />
+                    <TreeNode key={r.id} node={r} rest={rest} deg={visao === "lider" ? 0 : degrausDe(rootsOrdenadas)(r)} />
                   ))}
                 </ul>
               )}

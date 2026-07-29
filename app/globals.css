@@ -104,6 +104,11 @@ main{padding:20px 24px 24px}
 .subline{margin:8px 0 0;font-size:13px;color:var(--ink-soft);font-weight:500}
 .subline b{color:var(--ink)}
 .actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+/* seletor da visão da árvore (nível hierárquico × liderança direta) */
+.org-visao{display:flex;gap:4px;background:#f2f5fa;border-radius:12px;padding:4px}
+.ov-btn{border:0;background:transparent;border-radius:9px;padding:7px 12px;font:inherit;font-size:12px;font-weight:700;color:var(--ink-soft);cursor:pointer;transition:background .15s,color .15s;white-space:nowrap}
+.ov-btn:hover{color:var(--ink)}
+.ov-btn.sel{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(16,24,40,.09)}
 /* cartões de total (rosa/branco) — Sede (Rossi), Demais locais e Total geral.
    Ficam à direita do board-head (title | ações | totais via space-between). */
 /* totais na barra de controles — à direita, na mesma linha dos filtros;
@@ -173,6 +178,9 @@ main{padding:20px 24px 24px}
    card (antes era display:none e o fio "apagava" no meio do caminho) */
 .tree li:only-child::before{display:none}
 .tree li:only-child::after{width:0;border-top:0;border-top-left-radius:0;border-top-right-radius:0}
+/* visão "liderança direta": sem degraus, então dá mais respiro horizontal
+   entre irmãos (na visão por nível o degrau já separa visualmente) */
+.tree.visao-lider li{padding-left:20px;padding-right:20px}
 .tree > ul{padding:0}
 .tree > ul::before{display:none}
 .tree > ul > li{padding-top:var(--deg,0px)}
