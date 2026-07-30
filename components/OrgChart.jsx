@@ -443,28 +443,51 @@ export default function OrgChart() {
     const anterior = collapsedSet;
     setCollapsedSet(new Set()); // tudo expandido na imagem
     await new Promise((r) => setTimeout(r, 300)); // re-render + layout
+    let palco;
     try {
-      const natW = t.scrollWidth, natH = t.scrollHeight;
+      const { toPng } = await import("html-to-image");
+      const PAD = 72; // borda de afastamento em volta do desenho
+      const tituloView = visao === "lider" ? "Liderança direta" : "Nível hierárquico";
+
+      // clona a árvore (já expandida) para um palco fora da tela, com borda
+      // de afastamento e um cabeçalho — assim o card não encosta na margem e
+      // a imagem diz por qual visão foi gerada.
+      const clone = t.cloneNode(true);
+      clone.style.position = "static";
+      clone.style.transform = "none";
+
+      const cabecalho = document.createElement("div");
+      cabecalho.style.cssText =
+        "font-family:'Plus Jakarta Sans',system-ui,-apple-system,Segoe UI,sans-serif;margin-bottom:34px";
+      cabecalho.innerHTML =
+        `<div style="font-size:13px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#f16021;margin-bottom:6px">Organograma · ${tituloView}</div>` +
+        `<div style="font-size:32px;font-weight:800;color:#1f3864;line-height:1.1">${nomeArea}</div>`;
+
+      palco = document.createElement("div");
+      palco.style.cssText =
+        `position:fixed;left:-99999px;top:0;display:inline-block;padding:${PAD}px;background:#ffffff`;
+      palco.appendChild(cabecalho);
+      palco.appendChild(clone);
+      document.body.appendChild(palco);
+
+      const natW = palco.scrollWidth, natH = palco.scrollHeight;
       // alta resolução, respeitando o limite de canvas dos navegadores (~16k px)
       const pixelRatio = Math.max(1, Math.min(3, Math.floor(16000 / Math.max(natW, natH)) || 1));
-      const { toPng } = await import("html-to-image");
-      const opcoes = {
-        width: natW, height: natH, pixelRatio,
-        backgroundColor: "#ffffff",
-        style: { transform: "none", position: "static" },
-      };
+      const opcoes = { width: natW, height: natH, pixelRatio, backgroundColor: "#ffffff" };
       let dataUrl;
       try {
-        dataUrl = await toPng(t, opcoes);
+        dataUrl = await toPng(palco, opcoes);
       } catch {
         // fallback: sem embutir a fonte externa (ambientes com rede restrita)
-        dataUrl = await toPng(t, { ...opcoes, fontEmbedCSS: "" });
+        dataUrl = await toPng(palco, { ...opcoes, fontEmbedCSS: "" });
       }
+      const sufixo = visao === "lider" ? "lideranca-direta" : "nivel-hierarquico";
       const a = document.createElement("a");
       a.href = dataUrl;
-      a.download = `organograma-${normalizar(nomeArea).replace(/\s+/g, "-")}.png`;
+      a.download = `organograma-${normalizar(nomeArea).replace(/\s+/g, "-")}-${sufixo}.png`;
       a.click();
     } finally {
+      if (palco) palco.remove();
       setCollapsedSet(anterior);
       setBaixando(false);
     }
