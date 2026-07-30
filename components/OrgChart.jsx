@@ -443,15 +443,15 @@ export default function OrgChart() {
     const anterior = collapsedSet;
     setCollapsedSet(new Set()); // tudo expandido na imagem
     await new Promise((r) => setTimeout(r, 300)); // re-render + layout
-    let palco;
+    let abrigo;
     try {
       const { toPng } = await import("html-to-image");
       const PAD = 72; // borda de afastamento em volta do desenho
       const tituloView = visao === "lider" ? "Liderança direta" : "Nível hierárquico";
 
-      // clona a árvore (já expandida) para um palco fora da tela, com borda
-      // de afastamento e um cabeçalho — assim o card não encosta na margem e
-      // a imagem diz por qual visão foi gerada.
+      // clona a árvore (já expandida) para um palco com borda de afastamento
+      // e um cabeçalho — assim o card não encosta na margem e a imagem diz
+      // por qual visão foi gerada.
       const clone = t.cloneNode(true);
       clone.style.position = "static";
       clone.style.transform = "none";
@@ -463,12 +463,17 @@ export default function OrgChart() {
         `<div style="font-size:13px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#f16021;margin-bottom:6px">Organograma · ${tituloView}</div>` +
         `<div style="font-size:32px;font-weight:800;color:#1f3864;line-height:1.1">${nomeArea}</div>`;
 
-      palco = document.createElement("div");
-      palco.style.cssText =
-        `position:fixed;left:-99999px;top:0;display:inline-block;padding:${PAD}px;background:#ffffff`;
+      // O deslocamento para fora da tela fica num INVÓLUCRO à parte: estilos
+      // inline do nó capturado vão junto para a imagem serializada — capturar
+      // um nó com left:-99999px sairia uma imagem em branco.
+      const palco = document.createElement("div");
+      palco.style.cssText = `display:inline-block;padding:${PAD}px;background:#ffffff`;
       palco.appendChild(cabecalho);
       palco.appendChild(clone);
-      document.body.appendChild(palco);
+      abrigo = document.createElement("div");
+      abrigo.style.cssText = "position:fixed;left:-99999px;top:0";
+      abrigo.appendChild(palco);
+      document.body.appendChild(abrigo);
 
       const natW = palco.scrollWidth, natH = palco.scrollHeight;
       // alta resolução, respeitando o limite de canvas dos navegadores (~16k px)
@@ -487,7 +492,7 @@ export default function OrgChart() {
       a.download = `organograma-${normalizar(nomeArea).replace(/\s+/g, "-")}-${sufixo}.png`;
       a.click();
     } finally {
-      if (palco) palco.remove();
+      if (abrigo) abrigo.remove();
       setCollapsedSet(anterior);
       setBaixando(false);
     }
