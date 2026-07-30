@@ -731,3 +731,45 @@ main{padding:20px 24px 24px}
   .login-visual-txt h1{font-size:30px}
   .login-form-wrap{padding:36px 24px}
 }
+
+/* ===== Painel de indicadores (GESTOR/ADMIN) — paleta aprovada na prévia v3:
+   Linen #FAF7F2 (fundo), Sand #EFE9E2 (trilhas/bordas), Charcoal #1F2937
+   (texto), Taupe #C9BBAA (apoio e categorias "Sem …") ===== */
+.pn-page{background:#FAF7F2;border:1px solid #EFE9E2;border-radius:22px;padding:20px}
+.pn-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.pn-kpi{background:#fff;border:1px solid #EFE9E2;border-radius:16px;padding:16px 18px;border-top:3px solid var(--ac)}
+.pn-kpi em{display:block;font-style:normal;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#C9BBAA;margin-bottom:6px}
+.pn-kpi b{font-size:30px;font-weight:800;line-height:1;color:#1F2937}
+.pn-kpi small{display:block;font-size:12px;color:#8d8478;margin-top:5px;font-weight:600}
+.pn-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pn-card{background:#fff;border:1px solid #EFE9E2;border-radius:16px;padding:18px 20px;min-width:0}
+.pn-card.full{grid-column:1 / -1}
+.pn-card h2{font-size:14px;font-weight:800;margin:0 0 2px;display:flex;align-items:center;gap:8px;color:#1F2937}
+.pn-card h2 i{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+.pn-card > p{font-size:11.5px;color:#C9BBAA;margin:0 0 14px;font-weight:600}
+/* barras horizontais: rótulo · barra · %(destaque) · quantidade(apoio) */
+.pn-bh{display:grid;grid-template-columns:172px 1fr 56px 44px;gap:10px;align-items:center;padding:4.5px 0}
+.pn-bh-rot{font-size:12px;font-weight:600;color:#4b4437;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pn-bh-track{height:14px;background:#EFE9E2;border-radius:5px;overflow:hidden}
+.pn-bh-fill{display:block;height:100%;border-radius:4px}
+.pn-bh-pct{font-size:13.5px;font-weight:800;text-align:right;color:#1F2937}
+.pn-bh-n{font-size:11px;color:#C9BBAA;text-align:right;font-weight:700}
+/* colunas verticais: % em cima (destaque), quantidade + faixa embaixo */
+.pn-cols{display:flex;gap:8px;align-items:stretch;height:230px}
+.pn-cv{flex:1;display:flex;flex-direction:column;align-items:center;min-width:0}
+.pn-cv-pct{font-size:12px;font-weight:800;margin-bottom:4px;color:#1F2937}
+.pn-cv-barwrap{flex:1;width:100%;max-width:46px;display:flex;align-items:flex-end}
+.pn-cv-bar{width:100%;border-radius:5px 5px 0 0;min-height:3px}
+.pn-cv-n{font-size:10.5px;color:#C9BBAA;font-weight:700;margin-top:5px}
+.pn-cv-rot{font-size:10px;color:#8d8478;font-weight:600;margin-top:2px;text-align:center;line-height:1.2}
+.pn-cv.dim .pn-cv-bar{background:#EFE9E2!important}
+.pn-cv.dim .pn-cv-pct{color:#C9BBAA}
+/* medidor CLT × PJ */
+.pn-meter{display:flex;height:26px;border-radius:8px;overflow:hidden;gap:2px;margin-top:14px}
+.pn-meter i{display:block;height:100%}
+.pn-tipos{display:flex;gap:26px}
+.pn-tipo b{font-size:34px;font-weight:800;line-height:1;color:#1F2937}
+.pn-tipo em{font-style:normal;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;color:#4b4437;margin-bottom:6px}
+.pn-tipo small{display:block;font-size:12px;color:#C9BBAA;font-weight:700;margin-top:4px}
+.pn-sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+@media (max-width:860px){.pn-grid{grid-template-columns:1fr}.pn-kpis{grid-template-columns:1fr 1fr}.pn-bh{grid-template-columns:120px 1fr 52px 40px}}

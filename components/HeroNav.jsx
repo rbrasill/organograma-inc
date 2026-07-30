@@ -23,6 +23,7 @@ const ITENS = [
   { key: "colaboradores", href: "/colaboradores", label: "Editar colaboradores", Icon: PencilIcon, title: "Localizar e editar dados de colaboradores", nivelMin: NIVEL.ADMIN },
   { key: "pj", href: "/pj", label: "Colaboradores PJ", Icon: BriefcaseIcon, title: "Gerenciar prestadores PJ: cadastrar, editar, status, excluir", nivelMin: NIVEL.ADMIN },
   { key: "lideres", href: "/lideres", label: "Diretorias", Icon: UserIcon, title: "Diretorias, suas áreas e o líder de cada área", nivelMin: NIVEL.COLABORADOR },
+  { key: "painel", href: "/painel", label: "Painel", Icon: GridIcon, title: "Indicadores do organograma: regionais, vínculo, diretorias, situação, idade e tempo de casa", nivelMin: NIVEL.GESTOR },
   { key: "importar", href: "/?abrir=importar", label: "Importar Excel", Icon: UploadIcon, title: "Subir a base oficial por Excel", acao: true, nivelMin: NIVEL.ADMIN },
   { key: "exportar", href: "/api/colaboradores/exportar", label: "Exportar base", Icon: DownloadIcon, title: "Baixar toda a base em Excel", download: true, nivelMin: NIVEL.GESTOR },
   { key: "catalogos", href: "/catalogos", label: "Catálogos", Icon: GridIcon, title: "Cargos, níveis, locais, regionais e situações", nivelMin: NIVEL.ADMIN },

@@ -32,6 +32,7 @@ const PAGINA_MINIMO = [
   ["/pj", NIVEL.ADMIN],
   ["/catalogos", NIVEL.ADMIN],
   ["/lideres", NIVEL.COLABORADOR],
+  ["/painel", NIVEL.GESTOR],
 ];
 
 function b64urlParaStr(s) {
