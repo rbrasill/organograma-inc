@@ -104,6 +104,11 @@ main{padding:20px 24px 24px}
 .subline{margin:8px 0 0;font-size:13px;color:var(--ink-soft);font-weight:500}
 .subline b{color:var(--ink)}
 .actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+/* seletor da visão da árvore (nível hierárquico × liderança direta) */
+.org-visao{display:flex;gap:4px;background:#f2f5fa;border-radius:12px;padding:4px}
+.ov-btn{border:0;background:transparent;border-radius:9px;padding:7px 12px;font:inherit;font-size:12px;font-weight:700;color:var(--ink-soft);cursor:pointer;transition:background .15s,color .15s;white-space:nowrap}
+.ov-btn:hover{color:var(--ink)}
+.ov-btn.sel{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(16,24,40,.09)}
 /* cartões de total (rosa/branco) — Sede (Rossi), Demais locais e Total geral.
    Ficam à direita do board-head (title | ações | totais via space-between). */
 /* totais na barra de controles — à direita, na mesma linha dos filtros;
@@ -126,6 +131,13 @@ main{padding:20px 24px 24px}
 .btn-primary .ic{background:rgba(255,255,255,.22)}
 .btn-primary:hover .ic{transform:translateX(1px)}
 .btn-ghost{background:#fff;color:#b42318;border:1px solid #f4d5d1;box-shadow:var(--shadow-soft)}
+/* validação do organograma: laranja destacado = pendente (ação); verde = validado */
+.btn-atencao{background:linear-gradient(145deg,#f97316,var(--inc));color:#fff;box-shadow:0 10px 22px -12px rgba(241,96,33,.9)}
+.btn-atencao .ic{background:rgba(255,255,255,.22)}
+.btn-atencao:disabled{opacity:.6;cursor:wait}
+.btn-validado{background:linear-gradient(145deg,#16a34a,#12894b);color:#fff;box-shadow:0 10px 22px -12px rgba(22,163,74,.9);cursor:default}
+.btn-validado .ic{background:rgba(255,255,255,.22)}
+.btn-validado:disabled{opacity:1}
 .btn-ghost .ic{background:#fdecea}
 .btn-neutral{background:#eef1f7;color:var(--ink-soft)}
 .icon-btn{width:38px;height:38px;border-radius:11px;background:#fff;border:1px solid var(--line);color:var(--ink-soft);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow-soft);transition:transform .4s var(--ease),color .3s}
@@ -137,7 +149,9 @@ main{padding:20px 24px 24px}
      desconto menor = área um pouco mais alta, mas sempre dentro da tela */
   height:max(520px, calc(100dvh - 288px));
   border:1px solid var(--line-soft);border-radius:16px;
-  background:radial-gradient(var(--line) 1px, transparent 1px) 0 0/22px 22px, #fbfcfe;
+  /* creme claro da paleta INC; os pontinhos da grade acompanham num tom
+     quente — o cinza-azulado de antes brigava com o fundo bege */
+  background:radial-gradient(#f1e9dc 1px, transparent 1px) 0 0/22px 22px, #fffcf8;
   cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;
 }
 .tree-viewport.dragging{cursor:grabbing}
@@ -164,6 +178,9 @@ main{padding:20px 24px 24px}
    card (antes era display:none e o fio "apagava" no meio do caminho) */
 .tree li:only-child::before{display:none}
 .tree li:only-child::after{width:0;border-top:0;border-top-left-radius:0;border-top-right-radius:0}
+/* visão "liderança direta": sem degraus, então dá mais respiro horizontal
+   entre irmãos (na visão por nível o degrau já separa visualmente) */
+.tree.visao-lider li{padding-left:20px;padding-right:20px}
 .tree > ul{padding:0}
 .tree > ul::before{display:none}
 .tree > ul > li{padding-top:var(--deg,0px)}
@@ -714,3 +731,45 @@ main{padding:20px 24px 24px}
   .login-visual-txt h1{font-size:30px}
   .login-form-wrap{padding:36px 24px}
 }
+
+/* ===== Painel de indicadores (GESTOR/ADMIN) — paleta aprovada na prévia v3:
+   Linen #FAF7F2 (fundo), Sand #EFE9E2 (trilhas/bordas), Charcoal #1F2937
+   (texto), Taupe #C9BBAA (apoio e categorias "Sem …") ===== */
+.pn-page{background:#FAF7F2;border:1px solid #EFE9E2;border-radius:22px;padding:20px}
+.pn-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.pn-kpi{background:#fff;border:1px solid #EFE9E2;border-radius:16px;padding:16px 18px;border-top:3px solid var(--ac)}
+.pn-kpi em{display:block;font-style:normal;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#C9BBAA;margin-bottom:6px}
+.pn-kpi b{font-size:30px;font-weight:800;line-height:1;color:#1F2937}
+.pn-kpi small{display:block;font-size:12px;color:#8d8478;margin-top:5px;font-weight:600}
+.pn-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pn-card{background:#fff;border:1px solid #EFE9E2;border-radius:16px;padding:18px 20px;min-width:0}
+.pn-card.full{grid-column:1 / -1}
+.pn-card h2{font-size:14px;font-weight:800;margin:0 0 2px;display:flex;align-items:center;gap:8px;color:#1F2937}
+.pn-card h2 i{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+.pn-card > p{font-size:11.5px;color:#C9BBAA;margin:0 0 14px;font-weight:600}
+/* barras horizontais: rótulo · barra · %(destaque) · quantidade(apoio) */
+.pn-bh{display:grid;grid-template-columns:172px 1fr 56px 44px;gap:10px;align-items:center;padding:4.5px 0}
+.pn-bh-rot{font-size:12px;font-weight:600;color:#4b4437;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pn-bh-track{height:14px;background:#EFE9E2;border-radius:5px;overflow:hidden}
+.pn-bh-fill{display:block;height:100%;border-radius:4px}
+.pn-bh-pct{font-size:13.5px;font-weight:800;text-align:right;color:#1F2937}
+.pn-bh-n{font-size:11px;color:#C9BBAA;text-align:right;font-weight:700}
+/* colunas verticais: % em cima (destaque), quantidade + faixa embaixo */
+.pn-cols{display:flex;gap:8px;align-items:stretch;height:230px}
+.pn-cv{flex:1;display:flex;flex-direction:column;align-items:center;min-width:0}
+.pn-cv-pct{font-size:12px;font-weight:800;margin-bottom:4px;color:#1F2937}
+.pn-cv-barwrap{flex:1;width:100%;max-width:46px;display:flex;align-items:flex-end}
+.pn-cv-bar{width:100%;border-radius:5px 5px 0 0;min-height:3px}
+.pn-cv-n{font-size:10.5px;color:#C9BBAA;font-weight:700;margin-top:5px}
+.pn-cv-rot{font-size:10px;color:#8d8478;font-weight:600;margin-top:2px;text-align:center;line-height:1.2}
+.pn-cv.dim .pn-cv-bar{background:#EFE9E2!important}
+.pn-cv.dim .pn-cv-pct{color:#C9BBAA}
+/* medidor CLT × PJ */
+.pn-meter{display:flex;height:26px;border-radius:8px;overflow:hidden;gap:2px;margin-top:14px}
+.pn-meter i{display:block;height:100%}
+.pn-tipos{display:flex;gap:26px}
+.pn-tipo b{font-size:34px;font-weight:800;line-height:1;color:#1F2937}
+.pn-tipo em{font-style:normal;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;color:#4b4437;margin-bottom:6px}
+.pn-tipo small{display:block;font-size:12px;color:#C9BBAA;font-weight:700;margin-top:4px}
+.pn-sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+@media (max-width:860px){.pn-grid{grid-template-columns:1fr}.pn-kpis{grid-template-columns:1fr 1fr}.pn-bh{grid-template-columns:120px 1fr 52px 40px}}

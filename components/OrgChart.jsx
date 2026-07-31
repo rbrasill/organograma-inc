@@ -128,6 +128,17 @@ function fileirasDeFolhas(leaves) {
   return fileiras;
 }
 
+// modo "liderança direta": as folhas quebram em blocos de até 5 APENAS pela
+// contagem (sem agrupar por nível) — quem pende de alguém é subordinado
+// direto dele, e irmãos ficam na mesma linha independentemente do nível.
+function fileirasDiretas(leaves) {
+  const fileiras = [];
+  for (let i = 0; i < leaves.length; i += MAX_POR_FILEIRA) {
+    fileiras.push(leaves.slice(i, i + MAX_POR_FILEIRA));
+  }
+  return fileiras;
+}
+
 function TreeNode({ node, rest, deg = 0 }) {
   const collapsed = rest.collapsedSet.has(node.id);
 
@@ -141,8 +152,9 @@ function TreeNode({ node, rest, deg = 0 }) {
   const hasKids = kids.length > 0;
   const branches = kids.filter((c) => (c.children || []).length > 0);
   const leaves = kids.filter((c) => (c.children || []).length === 0);
-  const fileiras = fileirasDeFolhas(leaves);
-  const degDe = degrausDe(kids);
+  const direto = rest.visao === "lider";
+  const fileiras = direto ? fileirasDiretas(leaves) : fileirasDeFolhas(leaves);
+  const degDe = direto ? () => 0 : degrausDe(kids);
 
   return (
     <li style={{ "--deg": `${deg}px` }}>
@@ -200,8 +212,6 @@ export default function OrgChart() {
   const [pessoas, setPessoas] = useState([]);
   const [setores, setSetores] = useState([]);
   const [areaId, setAreaId] = useState(null);
-  const [localId, setLocalId] = useState(null);       // escopo por local (obra/sede)
-  const [locais, setLocais] = useState([]);           // locais p/ o filtro
   const [totais, setTotais] = useState(null);         // { geral, sede, campo }
   const [listas, setListas] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -219,26 +229,36 @@ export default function OrgChart() {
   const [liderAreaAlvo, setLiderAreaAlvo] = useState(null); // card do líder externo aberto
   const [baixando, setBaixando] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  // validação do organograma da área: { validadoEm, atual } (hash comparado no servidor)
+  const [validacao, setValidacao] = useState(null);
+  const [validando, setValidando] = useState(false);
+  // visão da árvore: "nivel" (degraus/fileiras por nível) ou "lider"
+  // (liderança direta: liderados na mesma linha). Preferência por navegador.
+  const [visao, setVisao] = useState("nivel");
+  useEffect(() => {
+    try { const v = localStorage.getItem("org_visao"); if (v === "lider") setVisao("lider"); } catch {}
+  }, []);
+  function trocarVisao(v) {
+    setVisao(v);
+    try { localStorage.setItem("org_visao", v); } catch {}
+  }
   const boxRef = useRef(null);
   const viewportRef = useRef(null);
   const treeRef = useRef(null);
 
-  // escopo do organograma: por ÁREA ou por LOCAL (um de cada vez — escolher
-  // um limpa o outro). Sem escopo, mostra só os totais e os seletores.
-  const carregar = useCallback(async (area, local) => {
+  // escopo do organograma: por ÁREA. Sem escopo, só os totais e o seletor.
+  const carregar = useCallback(async (area) => {
     setCarregando(true);
     setErroApi("");
     try {
-      const qs = area ? `?area=${encodeURIComponent(area)}` : local ? `?local=${encodeURIComponent(local)}` : "";
+      const qs = area ? `?area=${encodeURIComponent(area)}` : "";
       const r = await fetch(`/api/organograma${qs}`);
       const j = await r.json();
       if (!j.ok) throw new Error(j.erro || "Falha ao carregar o organograma.");
       setSetores(j.setores);
       setAreaId(j.areaId);
-      setLocalId(j.localId || null);
       setPessoas(j.pessoas);
       setListas(j.listas);
-      if (j.locais) setLocais(j.locais);
       if (j.totais) setTotais(j.totais);
       setCollapsedSet(new Set());
       setQuery("");
@@ -249,7 +269,7 @@ export default function OrgChart() {
     setCarregando(false);
   }, []);
 
-  useEffect(() => { carregar(null, null); }, [carregar]);
+  useEffect(() => { carregar(null); }, [carregar]);
 
   // vindo de outra página com ?abrir=importar|areas → abre o modal direto
   useEffect(() => {
@@ -258,9 +278,33 @@ export default function OrgChart() {
     if (abrir) window.history.replaceState(null, "", "/");
   }, []);
 
+  // status da validação da área selecionada (pendente/validado + data)
+  useEffect(() => {
+    if (!areaId) { setValidacao(null); return; }
+    let ativo = true;
+    fetch(`/api/organograma/validacao?area=${encodeURIComponent(areaId)}`)
+      .then((r) => r.json())
+      .then((j) => { if (ativo) setValidacao(j.ok ? j : null); })
+      .catch(() => { if (ativo) setValidacao(null); });
+    return () => { ativo = false; };
+  }, [areaId, pessoas]); // pessoas: revalida o status após edições na tela
+
+  async function validarOrganograma() {
+    if (!areaId || validando) return;
+    setValidando(true);
+    try {
+      const r = await fetch("/api/organograma/validacao", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ areaId }),
+      });
+      const j = await r.json();
+      if (j.ok) setValidacao(j);
+    } catch { /* silencioso: o botão continua laranja */ }
+    setValidando(false);
+  }
+
   const nomeArea = setores.find((s) => s.id === areaId)?.nome || "—";
-  const nomeLocal = locais.find((l) => l.id === localId)?.nome || "—";
-  const escopoNome = areaId ? nomeArea : localId ? nomeLocal : null;
+  const escopoNome = areaId ? nomeArea : null;
 
   // pan & zoom
   const [view, setView] = useState({ x: 0, y: 24, scale: 1 });
@@ -399,28 +443,56 @@ export default function OrgChart() {
     const anterior = collapsedSet;
     setCollapsedSet(new Set()); // tudo expandido na imagem
     await new Promise((r) => setTimeout(r, 300)); // re-render + layout
+    let abrigo;
     try {
-      const natW = t.scrollWidth, natH = t.scrollHeight;
+      const { toPng } = await import("html-to-image");
+      const PAD = 72; // borda de afastamento em volta do desenho
+      const tituloView = visao === "lider" ? "Liderança direta" : "Nível hierárquico";
+
+      // clona a árvore (já expandida) para um palco com borda de afastamento
+      // e um cabeçalho — assim o card não encosta na margem e a imagem diz
+      // por qual visão foi gerada.
+      const clone = t.cloneNode(true);
+      clone.style.position = "static";
+      clone.style.transform = "none";
+
+      const cabecalho = document.createElement("div");
+      cabecalho.style.cssText =
+        "font-family:'Plus Jakarta Sans',system-ui,-apple-system,Segoe UI,sans-serif;margin-bottom:34px";
+      cabecalho.innerHTML =
+        `<div style="font-size:13px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#f16021;margin-bottom:6px">Organograma · ${tituloView}</div>` +
+        `<div style="font-size:32px;font-weight:800;color:#1f3864;line-height:1.1">${nomeArea}</div>`;
+
+      // O deslocamento para fora da tela fica num INVÓLUCRO à parte: estilos
+      // inline do nó capturado vão junto para a imagem serializada — capturar
+      // um nó com left:-99999px sairia uma imagem em branco.
+      const palco = document.createElement("div");
+      palco.style.cssText = `display:inline-block;padding:${PAD}px;background:#ffffff`;
+      palco.appendChild(cabecalho);
+      palco.appendChild(clone);
+      abrigo = document.createElement("div");
+      abrigo.style.cssText = "position:fixed;left:-99999px;top:0";
+      abrigo.appendChild(palco);
+      document.body.appendChild(abrigo);
+
+      const natW = palco.scrollWidth, natH = palco.scrollHeight;
       // alta resolução, respeitando o limite de canvas dos navegadores (~16k px)
       const pixelRatio = Math.max(1, Math.min(3, Math.floor(16000 / Math.max(natW, natH)) || 1));
-      const { toPng } = await import("html-to-image");
-      const opcoes = {
-        width: natW, height: natH, pixelRatio,
-        backgroundColor: "#ffffff",
-        style: { transform: "none", position: "static" },
-      };
+      const opcoes = { width: natW, height: natH, pixelRatio, backgroundColor: "#ffffff" };
       let dataUrl;
       try {
-        dataUrl = await toPng(t, opcoes);
+        dataUrl = await toPng(palco, opcoes);
       } catch {
         // fallback: sem embutir a fonte externa (ambientes com rede restrita)
-        dataUrl = await toPng(t, { ...opcoes, fontEmbedCSS: "" });
+        dataUrl = await toPng(palco, { ...opcoes, fontEmbedCSS: "" });
       }
+      const sufixo = visao === "lider" ? "lideranca-direta" : "nivel-hierarquico";
       const a = document.createElement("a");
       a.href = dataUrl;
-      a.download = `organograma-${normalizar(nomeArea).replace(/\s+/g, "-")}.png`;
+      a.download = `organograma-${normalizar(nomeArea).replace(/\s+/g, "-")}-${sufixo}.png`;
       a.click();
     } finally {
+      if (abrigo) abrigo.remove();
       setCollapsedSet(anterior);
       setBaixando(false);
     }
@@ -479,7 +551,7 @@ export default function OrgChart() {
       return;
     }
     focoPendenteRef.current = res.matricula;
-    carregar(res.setorId || null, null);
+    carregar(res.setorId || null);
   }
 
   // quando a área nova termina de carregar (byId muda), foca a pessoa pendente
@@ -495,7 +567,7 @@ export default function OrgChart() {
   // card do líder externo abre o modal da ÁREA (troca em massa);
   // os demais abrem o modal normal do colaborador
   const rest = {
-    byId, collapsedSet, onToggle, highlightId,
+    byId, collapsedSet, onToggle, highlightId, visao,
     // nó externo (líder de outra área) abre a TROCA de líder — só ADMIN
     onOpen: (n) => (n.externo ? (sessao.nivel >= NIVEL.ADMIN && setLiderAreaAlvo(n)) : setOpenId(n.id)),
   };
@@ -553,19 +625,6 @@ export default function OrgChart() {
             {setores.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
           </select>
         </div>
-        <div className="select">
-          <BuildingIcon size={15} /> Local:
-          <select
-            className="area-select"
-            value={localId || ""}
-            onChange={(e) => carregar(null, e.target.value || null)}
-            disabled={carregando || locais.length === 0}
-            title="Ver o organograma de um local de trabalho (obra/sede)"
-          >
-            <option value="">Selecione um local...</option>
-            {locais.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
-          </select>
-        </div>
         <div className="search" ref={boxRef}>
           <SearchIcon />
           <input
@@ -619,23 +678,32 @@ export default function OrgChart() {
         <div className="board">
           <div className="board-head">
             <div className="title-wrap">
-              <span className="eyebrow">{areaId ? "Organograma da área" : localId ? "Organograma do local" : "Organograma"}</span>
-              <h2>{escopoNome || "Selecione uma área ou local"}</h2>
+              <span className="eyebrow">{areaId ? "Organograma da área" : "Organograma"}</span>
+              <h2>{escopoNome || "Selecione uma área"}</h2>
               {areaId ? (
                 <p className="subline">
-                  {totalArea} pessoas &nbsp;·&nbsp; Líder da área: <b>{liderArea}</b> &nbsp;·&nbsp; Última validação: <b>pendente</b>
-                </p>
-              ) : localId ? (
-                <p className="subline">
-                  {totalArea} colaborador(es) neste local de trabalho
+                  {totalArea} pessoas &nbsp;·&nbsp; Líder da área: <b>{liderArea}</b> &nbsp;·&nbsp; Última validação:{" "}
+                  <b>{validacao?.atual && validacao?.validadoEm ? validacao.validadoEm : "pendente"}</b>
                 </p>
               ) : (
                 <p className="subline">
-                  Escolha uma <b>área</b> ou um <b>local</b> no seletor acima — ou busque uma pessoa para abrir a área dela.
+                  Escolha uma <b>área</b> no seletor acima — ou busque uma pessoa para abrir a área dela.
                 </p>
               )}
             </div>
             <div className="actions">
+              {areaId && (
+                <div className="org-visao" title="Como desenhar a árvore: por nível hierárquico (degraus) ou por liderança direta (liderados na mesma linha)">
+                  <button
+                    className={`ov-btn ${visao === "nivel" ? "sel" : ""}`}
+                    onClick={() => trocarVisao("nivel")}
+                  >Nível hierárquico</button>
+                  <button
+                    className={`ov-btn ${visao === "lider" ? "sel" : ""}`}
+                    onClick={() => trocarVisao("lider")}
+                  >Liderança direta</button>
+                </div>
+              )}
               {sessao.nivel >= NIVEL.COLABORADOR && (
                 <button
                   className="btn btn-ghost btn-baixar"
@@ -647,8 +715,22 @@ export default function OrgChart() {
                   {baixando ? "Gerando imagem..." : "Baixar imagem"}
                 </button>
               )}
-              {sessao.nivel >= NIVEL.ADMIN && (
-                <button className="btn btn-primary"><span className="ic"><CheckIcon /></span>Validar organograma</button>
+              {sessao.nivel >= NIVEL.GESTOR && areaId && (
+                validacao?.atual ? (
+                  <button className="btn btn-validado" disabled title={`Organograma validado em ${validacao.validadoEm}`}>
+                    <span className="ic"><CheckIcon /></span>Organograma validado
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-atencao"
+                    disabled={validando}
+                    title="A estrutura mudou desde a última validação (ou nunca foi validada) — confirme que o organograma reflete a realidade"
+                    onClick={validarOrganograma}
+                  >
+                    <span className="ic"><AlertIcon size={14} /></span>
+                    {validando ? "Validando..." : "Validar organograma"}
+                  </button>
+                )
               )}
               <button
                 className={`icon-btn ${fullscreen ? "on" : ""}`}
@@ -698,11 +780,11 @@ export default function OrgChart() {
               </div>
             )}
 
-            <div className="tree" ref={treeRef} style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}>
+            <div className={`tree ${visao === "lider" ? "visao-lider" : ""}`} ref={treeRef} style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}>
               {roots.length > 0 && (
                 <ul>
                   {rootsOrdenadas.map((r) => (
-                    <TreeNode key={r.id} node={r} rest={rest} deg={degrausDe(rootsOrdenadas)(r)} />
+                    <TreeNode key={r.id} node={r} rest={rest} deg={visao === "lider" ? 0 : degrausDe(rootsOrdenadas)(r)} />
                   ))}
                 </ul>
               )}
@@ -741,7 +823,7 @@ export default function OrgChart() {
           areaNome={nomeArea}
           qtdDiretos={pessoas.filter((p) => !p.externo && p.lider === liderAreaAlvo.id).length}
           onClose={() => setLiderAreaAlvo(null)}
-          onTrocado={() => { setLiderAreaAlvo(null); carregar(areaId, localId); }}
+          onTrocado={() => { setLiderAreaAlvo(null); carregar(areaId); }}
         />
       )}
 
@@ -757,7 +839,7 @@ export default function OrgChart() {
           onSalvar={(atual, extra) => {
             // mudança estrutural (cargo/área/líder, salvar direto do admin)
             // redesenha a árvore — o patch local não cobre troca de líder/área
-            if (extra?.recarregar) { carregar(areaId, localId); return; }
+            if (extra?.recarregar) { carregar(areaId); return; }
             setPessoas((prev) => prev.map((p) => (p.id === atual.id ? { ...p, ...atual } : p)));
           }}
         />
