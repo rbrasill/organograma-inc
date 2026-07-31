@@ -334,7 +334,13 @@ export async function POST(req) {
     await conn.beginTransaction();
 
     const [[antigo]] = await conn.query(
-      "SELECT id, nome, setor_id, lider_id FROM colaborador WHERE codigo_dp = ? FOR UPDATE", [deMatricula]
+      `SELECT c.id, c.nome, c.setor_id, c.lider_id,
+              COALESCE(nhp.ordem, nh.ordem) AS ordem
+         FROM colaborador c
+         LEFT JOIN cargo cg ON cg.id = c.cargo_id
+         LEFT JOIN nivel_hierarquico nh ON nh.id = cg.nivel_id
+         LEFT JOIN nivel_hierarquico nhp ON nhp.id = c.nivel_id
+        WHERE c.codigo_dp = ? FOR UPDATE`, [deMatricula]
     );
     const [[novo]] = await conn.query(
       "SELECT id, nome, setor_id FROM colaborador WHERE codigo_dp = ? AND ativo = 1 FOR UPDATE", [paraMatricula]
@@ -342,13 +348,20 @@ export async function POST(req) {
     if (!antigo) { await conn.rollback(); return Response.json({ ok: false, erro: "Líder atual não encontrado." }, { status: 404 }); }
     if (!novo) { await conn.rollback(); return Response.json({ ok: false, erro: "Novo líder não encontrado (ou inativo)." }, { status: 404 }); }
 
+    // O antigo líder é o DIRETOR responsável (níveis 1–5)? Então ele fica
+    // ACIMA: o novo líder passa a responder a ele, e ele não é rebaixado.
+    // (Regra do domínio: área tem líder direto E diretor — trocar o líder
+    // não pode transformar o diretor em subordinado do novo líder.)
+    const antigoEhDiretor = antigo.ordem != null && antigo.ordem >= 1 && antigo.ordem <= 5;
+
     // 1. novo líder da própria área assume o posto do antigo:
-    //    - antigo era MEMBRO da área → novo herda o diretor dele;
-    //    - antigo era EXTERNO (diretor liderando direto) → novo passa a
-    //      responder ao próprio antigo (o diretor continua diretor).
+    //    - antigo é o DIRETOR (membro ou externo) → novo responde ao antigo;
+    //    - antigo era membro comum → novo herda o chefe dele.
     //    Quem é de fora mantém o próprio líder (vira âncora externa).
     if (novo.setor_id === areaId) {
-      let novoChefe = antigo.setor_id === areaId ? (antigo.lider_id || null) : antigo.id;
+      let novoChefe = antigoEhDiretor || antigo.setor_id !== areaId
+        ? antigo.id
+        : (antigo.lider_id || null);
       if (novoChefe === novo.id) novoChefe = null; // nunca auto-liderança
       await conn.query("UPDATE colaborador SET lider_id = ? WHERE id = ?", [novoChefe, novo.id]);
     }
@@ -357,9 +370,10 @@ export async function POST(req) {
       "UPDATE colaborador SET lider_id = ? WHERE setor_id = ? AND ativo = 1 AND lider_id = ? AND id <> ?",
       [novo.id, areaId, antigo.id, novo.id]
     );
-    // 3. o antigo (se for membro da área) passa a responder ao novo
+    // 3. o antigo membro comum passa a responder ao novo; o DIRETOR nunca
+    //    é rebaixado — permanece acima do novo líder
     let antigoReaponta = false;
-    if (antigo.setor_id === areaId) {
+    if (antigo.setor_id === areaId && !antigoEhDiretor) {
       await conn.query("UPDATE colaborador SET lider_id = ? WHERE id = ?", [novo.id, antigo.id]);
       antigoReaponta = true;
     }
