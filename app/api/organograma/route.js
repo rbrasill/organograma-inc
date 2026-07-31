@@ -161,7 +161,7 @@ export async function GET(req) {
       cor: r.cor || null,
     }));
 
-    const pessoas = [...externos, ...membros];
+    let pessoas = [...externos, ...membros];
 
     // ===== DIRETOR RESPONSÁVEL no desenho (só no escopo por área) =====
     // Regra do domínio: toda área tem um líder direto e, acima dele, um
@@ -175,12 +175,12 @@ export async function GET(req) {
       diretorNome = diretor?.nome || "";
       if (diretor) {
         const dirId = diretor.matricula || diretor.id;
-        const jaDesenhado = pessoas.find((p) => p.id === dirId);
-        if (jaDesenhado) {
+        let dirNode = pessoas.find((p) => p.id === dirId);
+        if (dirNode) {
           // o diretor já é um card da área (âncora externa ou o próprio líder)
-          jaDesenhado.diretor = true;
+          dirNode.diretor = true;
         } else {
-          pessoas.unshift({
+          dirNode = {
             id: dirId,
             nome: diretor.nome,
             cargo: diretor.cargo || "",
@@ -199,7 +199,17 @@ export async function GET(req) {
             diretor: true,
             pseudo: true, // não é membro da área — só o card do responsável
             setorOrigem: diretor.setorNome || "",
-          });
+          };
+          pessoas.unshift(dirNode);
+        }
+        // O desenho da área PARA no diretor: a cadeia acima dele (ex.: a
+        // presidência, quando o diretor é membro da área) sai do desenho —
+        // senão o chefe do diretor viraria filho dele e a árvore entraria em
+        // ciclo (raiz nenhuma → área "vazia").
+        const liderDoDiretor = dirNode.lider || null;
+        dirNode.lider = null;
+        if (liderDoDiretor) {
+          pessoas = pessoas.filter((p) => !(p.externo && p.id === liderDoDiretor));
         }
         // TODAS as raízes do desenho penduram no diretor (âncoras externas e
         // topos soltos); quem respondia a alguém de fora que não é o diretor
