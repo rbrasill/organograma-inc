@@ -124,19 +124,36 @@ export async function GET(req) {
       const resp = responsavelDe(lider);
       const ehOResponsavel = !!(resp.pessoa && resp.pessoa.id === lider.id);
 
+      // líder DIRETO exibido: quando o topo da área é o próprio diretor,
+      // mostra quem está logo abaixo dele dentro da área (o diretor já
+      // aparece como responsável do grupo). Sem ninguém abaixo, ele acumula.
+      let liderCard = lider, liderCardExterno = liderExterno, diretosCard = diretosNaArea;
+      let tagCard = ehOResponsavel ? (lider.familia || "Diretor") : "";
+      if (ehOResponsavel) {
+        const abaixo = membros
+          .filter((m) => m.liderId === lider.id && m.id !== lider.id)
+          .sort((a, b) => ord(a) - ord(b) || a.nome.localeCompare(b.nome, "pt-BR"));
+        if (abaixo.length > 0) {
+          liderCard = abaixo[0];
+          liderCardExterno = false;
+          diretosCard = diretos.get(liderCard.id) || 0;
+          tagCard = "";
+        }
+      }
+
       const area = {
         id: setorId,
         nome: membros[0].setorNome || "—",
         pessoas: membros.length,
         outrosTopo: raizes.length - 1,
         lider: {
-          matricula: lider.matricula || "",
-          nome: lider.nome,
-          cargo: lider.cargo || "",
-          diretos: diretosNaArea,
-          externo: liderExterno,
+          matricula: liderCard.matricula || "",
+          nome: liderCard.nome,
+          cargo: liderCard.cargo || "",
+          diretos: diretosCard,
+          externo: liderCardExterno,
           // selo no card quando o líder É o responsável (Diretor/CFO/Presidente…)
-          tag: ehOResponsavel ? (lider.familia || "Diretor") : "",
+          tag: tagCard,
         },
       };
 

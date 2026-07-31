@@ -170,8 +170,8 @@ export async function GET(req) {
     let liderAreaNome = "";
     let diretorNome = "";
     if (areaId) {
-      const { lider, diretor } = await liderEDiretorDaArea(pool, areaId);
-      liderAreaNome = lider?.nome || "";
+      const { lider, diretor, liderExibicao } = await liderEDiretorDaArea(pool, areaId);
+      liderAreaNome = (liderExibicao || lider)?.nome || "";
       diretorNome = diretor?.nome || "";
       if (diretor) {
         const dirId = diretor.matricula || diretor.id;
