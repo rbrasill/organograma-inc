@@ -13,6 +13,7 @@
 //       3. o antigo (membro da área) passa a responder ao novo.
 
 import { getPool } from "@/lib/db";
+import { liderEDiretorDaArea } from "@/lib/diretorias";
 import { exigirNivel } from "@/lib/permissoes";
 import { NIVEL } from "@/lib/perfis";
 
@@ -128,11 +129,6 @@ export async function GET(req) {
         nome: membros[0].setorNome || "—",
         pessoas: membros.length,
         outrosTopo: raizes.length - 1,
-        // Regra do domínio: toda área tem um LÍDER DIRETO interno e, acima
-        // dele, um diretor. Quando o único elo é alguém de fora, a área está
-        // SEM líder interno — estado anômalo que a tela precisa denunciar em
-        // vez de exibir o externo como se fosse o líder da área.
-        semLiderInterno: liderExterno,
         lider: {
           matricula: lider.matricula || "",
           nome: lider.nome,
@@ -261,9 +257,9 @@ export async function POST(req) {
     const body = await req.json();
 
     // ---- trocar_diretor: muda a DIRETORIA da área sem tocar no líder ----
-    // Reaponta os topos internos da área (quem não responde a ninguém de
-    // dentro) para o novo responsável — que tem de ser diretor (níveis 2–5),
-    // presidente ou conselheiro (nível 1). A estrutura interna fica intacta.
+    // Regra do domínio: toda área tem um líder direto (interno ou de fora) e,
+    // acima dele, um diretor. Trocar o diretor = reapontar A QUEM O LÍDER DA
+    // ÁREA RESPONDE — o líder continua líder e a equipe continua nele.
     if (body.acao === "trocar_diretor") {
       const { areaId, paraMatricula } = body;
       if (!areaId || !paraMatricula) {
@@ -288,59 +284,40 @@ export async function POST(req) {
         return Response.json({ ok: false, erro: "O responsável por uma área tem de ser diretor, presidente ou conselheiro (níveis 1–5)." }, { status: 400 });
       }
 
-      // topos internos da área: ativos cujo líder é nulo, inativo ou de fora
-      const [raizes] = await conn.query(
-        `SELECT c.id FROM colaborador c
-           LEFT JOIN colaborador l ON l.id = c.lider_id AND l.ativo = 1
-          WHERE c.ativo = 1 AND c.setor_id = ?
-            AND (c.lider_id IS NULL OR l.id IS NULL OR l.setor_id <> c.setor_id)`,
-        [areaId]
-      );
-      const idsRaizes = raizes.map((r) => r.id).filter((id) => id !== dir.id);
-      if (idsRaizes.length === 0) {
+      // líder da área pela MESMA regra da tela (raiz interna única, âncora
+      // externa com mais raízes, ou a raiz de nível mais alto)
+      const { lider } = await liderEDiretorDaArea(pool, areaId);
+      if (!lider) {
         await conn.rollback();
-        return Response.json({ ok: false, erro: "A área não tem topo interno para reapontar (ou o topo já é o próprio responsável)." }, { status: 409 });
+        return Response.json({ ok: false, erro: "A área não tem líder definido para reapontar." }, { status: 409 });
       }
-      // Regra: a troca de diretoria move o LÍDER da área, e só ele. Com mais de
-      // um topo interno não existe um líder definido — reapontar todos penduraria
-      // a área inteira no diretor (foi assim que o líder se perdia antes).
-      if (idsRaizes.length > 1) {
+      if (lider.id === dir.id) {
         await conn.rollback();
-        return Response.json({
-          ok: false,
-          erro: `Esta área tem ${idsRaizes.length} pessoas no topo, sem um líder direto definido. Defina o líder da área primeiro (aba "Líder da área") — só então a diretoria pode ser trocada sem desmontar a equipe.`,
-        }, { status: 409 });
+        return Response.json({ ok: false, erro: "Essa pessoa já é o líder direto da área — escolha a quem ela deve responder." }, { status: 400 });
       }
 
-      // guarda anticiclo: se a cadeia do novo responsável passa por alguém DA
-      // área, apontar os topos para ele criaria um laço (ele responderia,
-      // indiretamente, a quem passaria a responder a ele)
-      if (dir.setor_id !== areaId) {
+      // guarda anticiclo: se a cadeia do novo responsável passa pelo líder,
+      // apontar o líder para ele criaria um laço na hierarquia
+      {
         const vistos = new Set([dir.id]);
         let curId = dir.lider_id;
         while (curId && !vistos.has(curId)) {
+          if (curId === lider.id) {
+            await conn.rollback();
+            return Response.json({ ok: false, erro: "Esse responsável responde ao líder desta área — a troca criaria um ciclo na hierarquia." }, { status: 400 });
+          }
           vistos.add(curId);
           const [[cur]] = await conn.query(
-            "SELECT id, setor_id, lider_id, ativo FROM colaborador WHERE id = ?", [curId]
+            "SELECT id, lider_id, ativo FROM colaborador WHERE id = ?", [curId]
           );
           if (!cur || !cur.ativo) break;
-          if (cur.setor_id === areaId) {
-            await conn.rollback();
-            return Response.json({ ok: false, erro: "Esse responsável responde a alguém desta área — a troca criaria um ciclo na hierarquia." }, { status: 400 });
-          }
           curId = cur.lider_id;
         }
-      } else {
-        await conn.rollback();
-        return Response.json({ ok: false, erro: "O responsável é da própria área — para trocar o líder interno, use a aba Líder." }, { status: 400 });
       }
 
-      const [r] = await conn.query(
-        `UPDATE colaborador SET lider_id = ? WHERE id IN (${idsRaizes.map(() => "?").join(",")})`,
-        [dir.id, ...idsRaizes]
-      );
+      await conn.query("UPDATE colaborador SET lider_id = ? WHERE id = ?", [dir.id, lider.id]);
       await conn.commit();
-      return Response.json({ ok: true, reapontados: r.affectedRows || 0, diretorNome: dir.nome });
+      return Response.json({ ok: true, reapontados: 1, diretorNome: dir.nome, liderNome: lider.nome });
     }
 
     if (body.acao !== "trocar") return Response.json({ ok: false, erro: "Ação desconhecida." }, { status: 400 });

@@ -332,8 +332,6 @@ main{padding:20px 24px 24px}
 .lider-pop{margin-top:8px;background:#fff;border:1.5px solid #ffd3b5;border-radius:14px;box-shadow:0 10px 28px -14px rgba(255,83,15,.25);padding:8px;animation:pop .25s var(--ease)}
 .lp-hint{margin-top:6px;padding:0 4px 2px;font-size:11px;color:var(--ink-faint);font-weight:500}
 /* abas do modal de Diretorias: trocar o líder da área ou a diretoria dela */
-/* área sem líder interno: anomalia que a tela denuncia no card */
-.ld-tag-sem{display:inline-block;background:#fdf3f2;border:1px solid #f6cfcb;color:#b42318;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:800;letter-spacing:.02em}
 /* rótulo do papel dentro do card (LÍDER DIRETO) */
 .ld-papel-rot{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint)}
 /* modais de Diretorias: um pouco mais estreitos que o padrão */

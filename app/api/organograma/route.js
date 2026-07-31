@@ -7,6 +7,7 @@
 // está fora da área, a pessoa vira raiz da árvore daquela área.
 
 import { getPool } from "@/lib/db";
+import { liderEDiretorDaArea } from "@/lib/diretorias";
 
 export const dynamic = "force-dynamic";
 
@@ -162,7 +163,62 @@ export async function GET(req) {
 
     const pessoas = [...externos, ...membros];
 
-    return Response.json({ ok: true, setores, areaId, localId, pessoas, locais: locaisFiltro, totais, listas });
+    // ===== DIRETOR RESPONSÁVEL no desenho (só no escopo por área) =====
+    // Regra do domínio: toda área tem um líder direto e, acima dele, um
+    // diretor (ou a presidência). O diretor entra no TOPO do desenho e as
+    // raízes da área penduram nele — mesmo cálculo da tela Diretorias.
+    let liderAreaNome = "";
+    let diretorNome = "";
+    if (areaId) {
+      const { lider, diretor } = await liderEDiretorDaArea(pool, areaId);
+      liderAreaNome = lider?.nome || "";
+      diretorNome = diretor?.nome || "";
+      if (diretor) {
+        const dirId = diretor.matricula || diretor.id;
+        const jaDesenhado = pessoas.find((p) => p.id === dirId);
+        if (jaDesenhado) {
+          // o diretor já é um card da área (âncora externa ou o próprio líder)
+          jaDesenhado.diretor = true;
+        } else {
+          pessoas.unshift({
+            id: dirId,
+            nome: diretor.nome,
+            cargo: diretor.cargo || "",
+            local: "",
+            situacao: "",
+            email: "",
+            lider: null,
+            liderNome: "",
+            pj: String(dirId).toUpperCase().startsWith("PJ"),
+            regional: "",
+            nascimento: "",
+            admissao: "",
+            nivelOrdem: diretor.ordem || null,
+            familia: diretor.familia || "",
+            cor: diretor.cor || null,
+            diretor: true,
+            pseudo: true, // não é membro da área — só o card do responsável
+            setorOrigem: diretor.setorNome || "",
+          });
+        }
+        // TODAS as raízes do desenho penduram no diretor (âncoras externas e
+        // topos soltos); quem respondia a alguém de fora que não é o diretor
+        // guarda a informação para o aviso do card. O próprio diretor fica de
+        // fora do laço — a raiz do desenho é ele.
+        const ids = new Set(pessoas.map((p) => p.id));
+        for (const p of pessoas) {
+          if (p.id === dirId) continue;
+          const raiz = !p.lider || !ids.has(p.lider);
+          if (!raiz) continue;
+          if (p.lider && p.liderNome && p.liderNome !== diretor.nome) {
+            p.respondeForaNome = p.liderNome;
+          }
+          p.lider = dirId;
+        }
+      }
+    }
+
+    return Response.json({ ok: true, setores, areaId, localId, pessoas, locais: locaisFiltro, totais, listas, liderAreaNome, diretorNome });
   } catch (e) {
     const msg = e?.codigo === "SEM_CONFIG" ? e.message : `Falha ao acessar o banco: ${e.message}`;
     return Response.json({ ok: false, erro: msg }, { status: 500 });

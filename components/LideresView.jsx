@@ -91,7 +91,7 @@ export default function LideresView() {
   function abrirTroca(area, diretorNome, diretorMat) {
     setAlvo({
       areaId: area.id, areaNome: area.nome, pessoas: area.pessoas,
-      lider: area.lider, semLiderInterno: !!area.semLiderInterno,
+      lider: area.lider,
       diretorNome: diretorNome || "", diretorMat: diretorMat || "",
     });
     setBusca(""); setResultados([]); setNovo(null); setNovoDir(null);
@@ -162,9 +162,7 @@ export default function LideresView() {
               {area.lider.nome}
             </button>
             <span className="la-meta">
-              {area.semLiderInterno
-                ? <span className="ld-tag-sem">sem líder interno · quem responde é o diretor</span>
-                : (area.lider.tag && <span className="ld-tag-dir">{area.lider.tag}</span>)}
+              {area.lider.tag && <span className="ld-tag-dir">{area.lider.tag}</span>}
             </span>
             <em>{area.lider.cargo || "Cargo a definir"}</em>
           </span>
@@ -292,9 +290,7 @@ export default function LideresView() {
 
               {/* passo 2b: seletor de diretoria (lista de responsáveis) */}
               {aba === "diretor" && (
-                alvo.semLiderInterno ? (
-                  <div className="ld-erro-box">Defina o líder direto antes de trocar a diretoria.</div>
-                ) : (
+                (
                   <div className="lider-list ld-modal-lista">
                     {(dados?.responsaveis || [])
                       .filter((d) => d.matricula !== alvo.diretorMat && d.matricula !== alvo.lider.matricula)
@@ -323,7 +319,7 @@ export default function LideresView() {
                 <div style={{ flex: 1 }} />
                 <button
                   className="btn btn-primary"
-                  disabled={salvando || (aba === "lider" ? !novo : (!novoDir || alvo.semLiderInterno))}
+                  disabled={salvando || (aba === "lider" ? !novo : !novoDir)}
                   onClick={confirmarTroca}
                 >
                   <span className="ic"><CheckIcon /></span>{salvando ? "Aplicando..." : "Aplicar"}
