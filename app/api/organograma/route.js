@@ -226,6 +226,14 @@ export async function GET(req) {
           p.lider = dirId;
         }
       }
+      // marca o LÍDER DIRETO da área no card (ícone de destaque no desenho);
+      // se o líder é o próprio diretor, o card dele já leva a marca de diretor
+      const liderRow = liderExibicao || lider;
+      if (liderRow) {
+        const liderId = liderRow.matricula || liderRow.id;
+        const ln = pessoas.find((p) => p.id === liderId);
+        if (ln && !ln.diretor) ln.liderArea = true;
+      }
     }
 
     return Response.json({ ok: true, setores, areaId, localId, pessoas, locais: locaisFiltro, totais, listas, liderAreaNome, diretorNome });

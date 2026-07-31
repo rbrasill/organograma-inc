@@ -7,6 +7,7 @@ import {
   UserIcon, PinIcon, CheckIcon, CloseIcon, GridIcon,
   SearchIcon, FullscreenIcon, AlertIcon,
   PlusIcon, MinusIcon, TargetIcon, DownloadIcon, BuildingIcon, UsersIcon, BriefcaseIcon,
+  CrownIcon, AwardIcon, ManagerIcon,
 } from "@/components/icons";
 import PersonModal from "@/components/PersonModal";
 import ImportModal from "@/components/ImportModal";
@@ -81,7 +82,14 @@ function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
         <span className="alert" title={alertas.join(" · ")}><AlertIcon size={14} /></span>
       )}
       <div className="card-top">
-        <div className="ava"><UserIcon /></div>
+        {/* ícone por papel, do mais específico para o mais geral: diretor →
+            líder da área → liderança direta (tem gente abaixo) → colaborador */}
+        <div className={`ava${node.diretor || node.liderArea || kids > 0 ? " papel" : ""}`}>
+          {node.diretor ? <ManagerIcon />
+            : node.liderArea ? <AwardIcon />
+            : kids > 0 ? <CrownIcon />
+            : <UserIcon />}
+        </div>
         <div className="who">
           <div className="nm">{node.nome}</div>
           {node.cargo
@@ -807,6 +815,11 @@ export default function OrgChart() {
                 </span>
               ))
             )}
+            {/* papéis no avatar: só ícone + rótulo, sem texto explicativo */}
+            <span className="chip lg-papel"><span className="lg-ava papel"><ManagerIcon size={15} /></span> Diretor</span>
+            <span className="chip lg-papel"><span className="lg-ava papel"><AwardIcon size={15} /></span> Líder da área</span>
+            <span className="chip lg-papel"><span className="lg-ava papel"><CrownIcon size={14} /></span> Liderança direta</span>
+            <span className="chip lg-papel"><span className="lg-ava"><UserIcon size={14} /></span> Colaborador</span>
             <span className="chip" style={{ marginLeft: "auto" }}>
               <span className="alert stat"><AlertIcon size={13} /></span> Inconsistência
             </span>
