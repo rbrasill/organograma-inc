@@ -93,7 +93,10 @@ const DEFS = {
   },
   regional: {
     tabela: "regional", colCodigo: null, temNome: true, codigoUnico: false,
-    desvincular: ["UPDATE colaborador SET regional_id = NULL WHERE regional_id = ?"],
+    desvincular: [
+      "UPDATE colaborador SET regional_id = NULL WHERE regional_id = ?",
+      "UPDATE local_trabalho SET regional_id = NULL WHERE regional_id = ?", // vínculo local→regional (mig. 12)
+    ],
   },
   situacao: {
     tabela: "situacao", colCodigo: "codigo_dp", temNome: true, codigoUnico: true,
@@ -130,9 +133,12 @@ export async function GET() {
         ORDER BY n.ordem, n.variacao`
     );
     const [locais] = await pool.query(
-      `SELECT l.id, l.codigo_dp AS codigo, l.nome, COUNT(c.id) AS usos
-         FROM local_trabalho l LEFT JOIN colaborador c ON c.local_id = l.id AND c.ativo = 1
-        GROUP BY l.id, l.codigo_dp, l.nome ORDER BY l.nome`
+      `SELECT l.id, l.codigo_dp AS codigo, l.nome, l.regional_id AS regionalId, r.nome AS regionalNome,
+              COUNT(c.id) AS usos
+         FROM local_trabalho l
+         LEFT JOIN regional r ON r.id = l.regional_id
+         LEFT JOIN colaborador c ON c.local_id = l.id AND c.ativo = 1
+        GROUP BY l.id, l.codigo_dp, l.nome, l.regional_id, r.nome ORDER BY l.nome`
     );
     const [regionais] = await pool.query(
       `SELECT r.id, r.nome, COUNT(c.id) AS usos
@@ -207,6 +213,16 @@ async function validar(pool, tipo, campos, idAtual) {
     v.localId = localId;
   }
 
+  if (tipo === "local") {
+    // vínculo local→regional — OBRIGATÓRIO: todo local pertence a uma
+    // regional, e a regional dos colaboradores segue o local (mig. 12)
+    const regionalId = campos.regionalId || null;
+    if (!regionalId) return { erro: "Todo local precisa estar vinculado a uma regional." };
+    const [[r]] = await pool.query("SELECT id FROM regional WHERE id = ?", [regionalId]);
+    if (!r) return { erro: "Regional selecionada não existe." };
+    v.regionalId = regionalId;
+  }
+
   if (tipo === "situacao") {
     v.ativoArvore = campos.ativoArvore ? 1 : 0;
   }
@@ -244,6 +260,7 @@ export async function POST(req) {
       }
       if (tipo === "cargo") { sets.push("nivel_id = ?"); vals.push(valores.nivelId); }
       if (tipo === "setor") { sets.push("local_id = ?"); vals.push(valores.localId); }
+      if (tipo === "local") { sets.push("regional_id = ?"); vals.push(valores.regionalId); }
       if (tipo === "situacao") { sets.push("ativo_na_arvore = ?"); vals.push(valores.ativoArvore); }
 
       if (criando) {
@@ -264,6 +281,15 @@ export async function POST(req) {
       }
       // salvar: o código NUNCA entra no UPDATE — permanece o da criação
       await pool.query(`UPDATE ${def.tabela} SET ${sets.join(", ")} WHERE id = ?`, [...vals, id]);
+      // a regional do colaborador SEGUE o local: trocar a regional do local
+      // atualiza todo mundo que trabalha nele
+      if (tipo === "local") {
+        const [r] = await pool.query(
+          "UPDATE colaborador SET regional_id = ? WHERE local_id = ?",
+          [valores.regionalId, id]
+        );
+        return Response.json({ ok: true, colaboradoresAtualizados: r.affectedRows || 0 });
+      }
       return Response.json({ ok: true });
     }
 

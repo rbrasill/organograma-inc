@@ -564,15 +564,22 @@ export default function ColaboradoresView() {
                   </label>
                   <label className="fld">
                     <span>Regional</span>
-                    <select value={form.regionalId} onChange={(e) => set("regionalId", e.target.value)}>
-                      <option value="">— selecione —</option>
+                    {/* a regional SEGUE o local (vínculo local→regional):
+                        preenchida ao escolher o local, sem edição manual */}
+                    <select value={form.regionalId} disabled
+                      title="A regional vem do local de trabalho — defina-a em Gerenciar → Catálogos → Locais">
+                      <option value="">— definida pelo local —</option>
                       {(listas?.regionais || []).map((r) => <option key={r.id} value={r.id}>{r.nome}</option>)}
                     </select>
                   </label>
                 </div>
                 <label className="fld">
                   {rot("Local de trabalho", "localId")}
-                  <select value={form.localId} className={classe("localId")} onChange={(e) => set("localId", e.target.value)}>
+                  <select value={form.localId} className={classe("localId")} onChange={(e) => {
+                    const localId = e.target.value;
+                    const reg = (listas?.locais || []).find((l) => l.id === localId)?.regionalId || "";
+                    setForm((f) => ({ ...f, localId, regionalId: reg || f.regionalId }));
+                  }}>
                     <option value="">— selecione —</option>
                     {(listas?.locais || []).map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
                   </select>

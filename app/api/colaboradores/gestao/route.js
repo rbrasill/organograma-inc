@@ -36,6 +36,15 @@ async function situacaoAtivoId(pool) {
   return s?.id || null;
 }
 
+// A REGIONAL segue o LOCAL (mig. 12): quando o colaborador tem local e o
+// local tem regional, é ela que vale — o valor vindo da tela é só fallback
+// para local ainda sem regional definida no catálogo.
+async function regionalDoLocal(pool, localId) {
+  if (!localId) return null;
+  const [[l]] = await pool.query("SELECT regional_id FROM local_trabalho WHERE id = ?", [localId]);
+  return l?.regional_id || null;
+}
+
 // CPF é a identidade da pessoa: o login casa por ele e a importação do DP
 // deduplica por ele. Dois cadastros com o mesmo CPF são a mesma pessoa
 // duplicada — barra antes de gravar.
@@ -188,7 +197,7 @@ export async function GET(req) {
     );
     const [cargos]     = await pool.query("SELECT id, nome, nivel_id AS nivelId FROM cargo ORDER BY nome");
     const [setores]    = await pool.query("SELECT id, nome FROM setor ORDER BY nome");
-    const [locais]     = await pool.query("SELECT id, nome FROM local_trabalho ORDER BY nome");
+    const [locais]     = await pool.query("SELECT id, nome, regional_id AS regionalId FROM local_trabalho ORDER BY nome");
     const [regionais]  = await pool.query("SELECT id, nome FROM regional ORDER BY nome");
     const [situacoes]  = await pool.query("SELECT id, nome FROM situacao ORDER BY nome");
     const [niveis]     = await pool.query(
@@ -252,6 +261,12 @@ export async function POST(req) {
 
       const novoId = randomUUID();
       const fk = (v) => (v ? v : null);
+      const regionalId = (await regionalDoLocal(pool, campos.localId)) || fk(campos.regionalId);
+      // cadastro novo nunca entra sem regional — se o local ainda não tem a
+      // dele definida no catálogo, o cadastro orienta a resolver lá primeiro
+      if (!regionalId) {
+        return erro400("O local escolhido ainda não tem regional definida — vincule-a em Gerenciar → Catálogos → Locais antes de cadastrar.");
+      }
       await pool.query(
         `INSERT INTO colaborador
            (id, codigo_dp, nome, email, tipo_contratacao, cpf, telefone,
@@ -263,7 +278,7 @@ export async function POST(req) {
           cpf || null, (campos.telefone || "").trim() || null,
           dataOuNull(campos.dataNascimento), dataOuNull(campos.dataAdmissao),
           fk(campos.cargoId), vinc.nivelPessoal, fk(campos.setorId), fk(campos.localId),
-          fk(campos.regionalId), situacaoId, vinc.liderId,
+          regionalId, situacaoId, vinc.liderId,
         ]
       );
       await pool.query(
@@ -381,6 +396,9 @@ export async function POST(req) {
     const vinc = await resolverEstruturais(pool, campos, id, alvo.nivel_id);
     if (vinc.erro) return erro400(vinc.erro);
 
+    // regional derivada do local (opção A — a tela mostra, o banco garante)
+    const regionalId = (await regionalDoLocal(pool, campos.localId)) || fk(campos.regionalId);
+
     // cpf/telefone: só entram no UPDATE quando o payload traz o campo.
     // A tela geral de edição não os envia (CPF lá é somente visualização) —
     // sem isso, salvar por ela apagaria o CPF/telefone já gravados.
@@ -403,7 +421,7 @@ export async function POST(req) {
         nome, (campos.email || "").trim() || null, tipo,
         ...extraVal,
         fk(campos.cargoId), vinc.nivelPessoal, fk(campos.setorId), fk(campos.localId),
-        fk(campos.regionalId), fk(campos.situacaoId), vinc.liderId, id,
+        regionalId, fk(campos.situacaoId), vinc.liderId, id,
       ]
     );
 

@@ -76,12 +76,15 @@ const ABAS = [
     key: "locais", tipo: "local", label: "Locais", singular: "local",
     colunas: [
       { titulo: "Local", tipo: "nome", k: "nome" },
+      { titulo: "Regional", tipo: "regional" },
       { titulo: "Código", tipo: "codigo" },
       { titulo: "Colaboradores", k: "usos" },
     ],
     campos: [
       { k: "nome", label: "Nome", obrig: true },
       { k: "codigo", label: "Código (nº da obra no DP)", auto: true, dica: "vem do extrato do DP na importação" },
+      { k: "regionalId", label: "Regional", tipo: "regional", obrig: true,
+        dica: "os colaboradores deste local passam a contar nesta regional" },
     ],
     avisoExcluir: (it) => `${it.usos} colaborador(es) ficarão sem local de trabalho.`,
   },
@@ -232,6 +235,8 @@ export default function CatalogosView() {
     if (col.tipo === "codigo") return item.codigo ? <code className="ct-code">{item.codigo}</code> : vazio("—");
     if (col.tipo === "nivel") { const t = nomeNivel(item.nivelId); return t || vazio("— sem nível —"); }
     if (col.tipo === "local") return item.localNome || vazio("— sem local —");
+    if (col.tipo === "regional")
+      return item.regionalNome || <span className="ct-alerta-reg"><AlertIcon size={11} /> sem regional</span>;
     if (col.tipo === "arvore")
       return <span className={`ct-pill ${item.ativoArvore ? "on" : "off"}`}>{item.ativoArvore ? "Visível" : "Oculta"}</span>;
     return col.valor ? col.valor(item) : item[col.k];
@@ -329,7 +334,7 @@ export default function CatalogosView() {
               </div>
             </div>
             <div className="modal-body">
-              <FormCampos aba={aba} form={form} setForm={setForm} niveis={dados?.niveis || []} locais={dados?.locais || []} />
+              <FormCampos aba={aba} form={form} setForm={setForm} niveis={dados?.niveis || []} locais={dados?.locais || []} regionais={dados?.regionais || []} />
               {erroForm && <div className="ct-erro"><AlertIcon size={13} /> {erroForm}</div>}
             </div>
             <div className="modal-foot" style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -375,7 +380,7 @@ export default function CatalogosView() {
 }
 
 // campos do formulário, montados a partir da configuração da aba
-function FormCampos({ aba, form, setForm, niveis, locais }) {
+function FormCampos({ aba, form, setForm, niveis, locais, regionais }) {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   return (
     <div className="ct-form">
@@ -414,6 +419,20 @@ function FormCampos({ aba, form, setForm, niveis, locais }) {
                   </option>
                 ))}
               </select>
+            </label>
+          );
+        }
+        if (c.tipo === "regional") {
+          return (
+            <label key={c.k} className="fld">
+              <span>{c.label} <em className="fld-obrig">*</em></span>
+              <select value={form[c.k] || ""} onChange={(e) => set(c.k, e.target.value)}>
+                <option value="">Selecione a regional...</option>
+                {(regionais || []).map((r) => (
+                  <option key={r.id} value={r.id}>{r.nome}</option>
+                ))}
+              </select>
+              {c.dica ? <span className="ct-ex">{c.dica}</span> : null}
             </label>
           );
         }

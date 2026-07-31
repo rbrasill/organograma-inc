@@ -89,7 +89,7 @@ export async function POST(req) {
       // catálogos completos em memória (poucas centenas de linhas). Casamento
       // por CÓDIGO oficial (mais robusto) com fallback por nome_normalizado.
       const [setRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado FROM setor");
-      const [locRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado FROM local_trabalho");
+      const [locRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado, regional_id FROM local_trabalho");
       const [sitRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado FROM situacao");
       const [carRows] = await conn.query("SELECT id, codigo_cargo_dp, nome, nome_normalizado FROM cargo");
       const [regRows] = await conn.query("SELECT id, nome_normalizado FROM regional");
@@ -99,6 +99,9 @@ export async function POST(req) {
       setRows.forEach((r) => { if (r.codigo_dp) setCod.set(r.codigo_dp, r.id); setNome.set(r.nome_normalizado, r.id); });
       const locCod = new Map(), locNome = new Map();
       locRows.forEach((r) => { if (r.codigo_dp) locCod.set(r.codigo_dp, r.id); locNome.set(r.nome_normalizado, r.id); });
+      // regional de cada local (mig. 12): a regional do colaborador SEGUE o
+      // local; local sem regional adota a do arquivo na primeira linha que o citar
+      const locReg = new Map(locRows.map((r) => [r.id, r.regional_id || null]));
       const sitCod = new Map(), sitNome = new Map();
       sitRows.forEach((r) => { if (r.codigo_dp) sitCod.set(String(r.codigo_dp).toLowerCase(), r.id); sitNome.set(r.nome_normalizado, r.id); });
       // CARGO: o CÓDIGO do DP é a identidade (mig. 10); nome é fallback
@@ -234,7 +237,16 @@ export async function POST(req) {
         const cargoId =
           (normalizarCodigoCargo(l.codigoCargo) && carCod.get(normalizarCodigoCargo(l.codigoCargo))?.id) ||
           (l.cargo ? carNome.get(cargoNormalizado(l.cargo)) || null : null);
-        const regId   = l.regional ? regNome.get(normalizar(l.regional)) || null : null;
+        let regId    = l.regional ? regNome.get(normalizar(l.regional)) || null : null;
+        // a regional SEGUE o local: se o local tem regional, ela vale; se
+        // ainda não tem (local recém-criado ou legado), adota a do arquivo
+        if (localId) {
+          if (!locReg.get(localId) && regId) {
+            await conn.query("UPDATE local_trabalho SET regional_id = ? WHERE id = ?", [regId, localId]);
+            locReg.set(localId, regId);
+          }
+          regId = locReg.get(localId) || regId;
+        }
         // tipo de contratação: coluna explícita da v2; fallback = prefixo "PJ"
         const tipo = l.tipo
           ? (normalizar(l.tipo).includes("pj") ? "PJ" : "CLT")
