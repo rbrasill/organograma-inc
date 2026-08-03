@@ -20,7 +20,12 @@ const CAMPOS_LABEL = {
   setor: "Área / Setor", local: "Local de trabalho", regional: "Regional",
   situacao: "Situação", lider: "Líder direto", nivel: "Nível do cargo",
   dataNascimento: "Data de nascimento", dataAdmissao: "Data de admissão",
+  sexo: "Sexo", pcd: "PCD", quantidadeFilhos: "Quantidade de filhos",
 };
+
+// rótulos dos dados pessoais (mig. 13) para os diffs de confirmação
+const SEXO_LABEL = { M: "Masculino", F: "Feminino" };
+const simNaoBR = (v) => (v === 1 || v === "1" ? "Sim" : v === 0 || v === "0" ? "Não" : "—");
 
 // "YYYY-MM-DD" → "DD/MM/AAAA" (para os diffs de confirmação)
 const dataBR = (iso) => {
@@ -167,6 +172,9 @@ export default function ColaboradoresView() {
         cpf: c.cpf || "", // exibição apenas — não é enviado no salvar
         dataNascimento: c.data_nascimento || "", // CLT: só visualização (vem do DP)
         dataAdmissao: c.data_admissao || "",
+        sexo: c.sexo || "",
+        pcd: c.pcd === 1 ? "1" : c.pcd === 0 ? "0" : "", // "" = não informado
+        quantidadeFilhos: c.quantidade_filhos ?? "",
         tipo: c.tipo_contratacao || "CLT",
         cargoId: c.cargo_id || "",
         setorId: c.setor_id || "",
@@ -186,6 +194,9 @@ export default function ColaboradoresView() {
         liderMatricula: c.lider_mat || "", liderNome: c.lider_nome || "",
         nivelId: nivelEfetivo,
         dataNascimento: c.data_nascimento || "", dataAdmissao: c.data_admissao || "",
+        sexo: c.sexo || "",
+        pcd: c.pcd === 1 ? "1" : c.pcd === 0 ? "0" : "",
+        quantidadeFilhos: c.quantidade_filhos ?? "",
       });
     } catch (e) { setErro(e.message); }
     setCarregandoDet(false);
@@ -234,6 +245,13 @@ export default function ColaboradoresView() {
       if ((form.dataAdmissao || "") !== (original.dataAdmissao || ""))
         ms.push({ campo: "dataAdmissao", de: dataBR(original.dataAdmissao), para: dataBR(form.dataAdmissao) });
     }
+    // dados pessoais (mig. 13) — editáveis para CLT e PJ
+    if ((form.sexo || "") !== (original.sexo || ""))
+      ms.push({ campo: "sexo", de: SEXO_LABEL[original.sexo] || "—", para: SEXO_LABEL[form.sexo] || "—" });
+    if ((form.pcd || "") !== (original.pcd || ""))
+      ms.push({ campo: "pcd", de: simNaoBR(original.pcd), para: simNaoBR(form.pcd) });
+    if (String(form.quantidadeFilhos ?? "") !== String(original.quantidadeFilhos ?? ""))
+      ms.push({ campo: "quantidadeFilhos", de: String(original.quantidadeFilhos ?? "") || "—", para: String(form.quantidadeFilhos ?? "") || "—" });
     return ms;
   }, [form, original, nomeDe, nivelPorId]);
 
@@ -309,6 +327,9 @@ export default function ColaboradoresView() {
         liderMatricula: c.lider_mat || "", liderNome: c.lider_nome || "",
         nivelId: c.nivel_pessoal_id || c.cargo_nivel_id || "",
         dataNascimento: c.data_nascimento || "", dataAdmissao: c.data_admissao || "",
+        sexo: c.sexo || "",
+        pcd: c.pcd === 1 ? "1" : c.pcd === 0 ? "0" : "",
+        quantidadeFilhos: c.quantidade_filhos ?? "",
       });
       // reflete no formulário as datas efetivamente gravadas
       setForm((f) => f ? { ...f, dataNascimento: c.data_nascimento || "", dataAdmissao: c.data_admissao || "" } : f);
@@ -487,6 +508,45 @@ export default function ColaboradoresView() {
                       disabled={form.tipo === "CLT"}
                       title={form.tipo === "CLT" ? "Vem da importação por Excel (DP) e não é editável para CLT." : ""}
                       onChange={(e) => set("dataAdmissao", e.target.value)}
+                    />
+                  </label>
+                </div>
+                {/* dados pessoais (mig. 13) — editáveis para CLT e PJ */}
+                <div className="col-grid2">
+                  <label className="fld">
+                    {rot("Sexo", "sexo")}
+                    <select value={form.sexo || ""} className={classe("sexo")} onChange={(e) => set("sexo", e.target.value)}>
+                      <option value="">— não informado —</option>
+                      <option value="M">Masculino (M)</option>
+                      <option value="F">Feminino (F)</option>
+                    </select>
+                  </label>
+                  <label className="fld">
+                    {rot("PCD — Pessoa com Deficiência", "pcd")}
+                    <select value={form.pcd || ""} className={classe("pcd")} onChange={(e) => set("pcd", e.target.value)}>
+                      <option value="">— não informado —</option>
+                      <option value="1">Sim</option>
+                      <option value="0">Não</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="col-grid2">
+                  <label className="fld">
+                    {rot("Quantidade de filhos", "quantidadeFilhos")}
+                    <input
+                      type="number" min="0" step="1"
+                      value={form.quantidadeFilhos}
+                      className={classe("quantidadeFilhos")}
+                      placeholder="não informado"
+                      onChange={(e) => set("quantidadeFilhos", e.target.value)}
+                    />
+                  </label>
+                  <label className="fld">
+                    <span>Possui filhos <em className="ct-ex">· derivado da quantidade</em></span>
+                    <input
+                      value={String(form.quantidadeFilhos ?? "").trim() === "" ? "—" : Number(form.quantidadeFilhos) > 0 ? "Sim" : "Não"}
+                      disabled
+                      title="Calculado automaticamente: quantidade > 0 = Sim; 0 = Não; em branco = não informado."
                     />
                   </label>
                 </div>

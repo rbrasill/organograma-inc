@@ -71,6 +71,7 @@ async function carregarColaborador(pool, id) {
   const [rows] = await pool.query(
     `SELECT c.id, c.codigo_dp, c.nome, c.email, c.tipo_contratacao, c.ativo,
             c.cpf, c.telefone,
+            c.sexo, c.pcd, c.quantidade_filhos, c.possui_filhos,
             DATE_FORMAT(c.data_nascimento, '%Y-%m-%d') AS data_nascimento,
             DATE_FORMAT(c.data_admissao, '%Y-%m-%d')   AS data_admissao,
             c.cargo_id, c.setor_id, c.local_id, c.regional_id, c.situacao_id, c.lider_id,
@@ -126,6 +127,30 @@ async function resolverEstruturais(pool, campos, idAtual, nivelAtual) {
 
 // data vinda do formulário (input type=date): ISO válido ou null — nunca lixo
 const dataOuNull = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || "").trim()) ? String(v).trim() : null);
+
+// dados pessoais (mig. 13): normalização defensiva — a validação já recusou
+// os formatos inválidos, aqui só se garante que nunca entra lixo no banco.
+// sexo: 'M'/'F' ou NULL (não informado)
+const sexoOuNull = (v) => {
+  const s = String(v || "").trim().toUpperCase();
+  return s === "M" || s === "F" ? s : null;
+};
+// Sim/Não vindo da tela ('1'/'0', 'Sim'/'Não', booleano): 1, 0 ou NULL
+const simNaoOuNull = (v) => {
+  if (v === null || v === undefined || String(v).trim() === "") return null;
+  const s = normalizar(String(v).trim());
+  if (v === 1 || v === true || s === "1" || s === "sim" || s === "s") return 1;
+  if (v === 0 || v === false || s === "0" || s === "nao" || s === "n") return 0;
+  return null;
+};
+// quantidade de filhos: inteiro >= 0 ou NULL — possui_filhos NÃO se grava
+// (é coluna gerada pelo banco a partir desta: >0 = Sim, 0 = Não, NULL = —)
+const qtdFilhosOuNull = (v) => {
+  const s = String(v ?? "").trim();
+  if (!s) return null;
+  const n = Number(s);
+  return Number.isInteger(n) && n >= 0 ? n : null;
+};
 
 // próxima matrícula PJ disponível (PJ#### incremental)
 async function proximaMatriculaPJ(pool) {
@@ -270,13 +295,14 @@ export async function POST(req) {
       await pool.query(
         `INSERT INTO colaborador
            (id, codigo_dp, nome, email, tipo_contratacao, cpf, telefone,
-            data_nascimento, data_admissao,
+            data_nascimento, data_admissao, sexo, pcd, quantidade_filhos,
             cargo_id, nivel_id, setor_id, local_id, regional_id, situacao_id, lider_id, ativo)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
         [
           novoId, codigo, nome, (campos.email || "").trim() || null, tipo,
           cpf || null, (campos.telefone || "").trim() || null,
           dataOuNull(campos.dataNascimento), dataOuNull(campos.dataAdmissao),
+          sexoOuNull(campos.sexo), simNaoOuNull(campos.pcd), qtdFilhosOuNull(campos.quantidadeFilhos),
           fk(campos.cargoId), vinc.nivelPessoal, fk(campos.setorId), fk(campos.localId),
           regionalId, situacaoId, vinc.liderId,
         ]
@@ -409,6 +435,10 @@ export async function POST(req) {
     if (tem("telefone")) { extraSet.push("telefone = ?"); extraVal.push((campos.telefone || "").trim() || null); }
     if (tem("dataNascimento")) { extraSet.push("data_nascimento = ?"); extraVal.push(dataOuNull(campos.dataNascimento)); }
     if (tem("dataAdmissao")) { extraSet.push("data_admissao = ?"); extraVal.push(dataOuNull(campos.dataAdmissao)); }
+    // dados pessoais (mig. 13) — possui_filhos não entra: o banco deriva
+    if (tem("sexo")) { extraSet.push("sexo = ?"); extraVal.push(sexoOuNull(campos.sexo)); }
+    if (tem("pcd")) { extraSet.push("pcd = ?"); extraVal.push(simNaoOuNull(campos.pcd)); }
+    if (tem("quantidadeFilhos")) { extraSet.push("quantidade_filhos = ?"); extraVal.push(qtdFilhosOuNull(campos.quantidadeFilhos)); }
 
     await pool.query(
       `UPDATE colaborador

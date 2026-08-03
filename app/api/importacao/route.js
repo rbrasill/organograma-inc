@@ -207,7 +207,7 @@ export async function POST(req) {
       const cpfs = linhas.map((l) => l.cpf).filter(Boolean);
       const [ex] = await conn.query(
         `SELECT id, codigo_dp, nome, cpf, cargo_id, setor_id, local_id, regional_id, situacao_id,
-                tipo_contratacao, ativo,
+                tipo_contratacao, ativo, sexo, pcd,
                 DATE_FORMAT(data_nascimento, '%Y-%m-%d') AS data_nascimento,
                 DATE_FORMAT(data_admissao, '%Y-%m-%d') AS data_admissao
            FROM colaborador WHERE cpf IN (?)
@@ -258,6 +258,9 @@ export async function POST(req) {
         const cpfNovo = (l.cpf || "").trim() || null;
         const nasc = l.dataNascimento || null; // já em ISO (cliente valida)
         const adm = l.dataAdmissao || null;
+        // mig. 13: já normalizados no cliente ('M'/'F' e 1/0); defensivo aqui
+        const sexo = l.sexo === "M" || l.sexo === "F" ? l.sexo : null;
+        const pcd = l.pcd === 1 || l.pcd === 0 ? l.pcd : null;
 
         const cur = cpfNovo ? exMap.get(cpfNovo) : null; // identidade é o CPF
         if (cur) {
@@ -277,7 +280,8 @@ export async function POST(req) {
             diff(cargoId, cur.cargo_id) || diff(setorId, cur.setor_id) ||
             diff(localId, cur.local_id) || diff(regId, cur.regional_id) || diff(sitId, cur.situacao_id) ||
             cur.ativo !== 1 ||
-            diff(nasc, cur.data_nascimento) || diff(adm, cur.data_admissao);
+            diff(nasc, cur.data_nascimento) || diff(adm, cur.data_admissao) ||
+            diff(sexo, cur.sexo) || diff(pcd, cur.pcd);
           if (mudou) {
             // tipo_contratacao e CPF NUNCA mudam em registro existente
             await conn.query(
@@ -285,11 +289,12 @@ export async function POST(req) {
                  codigo_dp = COALESCE(?, codigo_dp), nome = COALESCE(?, nome),
                  data_nascimento = COALESCE(?, data_nascimento),
                  data_admissao = COALESCE(?, data_admissao),
+                 sexo = COALESCE(?, sexo), pcd = COALESCE(?, pcd),
                  cargo_id = COALESCE(?, cargo_id), setor_id = COALESCE(?, setor_id),
                  local_id = COALESCE(?, local_id), regional_id = COALESCE(?, regional_id),
                  situacao_id = COALESCE(?, situacao_id), ativo = 1
                WHERE id = ?`,
-              [chapaNova, l.nome || null, nasc, adm, cargoId, setorId, localId, regId, sitId, cur.id]
+              [chapaNova, l.nome || null, nasc, adm, sexo, pcd, cargoId, setorId, localId, regId, sitId, cur.id]
             );
             await conn.query(
               "UPDATE colaborador_historico SET data_fim = NOW() WHERE colaborador_id = ? AND data_fim IS NULL",
@@ -309,7 +314,7 @@ export async function POST(req) {
             l.motivos = [...(l.motivos || []), `Chapa ${l.matricula} já pertence a outro CPF — linha não importada`];
           } else {
             const nid = randomUUID();
-            novos.push([nid, l.matricula, l.nome, cpfNovo, nasc, adm, tipo, cargoId, setorId, localId, regId, sitId, 1]);
+            novos.push([nid, l.matricula, l.nome, cpfNovo, nasc, adm, sexo, pcd, tipo, cargoId, setorId, localId, regId, sitId, 1]);
             hist.push([randomUUID(), nid, cargoId, setorId, localId, sitId, "importacao"]);
             if (l.matricula) chapaDono.set(l.matricula, { id: nid, cpf: cpfNovo });
             if (cpfNovo) exMap.set(cpfNovo, { id: nid, codigo_dp: l.matricula }); // linha repetida no lote não duplica
@@ -323,7 +328,7 @@ export async function POST(req) {
       }
 
       if (novos.length) await bulkInsert(conn,
-        "INSERT INTO colaborador (id, codigo_dp, nome, cpf, data_nascimento, data_admissao, tipo_contratacao, cargo_id, setor_id, local_id, regional_id, situacao_id, ativo) VALUES ?", novos);
+        "INSERT INTO colaborador (id, codigo_dp, nome, cpf, data_nascimento, data_admissao, sexo, pcd, tipo_contratacao, cargo_id, setor_id, local_id, regional_id, situacao_id, ativo) VALUES ?", novos);
       if (hist.length) await bulkInsert(conn,
         "INSERT INTO colaborador_historico (id, colaborador_id, cargo_id, setor_id, local_id, situacao_id, motivo) VALUES ?", hist);
       if (itens.length) await bulkInsert(conn,
