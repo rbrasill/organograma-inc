@@ -89,7 +89,7 @@ export async function POST(req) {
       // catálogos completos em memória (poucas centenas de linhas). Casamento
       // por CÓDIGO oficial (mais robusto) com fallback por nome_normalizado.
       const [setRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado FROM setor");
-      const [locRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado FROM local_trabalho");
+      const [locRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado, regional_id FROM local_trabalho");
       const [sitRows] = await conn.query("SELECT id, codigo_dp, nome_normalizado FROM situacao");
       const [carRows] = await conn.query("SELECT id, codigo_cargo_dp, nome, nome_normalizado FROM cargo");
       const [regRows] = await conn.query("SELECT id, nome_normalizado FROM regional");
@@ -99,6 +99,9 @@ export async function POST(req) {
       setRows.forEach((r) => { if (r.codigo_dp) setCod.set(r.codigo_dp, r.id); setNome.set(r.nome_normalizado, r.id); });
       const locCod = new Map(), locNome = new Map();
       locRows.forEach((r) => { if (r.codigo_dp) locCod.set(r.codigo_dp, r.id); locNome.set(r.nome_normalizado, r.id); });
+      // regional de cada local (mig. 12): a regional do colaborador SEGUE o
+      // local; local sem regional adota a do arquivo na primeira linha que o citar
+      const locReg = new Map(locRows.map((r) => [r.id, r.regional_id || null]));
       const sitCod = new Map(), sitNome = new Map();
       sitRows.forEach((r) => { if (r.codigo_dp) sitCod.set(String(r.codigo_dp).toLowerCase(), r.id); sitNome.set(r.nome_normalizado, r.id); });
       // CARGO: o CÓDIGO do DP é a identidade (mig. 10); nome é fallback
@@ -204,7 +207,7 @@ export async function POST(req) {
       const cpfs = linhas.map((l) => l.cpf).filter(Boolean);
       const [ex] = await conn.query(
         `SELECT id, codigo_dp, nome, cpf, cargo_id, setor_id, local_id, regional_id, situacao_id,
-                tipo_contratacao, ativo,
+                tipo_contratacao, ativo, sexo, pcd,
                 DATE_FORMAT(data_nascimento, '%Y-%m-%d') AS data_nascimento,
                 DATE_FORMAT(data_admissao, '%Y-%m-%d') AS data_admissao
            FROM colaborador WHERE cpf IN (?)
@@ -234,7 +237,16 @@ export async function POST(req) {
         const cargoId =
           (normalizarCodigoCargo(l.codigoCargo) && carCod.get(normalizarCodigoCargo(l.codigoCargo))?.id) ||
           (l.cargo ? carNome.get(cargoNormalizado(l.cargo)) || null : null);
-        const regId   = l.regional ? regNome.get(normalizar(l.regional)) || null : null;
+        let regId    = l.regional ? regNome.get(normalizar(l.regional)) || null : null;
+        // a regional SEGUE o local: se o local tem regional, ela vale; se
+        // ainda não tem (local recém-criado ou legado), adota a do arquivo
+        if (localId) {
+          if (!locReg.get(localId) && regId) {
+            await conn.query("UPDATE local_trabalho SET regional_id = ? WHERE id = ?", [regId, localId]);
+            locReg.set(localId, regId);
+          }
+          regId = locReg.get(localId) || regId;
+        }
         // tipo de contratação: coluna explícita da v2; fallback = prefixo "PJ"
         const tipo = l.tipo
           ? (normalizar(l.tipo).includes("pj") ? "PJ" : "CLT")
@@ -246,6 +258,9 @@ export async function POST(req) {
         const cpfNovo = (l.cpf || "").trim() || null;
         const nasc = l.dataNascimento || null; // já em ISO (cliente valida)
         const adm = l.dataAdmissao || null;
+        // mig. 13: já normalizados no cliente ('M'/'F' e 1/0); defensivo aqui
+        const sexo = l.sexo === "M" || l.sexo === "F" ? l.sexo : null;
+        const pcd = l.pcd === 1 || l.pcd === 0 ? l.pcd : null;
 
         const cur = cpfNovo ? exMap.get(cpfNovo) : null; // identidade é o CPF
         if (cur) {
@@ -265,7 +280,8 @@ export async function POST(req) {
             diff(cargoId, cur.cargo_id) || diff(setorId, cur.setor_id) ||
             diff(localId, cur.local_id) || diff(regId, cur.regional_id) || diff(sitId, cur.situacao_id) ||
             cur.ativo !== 1 ||
-            diff(nasc, cur.data_nascimento) || diff(adm, cur.data_admissao);
+            diff(nasc, cur.data_nascimento) || diff(adm, cur.data_admissao) ||
+            diff(sexo, cur.sexo) || diff(pcd, cur.pcd);
           if (mudou) {
             // tipo_contratacao e CPF NUNCA mudam em registro existente
             await conn.query(
@@ -273,11 +289,12 @@ export async function POST(req) {
                  codigo_dp = COALESCE(?, codigo_dp), nome = COALESCE(?, nome),
                  data_nascimento = COALESCE(?, data_nascimento),
                  data_admissao = COALESCE(?, data_admissao),
+                 sexo = COALESCE(?, sexo), pcd = COALESCE(?, pcd),
                  cargo_id = COALESCE(?, cargo_id), setor_id = COALESCE(?, setor_id),
                  local_id = COALESCE(?, local_id), regional_id = COALESCE(?, regional_id),
                  situacao_id = COALESCE(?, situacao_id), ativo = 1
                WHERE id = ?`,
-              [chapaNova, l.nome || null, nasc, adm, cargoId, setorId, localId, regId, sitId, cur.id]
+              [chapaNova, l.nome || null, nasc, adm, sexo, pcd, cargoId, setorId, localId, regId, sitId, cur.id]
             );
             await conn.query(
               "UPDATE colaborador_historico SET data_fim = NOW() WHERE colaborador_id = ? AND data_fim IS NULL",
@@ -297,7 +314,7 @@ export async function POST(req) {
             l.motivos = [...(l.motivos || []), `Chapa ${l.matricula} já pertence a outro CPF — linha não importada`];
           } else {
             const nid = randomUUID();
-            novos.push([nid, l.matricula, l.nome, cpfNovo, nasc, adm, tipo, cargoId, setorId, localId, regId, sitId, 1]);
+            novos.push([nid, l.matricula, l.nome, cpfNovo, nasc, adm, sexo, pcd, tipo, cargoId, setorId, localId, regId, sitId, 1]);
             hist.push([randomUUID(), nid, cargoId, setorId, localId, sitId, "importacao"]);
             if (l.matricula) chapaDono.set(l.matricula, { id: nid, cpf: cpfNovo });
             if (cpfNovo) exMap.set(cpfNovo, { id: nid, codigo_dp: l.matricula }); // linha repetida no lote não duplica
@@ -311,7 +328,7 @@ export async function POST(req) {
       }
 
       if (novos.length) await bulkInsert(conn,
-        "INSERT INTO colaborador (id, codigo_dp, nome, cpf, data_nascimento, data_admissao, tipo_contratacao, cargo_id, setor_id, local_id, regional_id, situacao_id, ativo) VALUES ?", novos);
+        "INSERT INTO colaborador (id, codigo_dp, nome, cpf, data_nascimento, data_admissao, sexo, pcd, tipo_contratacao, cargo_id, setor_id, local_id, regional_id, situacao_id, ativo) VALUES ?", novos);
       if (hist.length) await bulkInsert(conn,
         "INSERT INTO colaborador_historico (id, colaborador_id, cargo_id, setor_id, local_id, situacao_id, motivo) VALUES ?", hist);
       if (itens.length) await bulkInsert(conn,

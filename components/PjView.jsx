@@ -22,6 +22,7 @@ const rotuloNivel = (n) =>
 const VAZIO = {
   matricula: "", nome: "", cpf: "", telefone: "", email: "",
   dataNascimento: "", dataAdmissao: "",
+  sexo: "", pcd: "", quantidadeFilhos: "", // mig. 13 ("" = não informado)
   situacaoId: "", cargoId: "", nivelId: "", setorId: "", regionalId: "", localId: "",
   liderMatricula: "", liderNome: "", ativo: 1,
 };
@@ -119,6 +120,9 @@ export default function PjView() {
         matricula: c.codigo_dp || "", nome: c.nome || "",
         cpf: formatarCpf(c.cpf || ""), telefone: c.telefone || "", email: c.email || "",
         dataNascimento: c.data_nascimento || "", dataAdmissao: c.data_admissao || "",
+        sexo: c.sexo || "",
+        pcd: c.pcd === 1 ? "1" : c.pcd === 0 ? "0" : "",
+        quantidadeFilhos: c.quantidade_filhos ?? "",
         situacaoId: c.situacao_id || "", cargoId: c.cargo_id || "",
         nivelId: c.nivel_pessoal_id || c.cargo_nivel_id || "",
         setorId: c.setor_id || "", regionalId: c.regional_id || "", localId: c.local_id || "",
@@ -326,6 +330,34 @@ export default function PjView() {
                   <label className="fld">{rot("Data de admissão", "dataAdmissao", <em className="ct-ex"> · quando foi contratado</em>)}
                     <input type="date" value={form.dataAdmissao} className={classe("dataAdmissao")} onChange={(e) => set("dataAdmissao", e.target.value)} /></label>
                 </div>
+                {/* dados pessoais (mig. 13) */}
+                <div className="col-grid2">
+                  <label className="fld">{rot("Sexo", "sexo")}
+                    <select value={form.sexo || ""} className={classe("sexo")} onChange={(e) => set("sexo", e.target.value)}>
+                      <option value="">— não informado —</option>
+                      <option value="M">Masculino (M)</option>
+                      <option value="F">Feminino (F)</option>
+                    </select></label>
+                  <label className="fld">{rot("PCD — Pessoa com Deficiência", "pcd")}
+                    <select value={form.pcd || ""} className={classe("pcd")} onChange={(e) => set("pcd", e.target.value)}>
+                      <option value="">— não informado —</option>
+                      <option value="1">Sim</option>
+                      <option value="0">Não</option>
+                    </select></label>
+                </div>
+                <div className="col-grid2">
+                  <label className="fld">{rot("Quantidade de filhos", "quantidadeFilhos")}
+                    <input type="number" min="0" step="1" value={form.quantidadeFilhos} className={classe("quantidadeFilhos")}
+                      placeholder="não informado" onChange={(e) => set("quantidadeFilhos", e.target.value)} /></label>
+                  <label className="fld">
+                    <span>Possui filhos <em className="ct-ex">· derivado da quantidade</em></span>
+                    <input
+                      value={String(form.quantidadeFilhos ?? "").trim() === "" ? "—" : Number(form.quantidadeFilhos) > 0 ? "Sim" : "Não"}
+                      disabled
+                      title="Calculado automaticamente: quantidade > 0 = Sim; 0 = Não; em branco = não informado."
+                    />
+                  </label>
+                </div>
                 <div className="col-grid2">
                   <label className="fld">
                     {rot("Situação", "situacaoId", cadastroNovo ? <em className="ct-ex"> · entra como Ativo</em> : null)}
@@ -359,13 +391,21 @@ export default function PjView() {
                       {(listas?.setores || []).map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
                     </select></label>
                   <label className="fld">{rot("Regional", "regionalId")}
-                    <select value={form.regionalId} className={classe("regionalId")} onChange={(e) => set("regionalId", e.target.value)}>
-                      <option value="">— selecione —</option>
+                    {/* a regional SEGUE o local (vínculo local→regional):
+                        preenchida ao escolher o local, sem edição manual */}
+                    <select value={form.regionalId} className={classe("regionalId")} disabled
+                      title="A regional vem do local de trabalho — defina-a em Gerenciar → Catálogos → Locais">
+                      <option value="">— definida pelo local —</option>
                       {(listas?.regionais || []).map((r) => <option key={r.id} value={r.id}>{r.nome}</option>)}
                     </select></label>
                 </div>
                 <label className="fld">{rot("Local de trabalho", "localId")}
-                  <select value={form.localId} className={classe("localId")} onChange={(e) => set("localId", e.target.value)}>
+                  <select value={form.localId} className={classe("localId")} onChange={(e) => {
+                    const localId = e.target.value;
+                    const reg = (listas?.locais || []).find((l) => l.id === localId)?.regionalId || "";
+                    setForm((f) => ({ ...f, localId, regionalId: reg || f.regionalId }));
+                    setMsg("");
+                  }}>
                     <option value="">— selecione —</option>
                     {(listas?.locais || []).map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
                   </select></label>

@@ -173,6 +173,7 @@ export default function ImportModal({ onClose }) {
         regional: l.regional,
         situacao: l.situacao, codigoSituacao: l.codigoSituacao,
         dataNascimento: l.nascISO || null, dataAdmissao: l.admISO || null,
+        sexo: l.sexoNorm || null, pcd: l.pcdNorm ?? null, // mig. 13 (já normalizados)
         matriculaLider: l.matriculaLider, liderValido: l.liderValido,
         status: l.status, motivos: [...(l.erros || []), ...(l.alertas || [])],
       });

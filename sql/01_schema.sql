@@ -89,9 +89,11 @@ CREATE TABLE IF NOT EXISTS local_trabalho (
   codigo_dp         VARCHAR(20)  NULL,   -- código oficial do DP (LOCTRA…)
   nome              VARCHAR(160) NOT NULL,
   nome_normalizado  VARCHAR(160) NOT NULL,
+  regional_id       CHAR(36)     NULL,   -- toda local pertence a UMA regional (mig. 12)
   PRIMARY KEY (id),
   UNIQUE KEY uq_local_norm (nome_normalizado),
-  UNIQUE KEY uq_local_dp (codigo_dp)
+  UNIQUE KEY uq_local_dp (codigo_dp),
+  KEY ix_local_regional (regional_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- FK do vínculo setor→local (declarada aqui porque setor é criado antes)
@@ -106,6 +108,10 @@ CREATE TABLE IF NOT EXISTS regional (
   PRIMARY KEY (id),
   UNIQUE KEY uq_regional_norm (nome_normalizado)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- FK do vínculo local→regional (declarada aqui porque local é criado antes)
+ALTER TABLE local_trabalho
+  ADD CONSTRAINT fk_local_regional FOREIGN KEY (regional_id) REFERENCES regional (id);
 
 -- 1.6 situacao — lista fechada; ativo_na_arvore controla se aparece no organograma
 CREATE TABLE IF NOT EXISTS situacao (

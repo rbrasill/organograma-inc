@@ -7,10 +7,10 @@ import {
   UserIcon, PinIcon, CheckIcon, CloseIcon, GridIcon,
   SearchIcon, FullscreenIcon, AlertIcon,
   PlusIcon, MinusIcon, TargetIcon, DownloadIcon, BuildingIcon, UsersIcon, BriefcaseIcon,
+  CrownIcon, AwardIcon, ManagerIcon,
 } from "@/components/icons";
 import PersonModal from "@/components/PersonModal";
 import ImportModal from "@/components/ImportModal";
-import LiderAreaModal from "@/components/LiderAreaModal";
 import useSessao from "@/components/useSessao";
 import { NIVEL } from "@/lib/perfis";
 
@@ -57,9 +57,10 @@ function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
   const cor = node.cor || NIVEIS[nivelVisual(node) - 1].cor;
   const kids = node.children ? node.children.length : 0;
   const alertas = inconsistenciasDe(node, byId);
-  // raiz da área cujo líder real existe fora dela (ex.: responde a um
-  // Diretor de outro setor) — mostra a ligação em vez de deixar "solto"
-  const liderExterno = node.lider && !byId[node.lider] && node.liderNome ? node.liderNome : null;
+  // aviso de vínculo real fora do desenho: a raiz foi pendurada no diretor,
+  // mas o líder direto dela é outra pessoa (de fora da área)
+  const respondeFora = node.respondeForaNome
+    || (node.lider && !byId[node.lider] && node.liderNome ? node.liderNome : null);
   return (
     <div
       id={`card-${node.id}`}
@@ -67,21 +68,28 @@ function Card({ node, byId, collapsed, onToggle, onOpen, highlight }) {
       style={{ "--lvl": cor }}
       onClick={() => onOpen(node)}
     >
-      {node.externo && (
-        <div className="lider-externo chefe" title={`Líder desta área — pertence à área ${node.setorOrigem || "—"}`}>
-          Líder da área <em>· vem de {node.setorOrigem || "outra área"}</em>
+      {node.diretor && (
+        <div className="lider-externo chefe" title="Responsável pela área na hierarquia — a gestão de líder/diretor é feita no menu Diretorias">
+          {node.nivelOrdem === 1 ? "Presidência" : "Diretor"} <em>· responsável pela área</em>
         </div>
       )}
-      {liderExterno && (
-        <div className="lider-externo" title={`Responde a ${liderExterno}, que está em outra área`}>
-          ↑ Responde a <b>{liderExterno}</b> <em>(fora desta área)</em>
+      {!node.diretor && respondeFora && (
+        <div className="lider-externo" title={`Responde a ${respondeFora}, que está em outra área`}>
+          ↑ Responde a <b>{respondeFora}</b> <em>(fora desta área)</em>
         </div>
       )}
       {alertas.length > 0 && (
         <span className="alert" title={alertas.join(" · ")}><AlertIcon size={14} /></span>
       )}
       <div className="card-top">
-        <div className="ava"><UserIcon /></div>
+        {/* ícone por papel, do mais específico para o mais geral: diretor →
+            líder da área → liderança direta (tem gente abaixo) → colaborador */}
+        <div className={`ava${node.diretor || node.liderArea || kids > 0 ? " papel" : ""}`}>
+          {node.diretor ? <ManagerIcon />
+            : node.liderArea ? <AwardIcon />
+            : kids > 0 ? <CrownIcon />
+            : <UserIcon />}
+        </div>
         <div className="who">
           <div className="nm">{node.nome}</div>
           {node.cargo
@@ -213,6 +221,8 @@ export default function OrgChart() {
   const [setores, setSetores] = useState([]);
   const [areaId, setAreaId] = useState(null);
   const [totais, setTotais] = useState(null);         // { geral, sede, campo }
+  const [liderAreaApi, setLiderAreaApi] = useState(""); // líder direto da área (API)
+  const [diretorArea, setDiretorArea] = useState("");   // diretor responsável (API)
   const [listas, setListas] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [erroApi, setErroApi] = useState("");
@@ -226,7 +236,6 @@ export default function OrgChart() {
   const [highlightId, setHighlightId] = useState(null);
   const [showSug, setShowSug] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [liderAreaAlvo, setLiderAreaAlvo] = useState(null); // card do líder externo aberto
   const [baixando, setBaixando] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   // validação do organograma da área: { validadoEm, atual } (hash comparado no servidor)
@@ -259,6 +268,8 @@ export default function OrgChart() {
       setAreaId(j.areaId);
       setPessoas(j.pessoas);
       setListas(j.listas);
+      setLiderAreaApi(j.liderAreaNome || "");
+      setDiretorArea(j.diretorNome || "");
       if (j.totais) setTotais(j.totais);
       setCollapsedSet(new Set());
       setQuery("");
@@ -564,12 +575,11 @@ export default function OrgChart() {
     return () => clearTimeout(t);
   }, [byId, focarEExpandir]);
 
-  // card do líder externo abre o modal da ÁREA (troca em massa);
-  // os demais abrem o modal normal do colaborador
+  // diretor e líderes de fora não abrem modal aqui: os dados deles são da
+  // área de origem, e a gestão de líder/diretoria é pelo menu Diretorias
   const rest = {
     byId, collapsedSet, onToggle, highlightId, visao,
-    // nó externo (líder de outra área) abre a TROCA de líder — só ADMIN
-    onOpen: (n) => (n.externo ? (sessao.nivel >= NIVEL.ADMIN && setLiderAreaAlvo(n)) : setOpenId(n.id)),
+    onOpen: (n) => { if (!n.externo && !n.diretor) setOpenId(n.id); },
   };
   const aberta = openId ? byId[openId] : null;
 
@@ -582,8 +592,9 @@ export default function OrgChart() {
 
   // líder da área = o líder externo (âncora) quando existe; senão a raiz de
   // nível mais alto da própria área
-  const liderArea = rootsOrdenadas.find((r) => r.externo)?.nome || rootsOrdenadas[0]?.nome || "—";
-  const totalArea = pessoas.filter((p) => !p.externo).length;
+  const liderArea = liderAreaApi
+    || rootsOrdenadas.find((r) => r.externo)?.nome || rootsOrdenadas[0]?.nome || "—";
+  const totalArea = pessoas.filter((p) => !p.externo && !p.pseudo).length;
 
   // legenda dinâmica: só as FAMÍLIAS de cargo (nome abreviado — Diretor,
   // Analista, Auxiliar...) presentes nesta área, cada uma com a cor do seu
@@ -682,7 +693,7 @@ export default function OrgChart() {
               <h2>{escopoNome || "Selecione uma área"}</h2>
               {areaId ? (
                 <p className="subline">
-                  {totalArea} pessoas &nbsp;·&nbsp; Líder da área: <b>{liderArea}</b> &nbsp;·&nbsp; Última validação:{" "}
+                  {totalArea} pessoas &nbsp;·&nbsp; Diretor: <b>{diretorArea || "—"}</b> &nbsp;·&nbsp; Líder da área: <b>{liderArea}</b> &nbsp;·&nbsp; Última validação:{" "}
                   <b>{validacao?.atual && validacao?.validadoEm ? validacao.validadoEm : "pendente"}</b>
                 </p>
               ) : (
@@ -804,6 +815,11 @@ export default function OrgChart() {
                 </span>
               ))
             )}
+            {/* papéis no avatar: só ícone + rótulo, sem texto explicativo */}
+            <span className="chip lg-papel"><span className="lg-ava papel"><ManagerIcon size={15} /></span> Diretor</span>
+            <span className="chip lg-papel"><span className="lg-ava papel"><AwardIcon size={15} /></span> Líder da área</span>
+            <span className="chip lg-papel"><span className="lg-ava papel"><CrownIcon size={14} /></span> Liderança direta</span>
+            <span className="chip lg-papel"><span className="lg-ava"><UserIcon size={14} /></span> Colaborador</span>
             <span className="chip" style={{ marginLeft: "auto" }}>
               <span className="alert stat"><AlertIcon size={13} /></span> Inconsistência
             </span>
@@ -815,17 +831,6 @@ export default function OrgChart() {
         <ImportModal onClose={() => { setShowImport(false); carregar(areaId); }} />
       )}
 
-
-      {liderAreaAlvo && (
-        <LiderAreaModal
-          lider={liderAreaAlvo}
-          areaId={areaId}
-          areaNome={nomeArea}
-          qtdDiretos={pessoas.filter((p) => !p.externo && p.lider === liderAreaAlvo.id).length}
-          onClose={() => setLiderAreaAlvo(null)}
-          onTrocado={() => { setLiderAreaAlvo(null); carregar(areaId); }}
-        />
-      )}
 
       {aberta && (
         <PersonModal
